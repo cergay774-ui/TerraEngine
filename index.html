@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="TerraEngine — a modern, innovative engine for Friday Night Funkin' modding.">
+  <title>TerraEngine — FNF Engine</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="noise"></div>
+  <header class="nav">
+    <a class="brand" href="#home">
+      <span class="brand-mark">T</span>
+      <span>Terra<span>Engine</span></span>
+    </a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#showcase">Showcase</a>
+      <a href="#docs">Docs</a>
+      <a href="#download">Download</a>
+    </nav>
+    <a class="nav-github" href="https://github.com/" target="_blank" rel="noreferrer">GitHub ↗</a>
+    <button class="menu" aria-label="Open menu">☰</button>
+  </header>
+
+  <main>
+    <section id="home" class="hero">
+      <div class="hero-copy reveal">
+        <div class="eyebrow"><i></i> FNF MODDING, REIMAGINED</div>
+        <h1>Build.<br><em>Play.</em><br>Break limits.</h1>
+        <p class="lead">
+          TerraEngine is a modern, creator-focused Friday Night Funkin' engine
+          designed for expressive mods, custom mechanics and total control.
+        </p>
+        <div class="hero-actions">
+          <a class="btn primary" href="#download">Download TerraEngine <span>↓</span></a>
+          <a class="btn ghost" href="#features">Explore features <span>→</span></a>
+        </div>
+        <div class="stats">
+          <div><strong>∞</strong><span>Creative freedom</span></div>
+          <div><strong>MOD</strong><span>First workflow</span></div>
+          <div><strong>OPEN</strong><span>Built for creators</span></div>
+        </div>
+      </div>
+
+      <div class="hero-art reveal">
+        <div class="orb orb-a"></div>
+        <div class="orb orb-b"></div>
+        <div class="grid-card">
+          <div class="card-top"><span>TerraEngine</span><span>v0.1 • DEV</span></div>
+          <div class="wave">
+            <span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div class="play-ring">▶</div>
+          <div class="card-bottom">
+            <span>BEAT SYNC</span><span>READY</span>
+          </div>
+        </div>
+        <div class="float-tag tag-one">CUSTOM EVENTS</div>
+        <div class="float-tag tag-two">60 FPS+</div>
+      </div>
+    </section>
+
+    <section id="features" class="section">
+      <div class="section-heading reveal">
+        <span class="section-number">01</span>
+        <div><p class="eyebrow">WHY TERRAEENGINE</p><h2>Made to let<br><em>ideas move.</em></h2></div>
+      </div>
+      <div class="feature-grid">
+        <article class="feature reveal">
+          <span class="feature-icon">✦</span><span class="feature-no">01</span>
+          <h3>Custom Mechanics</h3>
+          <p>Create gameplay that goes beyond the standard FNF formula with flexible events and systems.</p>
+        </article>
+        <article class="feature reveal">
+          <span class="feature-icon">⌁</span><span class="feature-no">02</span>
+          <h3>Beat Reactive</h3>
+          <p>Build scenes around music with beat-driven cameras, effects, UI reactions and animations.</p>
+        </article>
+        <article class="feature reveal">
+          <span class="feature-icon">▣</span><span class="feature-no">03</span>
+          <h3>Creator First</h3>
+          <p>Clear project structure and tools designed around the people actually making mods.</p>
+        </article>
+        <article class="feature reveal">
+          <span class="feature-icon">↗</span><span class="feature-no">04</span>
+          <h3>Performance</h3>
+          <p>Keep your visual ideas ambitious while giving creators room to optimize their projects.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="showcase" class="showcase section">
+      <div class="showcase-copy reveal">
+        <p class="eyebrow">BUILT FOR YOUR VISION</p>
+        <h2>Your mod.<br><em>Your rules.</em></h2>
+        <p>TerraEngine is a foundation, not a cage. Add custom UI, shaders, events, menus, cameras, gameplay systems and whatever your project needs.</p>
+        <div class="chips"><span>Lua / HScript*</span><span>Shaders*</span><span>Custom UI</span><span>Events</span></div>
+        <small>* Availability depends on the current engine build.</small>
+      </div>
+      <div class="terminal reveal">
+        <div class="terminal-head"><span>●</span><span>●</span><span>●</span><b>terra@engine ~</b></div>
+        <div class="terminal-body">
+          <p><i>$</i> terra create MyMod</p>
+          <p class="muted">Creating project structure...</p>
+          <p class="ok">✓ Project created successfully</p>
+          <p><i>$</i> terra dev</p>
+          <div class="terminal-line"><span class="loader"></span> Starting TerraEngine</div>
+          <p class="accent">READY — 60 FPS</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="docs" class="section docs">
+      <div class="section-heading reveal">
+        <span class="section-number">02</span>
+        <div><p class="eyebrow">START BUILDING</p><h2>Everything you<br><em>need to ship.</em></h2></div>
+      </div>
+      <div class="doc-grid">
+        <a class="doc-card reveal" href="#download"><span>→</span><b>Documentation</b><p>Learn the engine from the basics to advanced systems.</p></a>
+        <a class="doc-card reveal" href="https://github.com/" target="_blank" rel="noreferrer"><span>↗</span><b>GitHub</b><p>Source, issues, releases and development.</p></a>
+        <a class="doc-card reveal" href="#download"><span>↓</span><b>Getting Started</b><p>Install the engine and create your first project.</p></a>
+      </div>
+    </section>
+
+    <section id="download" class="download section">
+      <div class="download-panel reveal">
+        <div>
+          <p class="eyebrow">GET TERRAEENGINE</p>
+          <h2>Ready to create<br><em>something loud?</em></h2>
+          <p>Grab the latest build and start experimenting.</p>
+        </div>
+        <div class="download-actions">
+          <a class="btn primary" href="https://github.com/" target="_blank" rel="noreferrer">GitHub Releases ↗</a>
+          <a class="btn ghost" href="https://github.com/" target="_blank" rel="noreferrer">View Source</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="brand"><span class="brand-mark">T</span><span>Terra<span>Engine</span></span></div>
+    <p>Made for FNF creators. Built to go further.</p>
+    <small>TerraEngine is an independent project and is not affiliated with the creators of Friday Night Funkin'.</small>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
