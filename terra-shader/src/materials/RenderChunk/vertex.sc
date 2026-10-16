@@ -2,7 +2,12 @@ $input a_color0, a_position, a_texcoord0, a_texcoord1
 #ifdef INSTANCING
   $input i_data0, i_data1, i_data2, i_data3
 #endif
-$output v_color0, v_color1, v_fog, v_refl, v_texcoord0, v_lightmapUV, v_extra
+#include <newb/config.h>
+#ifdef NL_FRAG_FX
+  $output v_color0, v_color1, v_fog, v_refl, v_texcoord0, v_lightmapUV, v_extra, v_wpos, v_gpos, v_sun
+#else
+  $output v_color0, v_color1, v_fog, v_refl, v_texcoord0, v_lightmapUV, v_extra
+#endif
 
 #include <bgfx_shader.sh>
 #include <newb/main.sh>
@@ -54,10 +59,12 @@ void main() {
 
   float relativeDist = camDis / FogAndDistanceControl.z;
 
-  vec3 gPos = worldPos.xyz + CameraPosition.xyz;
   vec3 cPos = a_position.xyz;
   vec3 bPos = fract(cPos);
   vec3 tiledCpos = fract(cPos*0.0625);
+
+  // precise world locked position, x/z wrapped (see functions/time.h)
+  highp vec3 gPos = nlWrappedWorldPos(worldPos, CameraPosition.xyz, cPos);
 
   // bit 16 for dithering??
   // bit 15-1 for texture mapping
@@ -88,8 +95,10 @@ void main() {
   nl_environment env = nlDetectEnvironment(TimeOfDay.x, FogColor.rgb, FogAndDistanceControl.xyz);
   nl_skycolor skycol = nlSkyColors(env);
 
-  // time
-  highp float t = ViewPositionAndTime.w;
+  // time: raw game render timer (seconds, FPS independent) for sky/clouds,
+  // wrapped time for everything animated on terrain (see functions/time.h)
+  highp float tRaw = ViewPositionAndTime.w;
+  highp float t = nlWrapTime(tRaw);
 
   // convert color space to linear-space
   #ifdef SEASONS
@@ -105,17 +114,20 @@ void main() {
   #endif
 
   vec3 torchColor; // modified by nl_lighting
-  vec3 light = nlLighting(s_LightMapTexture, skycol, env, worldPos, torchColor, a_color0.rgb, uv1, lit, isTree, shade, t, FogAndDistanceControl.z, TimeOfDay.x, CameraPosition.xyz);
+  vec3 directLight; // sun/moon part of light, modified by nl_lighting
+  vec3 light = nlLighting(s_LightMapTexture, skycol, env, worldPos, torchColor, directLight, a_color0.rgb, uv1, lit, isTree, shade, tRaw, FogAndDistanceControl.z, TimeOfDay.x, CameraPosition.xyz);
 
   #if defined(ALPHA_TEST) && (defined(NL_PLANTS_WAVE) || defined(NL_LANTERN_WAVE)) && !defined(RENDER_AS_BILLBOARDS)
+    float lumBefore = luminance(light);
     nlWave(worldPos, light, env.rainFactor, uv1, lit, uv0, bPos, a_color0, cPos, tiledCpos, t, s_MatTexture, isColored, camDis, isTree);
+    directLight *= luminance(light)/max(lumBefore, 0.0001);
   #endif
 
   // loading chunks
   relativeDist += RenderChunkFogAlpha.x;
 
   vec4 fogColor;
-  fogColor.rgb = nlRenderSky(skycol, env, viewDir, t, true);
+  fogColor.rgb = nlRenderSky(skycol, env, viewDir, tRaw, true);
   fogColor.a = nlRenderFogFade(relativeDist, FogColor.rgb, FogAndDistanceControl.xy);
   #if defined(NL_GODRAY) && defined(NL_FOG)
     fogColor.a = mix(fogColor.a, 1.0, min(NL_GODRAY*nlRenderGodRayIntensity(cPos, worldPos, t, uv1, relativeDist, FogColor.rgb), 1.0));
@@ -128,10 +140,14 @@ void main() {
 
   #if defined(NL_CLOUDY_FOG) && defined(NL_FOG)
     float fg = smoothstep(0.0, 1.0-NL_CLOUDY_FOG, relativeDist);
-    fg *= sin(5.0*viewDir.y + 2.0*viewDir.x - 0.1*t);
-    fg *= sin(5.0*viewDir.y - 2.0*viewDir.x + viewDir.z + 0.1*t);
+    fg *= sin(5.0*viewDir.y + 2.0*viewDir.x - NL_SNAP_W(0.1)*t);
+    fg *= sin(5.0*viewDir.y - 2.0*viewDir.x + viewDir.z + NL_SNAP_W(0.1)*t);
     fogColor.a += (1.0-fogColor.a)*fg*fg;
   #endif
+
+  // rain seen by per pixel puddles / wet ground: overworld, not underwater
+  // (without NL_FRAG_FX the upstream per vertex wet ground nlRefl is used)
+  float rainOpen = (env.nether || env.end || env.underwater) ? 0.0 : env.rainFactor;
 
   float water = 0.0;
   vec4 refl = vec4(0.0,0.0,0.0,0.0);
@@ -139,12 +155,44 @@ void main() {
     color.a = mix(color.a, 1.0, 0.5*clamp(relativeDist, 0.0, 1.0));
     if (a_color0.b > 0.3 && a_color0.a < 0.95) {
       water = 1.0;
-      refl = nlWater(color, worldPos, skycol, env, a_color0, viewDir, cPos, tiledCpos, gPos, CameraPosition.xyz, light, torchColor, lit, bPos.y, camDis, t);
-    } else {
-      refl = nlRefl(color, skycol, env, viewDir, worldPos, tiledCpos, CameraPosition.xyz, torchColor, lit, camDis, FogAndDistanceControl.z, t);
+      // top surface (and top edge of side faces) follow the waves; offset <= 0
+      if (bPos.y > 0.0) {
+        worldPos.y += nlWaterVertexOffset(gPos.xz, t, camDis);
+      }
+      #if !TS_WATER_PER_PIXEL
+        refl = nlWater(color, worldPos, skycol, env, a_color0, viewDir, cPos, gPos, CameraPosition.xyz, light, torchColor, lit, bPos.y, camDis, t, tRaw);
+      #endif
     }
+    #if TS_WET_GROUND && !TS_PUDDLES && !defined(NL_FRAG_FX)
+    else {
+      refl = nlRefl(color, skycol, env, viewDir, worldPos, tiledCpos, CameraPosition.xyz, torchColor, lit, camDis, FogAndDistanceControl.z, tRaw);
+    }
+    #endif
+  #elif TS_WET_GROUND && !TS_PUDDLES && !defined(NL_FRAG_FX)
+    refl = nlRefl(color, skycol, env, viewDir, worldPos, tiledCpos, CameraPosition.xyz, torchColor, lit, camDis, FogAndDistanceControl.z, tRaw);
+  #endif
+
+  #if defined(NL_GLOW_SHIMMER) && !(defined(RENDER_AS_BILLBOARDS) || defined(SEASONS))
+    float shimmer = nlGlowShimmer(cPos, t);
   #else
-    refl = nlRefl(color, skycol, env, viewDir, worldPos, tiledCpos, CameraPosition.xyz, torchColor, lit, camDis, FogAndDistanceControl.z, t);
+    float shimmer = 1.0;
+  #endif
+
+  // lava (top surface of still lava): flowing dark crust + pulsing glow
+  bool isLava = false;
+  #if defined(NL_LAVA_NOISE) || TS_LAVA_FLOW
+    bool isc = (a_color0.r+a_color0.g+a_color0.b) > 2.999;
+    bool isb = bPos.y < 0.891 && bPos.y > 0.889;
+    isLava = isc && isb && (uv1.x > 0.81 && uv1.x < 0.876) && uv0.y > 0.5;
+  #endif
+  #ifdef NL_LAVA_NOISE
+    if (isLava) {
+      vec4 lava = nlLavaNoise(gPos, t);
+      #ifdef NL_LAVA_NOISE_BUMP
+        worldPos.y += NL_LAVA_NOISE_BUMP*lava.a;
+      #endif
+      color.rgb *= lava.rgb;
+    }
   #endif
 
   vec4 pos = mul(u_viewProj, vec4(worldPos, 1.0));
@@ -156,27 +204,24 @@ void main() {
   #endif
 
   if (env.underwater) {
-    nlUnderwaterLighting(light, pos.xyz, lit, uv1, tiledCpos, cPos, t, skycol.horizon);
+    nlUnderwaterLighting(light, pos, lit, uv1, gPos, cPos, t, skycol.horizon);
+    directLight = vec3(0.0, 0.0, 0.0); // no sun direction shading underwater
   }
 
-  color.rgb *= light;
-
-  #if defined(NL_GLOW_SHIMMER) && !(defined(RENDER_AS_BILLBOARDS) || defined(SEASONS))
-    float shimmer = nlGlowShimmer(cPos, t);
+  #if defined(NL_FRAG_FX) && TS_FACE_SHADING_ON
+    // direct light goes separately, fragment shades it by face direction
+    v_sun = vec4(color.rgb*directLight, 0.0);
+    color.rgb *= light - directLight;
   #else
-    float shimmer = 1.0;
+    color.rgb *= light;
   #endif
 
-  #ifdef NL_LAVA_NOISE
-    bool isc = (a_color0.r+a_color0.g+a_color0.b) > 2.999;
-    bool isb = bPos.y < 0.891 && bPos.y > 0.889;
-    if (isc && isb && (uv1.x > 0.81 && uv1.x < 0.876) && uv0.y > 0.5) {
-      vec4 lava = nlLavaNoise(gPos, t);
-      #ifdef NL_LAVA_NOISE_BUMP
-        worldPos.y += NL_LAVA_NOISE_BUMP*lava.a;
-      #endif
-      color.rgb *= lava.rgb;
-    }
+  #ifdef NL_FRAG_FX
+    #if !TS_FACE_SHADING_ON
+      v_sun = vec4(0.0, 0.0, 0.0, 0.0);
+    #endif
+    v_wpos = vec4(worldPos, rainOpen);
+    v_gpos = vec4(gPos, (isLava ? 1.0 : 0.0) + (env.underwater ? 2.0 : 0.0));
   #endif
 
   v_extra = vec4(shade, worldPos.y, water, shimmer);

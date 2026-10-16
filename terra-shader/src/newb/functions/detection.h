@@ -9,6 +9,7 @@ struct nl_environment {
   bool underwater;
   float rainFactor; // [0.0, 1.0]
   float dayFactor;  // [-1.0, 1.0]
+  float duskFactor; // 0.0 = morning half of the day (dawn palette), 1.0 = evening half (dusk palette)
   vec3 sunDir;      // normalized
   vec3 moonDir;     // normalized
   vec3 fogCol;      // [0.0, 1.0]
@@ -60,6 +61,10 @@ nl_environment calculateSunParams(nl_environment env, float TIME_OF_DAY) {
   vec3 moonDir = vec3(-sunDir.x, -sunDir.y, 0.0);
   env.dayFactor = sunDir.y;
 
+  // sun sets at TIME_OF_DAY 0.25 and rises at 0.75 (0.0 = noon). The switch
+  // happens around noon/midnight where the dawn/dusk weight is already zero.
+  env.duskFactor = smoothstep(-0.2, 0.2, sunDir.x);
+
   sunDir.yz = mul(rmat2(-degToRad(NL_SUN_PATH_TILT)), sunDir.yz);
   sunDir.xz = mul(rmat2(degToRad(NL_SUN_PATH_YAW)), sunDir.xz);
 
@@ -70,6 +75,17 @@ nl_environment calculateSunParams(nl_environment env, float TIME_OF_DAY) {
   env.moonDir = moonDir;
 
   return env;
+}
+
+// sky functions work in a frame with x and z mirrored (see nlRenderSky/SunMoon).
+// converts env.sunDir/env.moonDir to a world space direction (for normals).
+vec3 nlWorldDir(vec3 skyDir) {
+  return vec3(-skyDir.x, skyDir.y, -skyDir.z);
+}
+
+// main light (sun at day, moon at night) in world space
+vec3 nlMainLightDir(nl_environment env) {
+  return nlWorldDir(env.dayFactor > 0.0 ? env.sunDir : env.moonDir);
 }
 
 nl_environment nlDetectEnvironment(float TIME_OF_DAY, vec3 FOG_COLOR, vec3 FOG_CONTROL) {

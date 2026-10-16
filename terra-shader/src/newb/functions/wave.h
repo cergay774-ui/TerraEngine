@@ -1,8 +1,12 @@
 #ifndef WAVE_H
 #define WAVE_H
 
+// plants / lantern waving. t must be the wrapped time (nlWrapTime), all
+// frequencies are snapped with NL_SNAP_W so the time wrap is invisible.
+
 #include "utils.h"
 #include "noise.h"
+#include "time.h"
 
 #ifdef NL_LANTERN_WAVE
 void lanternWave(
@@ -22,7 +26,7 @@ void lanternWave(
   if (uv1.x > 0.6 && (isChain || isLantern)) {
     // simple wave for angle
     float phase = dot(floor(cPos), vec3_splat(0.3927));
-    vec2 theta = vec2(t + phase, t*1.4 + phase);
+    vec2 theta = vec2(NL_SNAP_W(1.0)*t + phase, NL_SNAP_W(1.4)*t + phase);
     theta = sin(vec2(theta.x,theta.x+0.7)) + rainFactor*sin(vec2(theta.y,theta.y+0.7));
     theta *= NL_LANTERN_WAVE*windStrength;
 
@@ -134,7 +138,9 @@ void nlWave(
   bool isLeafLitter = bPos.y==0.015625 && (bPosH.x+bPosH.y)==0.0;
   bool shouldWave = ((isTreeLeaves || isPlants || isVines) && isColored && !isLeafLitter) || (isFarmPlant && isTop);
 
-  float windStrength = lit.y*(noise1D(t*0.36) + rainFactor*0.4)*(1.0-waveFade);
+  // wind gusts: product of two slow sines (periodic, seamless at time wrap)
+  float gust = 0.5 + 0.5*sin(NL_SNAP_W(0.36)*t)*sin(NL_SNAP_W(0.23)*t + 1.3);
+  float windStrength = lit.y*(gust + rainFactor*0.4)*(1.0-waveFade);
 
   // darken farm plants bottom
   light *= isFarmPlant && !isTop ? 0.7 : 1.1;
@@ -164,8 +170,8 @@ void nlWave(
 
       float phaseDiff = dot(cPos,vec3_splat(PI_QUART)) + fastRand(tiledCpos.xz + tiledCpos.y);
       wave *= 1.0 + mix(
-        sin(t*NL_WAVE_SPEED + phaseDiff),
-        sin(t*NL_WAVE_SPEED*1.5 + phaseDiff),
+        sin(NL_SNAP_W(NL_WAVE_SPEED)*t + phaseDiff),
+        sin(NL_SNAP_W(NL_WAVE_SPEED*1.5)*t + phaseDiff),
         rainFactor);
 
       //worldPos.y -= 1.0-sqrt(1.0-wave*wave);

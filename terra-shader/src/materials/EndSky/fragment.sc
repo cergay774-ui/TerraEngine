@@ -18,6 +18,7 @@ void main() {
     color += 2.8*diffuse.rgb; // stars
 
     color = colorCorrection(color);
+    color = nlEndGrade(color);
 
     gl_FragColor = vec4(color, 1.0);
   #else

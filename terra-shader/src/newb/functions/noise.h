@@ -2,6 +2,7 @@
 #define NOISE_H
 
 #include "utils.h"
+#include "time.h"
 
 // functions under [1] are from https://gist.github.com/patriciogonzalezvivo/670c22f3966e662d2f83
 
@@ -88,5 +89,53 @@ float movingNoise2D(vec2 pos, float t, float f) {
   float n1 = sin(0.05*(pos.x+pos.y) + 8.0*nf2 + 0.4*t);
   return mix(n0*n0, n1*n1, f);
 }
+
+// ---- Terra: sine-free hashes and periodic value noise ----
+// hashes by Dave Hoskins (MIT, https://www.shadertoy.com/view/4djSRW)
+// stable in highp for coordinates up to a few thousand (world pos is wrapped)
+float nlHash12(highp vec2 p) {
+  highp vec3 p3 = fract(vec3(p.x, p.y, p.x)*0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y)*p3.z);
+}
+
+vec3 nlHash32(highp vec2 p) {
+  highp vec3 p3 = fract(vec3(p.x, p.y, p.x)*vec3(0.1031, 0.1030, 0.0973));
+  p3 += dot(p3, p3.yxz + 33.33);
+  return fract((p3.xxy + p3.yzz)*p3.zyx);
+}
+
+// value noise [0,1], tiles every `period` lattice cells (period must be a whole number)
+float nlNoiseP(highp vec2 p, float period) {
+  highp vec2 i = floor(p);
+  vec2 f = p - i;
+  vec2 u = f*f*(3.0 - 2.0*f);
+  highp vec2 i1 = mod(i + 1.0, vec2_splat(period));
+  i = mod(i, vec2_splat(period));
+  float a = nlHash12(i);
+  float b = nlHash12(vec2(i1.x, i.y));
+  float c = nlHash12(vec2(i.x, i1.y));
+  float d = nlHash12(i1);
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+// 3 independent value noise channels from one lattice (cheaper than 3 calls)
+vec3 nlNoise3P(highp vec2 p, float period) {
+  highp vec2 i = floor(p);
+  vec2 f = p - i;
+  vec2 u = f*f*(3.0 - 2.0*f);
+  highp vec2 i1 = mod(i + 1.0, vec2_splat(period));
+  i = mod(i, vec2_splat(period));
+  vec3 a = nlHash32(i);
+  vec3 b = nlHash32(vec2(i1.x, i.y));
+  vec3 c = nlHash32(vec2(i.x, i1.y));
+  vec3 d = nlHash32(i1);
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+// world-space noise with feature size `cell` blocks, seamless across NL_WORLD_WRAP
+// (cell must divide NL_WORLD_WRAP: 1, 2, 4, 8, 16, 32, 64...)
+#define nlWorldNoise(p, cell) nlNoiseP((p)/(cell), NL_WORLD_WRAP/(cell))
+#define nlWorldNoise3(p, cell) nlNoise3P((p)/(cell), NL_WORLD_WRAP/(cell))
 
 #endif

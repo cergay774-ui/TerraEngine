@@ -5,6 +5,7 @@
 // shaderc will optimize away unused functions per material.
 
 #include "config.h"
+#include "functions/time.h"
 #include "functions/tonemap.h"
 #include "functions/detection.h"
 #include "functions/fog.h"
@@ -15,5 +16,6 @@
 #include "functions/rain.h"
 #include "functions/wave.h"
 #include "functions/glow.h"
+#include "functions/grade.h"
 
 #endif

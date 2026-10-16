@@ -7,32 +7,38 @@
 #include "noise.h"
 #include "clouds.h"
 
-vec3 sunLightTint(float dayFactor, float rain) {
+vec3 sunLightTint(float dayFactor, float duskFactor, float rain) {
   float nightFactor = step(dayFactor, 0.0);
   float dawnFactor = 1.0-dayFactor*dayFactor;
   dawnFactor *= dawnFactor*dawnFactor;
   dawnFactor *= mix(1.0, dawnFactor*dawnFactor, nightFactor);
   vec3 tint = mix(NL_NOON_SUNLIGHT_COL, NL_NIGHT_MOONLIGHT_COL, nightFactor);
-  tint = mix(tint, NL_DAWN_SUNLIGHT_COL, dawnFactor);
+  tint = mix(tint, mix(NL_DAWN_SUNLIGHT_COL, NL_DUSK_SUNLIGHT_COL, duskFactor), dawnFactor);
   tint = mix(tint, vec3_splat(dot(tint, vec3_splat(0.33))), rain);
   return tint;
 }
 
+vec3 nlTorchColor(nl_environment env) {
+  if (env.underwater) {
+    return NL_UNDERWATER_TORCH_COL;
+  } else if (env.end) {
+    return NL_END_TORCH_COL;
+  } else if (env.nether) {
+    return NL_NETHER_TORCH_COL;
+  }
+  return NL_OVERWORLD_TORCH_COL;
+}
+
+// directLight: part of the result that comes from the sun/moon (used for
+// per pixel face shading). t: raw (unwrapped) time, cloud shadow must match sky clouds.
 vec3 nlLighting(
-  sampler2D tex, nl_skycolor skycol, nl_environment env, vec3 wPos, out vec3 torchColor, vec3 COLOR,
+  sampler2D tex, nl_skycolor skycol, nl_environment env, vec3 wPos, out vec3 torchColor, out vec3 directLight, vec3 COLOR,
   vec2 uv1, vec2 lit, bool isTree, float shade, highp float t, float renderdistance, float TIME_OF_DAY, vec3 CAMERA_POS
 ) {
   vec3 light;
+  directLight = vec3(0.0, 0.0, 0.0);
 
-  if (env.underwater) {
-    torchColor = NL_UNDERWATER_TORCH_COL;
-  } else if (env.end) {
-    torchColor = NL_END_TORCH_COL;
-  } else if (env.nether) {
-    torchColor = NL_NETHER_TORCH_COL;
-  } else {
-    torchColor = NL_OVERWORLD_TORCH_COL;
-  }
+  torchColor = nlTorchColor(env);
 
   float torchAttenuation = (NL_TORCHLIGHT_INTENSITY*uv1.x)/(0.5-0.45*lit.x);
 
@@ -66,8 +72,8 @@ vec3 nlLighting(
     sunLightAttenuation = mix(1.0, sunLightAttenuation*sunLightAttenuation, dawnFactor);
     sunLightAttenuation *= 1.0-0.4*env.rainFactor;
 
-    // shadow cast by sun light
-    float shadow = step(0.93, uv1.y);
+    // shadow cast by sun light: soft edge from the skylight lightmap
+    float shadow = smoothstep(0.93 - NL_SHADOW_SOFTNESS, 0.93, uv1.y);
     shadow = max(shadow, (1.0 - NL_SHADOW_INTENSITY + (0.6*NL_SHADOW_INTENSITY*nightIntensity))*lit.y);
     shadow *= shade > 0.8 ? 1.0 : 0.8;
     #if defined(NL_CLOUD_SHADOW) && (NL_CLOUD_TYPE == 1 || NL_CLOUD_TYPE == 2)
@@ -91,7 +97,8 @@ vec3 nlLighting(
     #endif
 
     // direct light from top
-    light = (NL_SUNLIGHT_INTENSITY*shadow*sunLightAttenuation)*sunLightTint(env.dayFactor, env.rainFactor);
+    light = (NL_SUNLIGHT_INTENSITY*shadow*sunLightAttenuation)*sunLightTint(env.dayFactor, env.duskFactor, env.rainFactor);
+    directLight = light;
 
     // sky ambient
     lum = luminance(light);
@@ -110,25 +117,46 @@ vec3 nlLighting(
   }
 
   // darken at crevices
-  light *= COLOR.g > 0.35 ? 1.0 : 0.8;
+  float k = COLOR.g > 0.35 ? 1.0 : 0.8;
 
   // brighten tree leaves
   if (isTree) {
-    light *= 1.25;
+    k *= 1.25;
   }
 
-  return light;
+  directLight *= k;
+  return light*k;
 }
 
-void nlUnderwaterLighting(inout vec3 light, inout vec3 pos, vec2 lit, vec2 uv1, vec3 tiledCpos, vec3 cPos, highp float t, vec3 horizonCol) {
+// caustics pattern [0,1]: thin bright moving lines, world locked and exactly
+// periodic (space: NL_WORLD_WRAP, time: NL_TIME_LOOP). gPos: wrapped world pos, t: wrapped time
+float nlCaustics(highp vec3 gPos, highp float t) {
+  highp vec2 p = gPos.xz + 0.35*gPos.yy;
+  float w1 = NL_SNAP_W(0.9*NL_WATER_WAVE_SPEED);
+  float w2 = NL_SNAP_W(1.3*NL_WATER_WAVE_SPEED);
+  highp vec2 q = p + 0.5*vec2(sin(NL_SNAP_K(1.1)*p.y + w1*t), sin(NL_SNAP_K(1.3)*p.x - w2*t));
+  float v = sin(NL_SNAP_K(1.9)*q.x + sin(NL_SNAP_K(2.3)*q.y + w2*t));
+  v += sin(NL_SNAP_K(2.1)*q.y + sin(NL_SNAP_K(1.7)*q.x - w1*t));
+  float c = 1.0 - 0.5*abs(v);
+  c *= c;
+  c *= c;
+  return c*c;
+}
+
+// gPos: wrapped world pos, t: wrapped time
+void nlUnderwaterLighting(inout vec3 light, inout vec4 pos, vec2 lit, vec2 uv1, highp vec3 gPos, vec3 cPos, highp float t, vec3 horizonCol) {
   if (uv1.y < 0.9) {
-    float caustics = disp(tiledCpos, NL_WATER_WAVE_SPEED*t);
-    caustics *= 3.0*caustics;
+    #if TS_CAUSTICS == 1
+      float caustics = 2.0*nlCaustics(gPos, t);
+    #else
+      float caustics = 0.0; // per pixel caustics (TS_CAUSTICS == 2) are added in fragment
+    #endif
     light += NL_UNDERWATER_BRIGHTNESS + NL_CAUSTIC_INTENSITY*caustics*(0.15 + lit.y + lit.x*0.7);
   }
   light *= mix(normalize(horizonCol), vec3_splat(0.6), lit.y*0.6);
   #ifdef NL_UNDERWATER_WAVE
-    pos.xy += NL_UNDERWATER_WAVE*min(0.05*pos.z,0.6)*sin(t*1.2 + dot(cPos,vec3_splat(PI_HALF)));
+    // light wobble of the whole view, phase is world locked
+    pos.xy += NL_UNDERWATER_WAVE*min(0.05*pos.z,0.6)*sin(NL_SNAP_W(1.2)*t + dot(cPos,vec3_splat(PI_HALF)));
   #endif
 }
 
@@ -163,7 +191,7 @@ vec3 nlEntityLighting(nl_skycolor skycol, nl_environment env, vec3 pos, vec4 nor
     sunLightAttenuation *= 1.0-0.5*env.rainFactor;
 
     // direct light from top
-    light = (NL_SUNLIGHT_INTENSITY*l*sunLightAttenuation)*sunLightTint(env.dayFactor, env.rainFactor);
+    light = (NL_SUNLIGHT_INTENSITY*l*sunLightAttenuation)*sunLightTint(env.dayFactor, env.duskFactor, env.rainFactor);
     vec3 N = normalize(mul(world, normal)).xyz;
     light *= 0.9 + max(N.y, 0.0);
 
@@ -224,10 +252,18 @@ vec4 nlEntityEdgeHighlightPreprocess(vec2 texcoord) {
   return 2.0*step(edgeMap, vec4_splat(0.5)) - 1.0;
 }
 
-vec4 nlLavaNoise(vec3 gPos, float t) {
-  float n = movingNoise2D(gPos.xz + gPos.yy, NL_LAVA_NOISE_SPEED*t, 0.9);
-  n *= n;
-  return vec4(mix(vec3(0.7, 0.4, 0.0)*smoothstep(-0.1, 0.5, n), vec3_splat(1.5), n*n),n);
+// lava crust noise: slow flowing dark crust + pulsing glow.
+// gPos: wrapped world pos, t: wrapped time. Returns rgb multiplier, a = noise
+vec4 nlLavaNoise(highp vec3 gPos, highp float t) {
+  highp vec2 p = gPos.xz;
+  // slow flow: scroll two noise layers in different directions (seamless at wraps)
+  highp vec2 flow1 = vec2(nlScroll(t, 0.35*NL_LAVA_NOISE_SPEED, 8.0), nlScroll(t, 0.2*NL_LAVA_NOISE_SPEED, 8.0));
+  highp vec2 flow2 = vec2(nlScroll(t, -0.25*NL_LAVA_NOISE_SPEED, 4.0), nlScroll(t, 0.4*NL_LAVA_NOISE_SPEED, 4.0));
+  float n = 0.65*nlWorldNoise(p + flow1, 8.0) + 0.35*nlWorldNoise(p + flow2, 4.0);
+  n = smoothstep(0.25, 0.85, n);
+  float pulse = 1.0 + NL_LAVA_PULSE*sin(NL_SNAP_W(0.9)*t + NL_TAU*nlWorldNoise(p, 16.0));
+  vec3 col = mix(vec3(0.7, 0.4, 0.0)*smoothstep(-0.1, 0.5, n), vec3_splat(1.5), n*n)*pulse;
+  return vec4(col, n);
 }
 
 #endif

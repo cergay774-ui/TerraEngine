@@ -48,9 +48,10 @@ nl_skycolor nlOverworldSkyColors(nl_environment env) {
   float dawnFactor = 1.0-env.dayFactor*env.dayFactor;
   dawnFactor *= dawnFactor*dawnFactor;
   dawnFactor *= mix(1.0, dawnFactor*dawnFactor, nightFactor);
-  s.zenith = mix(s.zenith, NL_DAWN_ZENITH_COL, dawnFactor);
-  s.horizon = mix(s.horizon, NL_DAWN_HORIZON_COL, dawnFactor);
-  s.horizonEdge = mix(s.horizonEdge, NL_DAWN_EDGE_COL, dawnFactor);
+  // separate sunrise / sunset palettes
+  s.zenith = mix(s.zenith, mix(NL_DAWN_ZENITH_COL, NL_DUSK_ZENITH_COL, env.duskFactor), dawnFactor);
+  s.horizon = mix(s.horizon, mix(NL_DAWN_HORIZON_COL, NL_DUSK_HORIZON_COL, env.duskFactor), dawnFactor);
+  s.horizonEdge = mix(s.horizonEdge, mix(NL_DAWN_EDGE_COL, NL_DUSK_EDGE_COL, env.duskFactor), dawnFactor);
 
   float zh = dot(s.zenith, vec3_splat(0.33));
   float hh = dot(s.horizon, vec3_splat(0.33));

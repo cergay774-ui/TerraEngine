@@ -2,6 +2,7 @@
 #define GLOW_H
 
 #include "sky.h"
+#include "time.h"
 
 vec3 glowDetect(vec4 diffuse) {
   // Texture alpha: diffuse.a
@@ -84,7 +85,8 @@ vec3 nlGlow(sampler2D tex, vec2 uv, float shimmer) {
 
 #ifdef NL_GLOW_SHIMMER
 float nlGlowShimmer(vec3 cPos, float t) {
-  float shimmer = sin(0.7*dot(cPos, vec3(1.0, 1.0, 1.0)) - NL_GLOW_SHIMMER_SPEED*t);
+  // t: wrapped time
+  float shimmer = sin(0.7*dot(cPos, vec3(1.0, 1.0, 1.0)) - NL_SNAP_W(NL_GLOW_SHIMMER_SPEED)*t);
   shimmer = sin(1.2*shimmer + 0.7*dot(cPos, vec3(-1.0, -1.0, 1.0)));
   shimmer *= shimmer;
   return mix(1.0, shimmer*shimmer, NL_GLOW_SHIMMER);
