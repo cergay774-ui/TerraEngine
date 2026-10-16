@@ -1,0 +1,14 @@
+# build output / downloaded toolchain
+build/
+tool/data/
+tool/lib/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# generated at build time from src/common (single source of truth)
+src/materials/*/material.json
+src/materials/*/uniforms/
+
+*.bin
