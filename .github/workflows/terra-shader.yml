@@ -28,13 +28,13 @@ jobs:
       run:
         working-directory: terra-shader
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
           cache: 'pip'
           cache-dependency-path: terra-shader/requirements.txt
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: terra-shader/tool/data
           key: terra-toolchain-${{ runner.os }}-${{ hashFiles('terra-shader/tool/util.py') }}
