@@ -17,3 +17,8 @@ A dark, modern landing page for the TerraEngine FNF engine.
 
 ## Customize
 Replace the placeholder GitHub links in `index.html` with your repository and release links.
+
+## Terra Shader (Minecraft Bedrock)
+The [`terra-shader/`](terra-shader/README.md) folder contains an optimized RenderDragon shader pack
+for Minecraft Bedrock 26.5x (Android / Windows), based on Newb X and built with Lazurite.
+See [`terra-shader/README.md`](terra-shader/README.md) (Russian) for build and install instructions.

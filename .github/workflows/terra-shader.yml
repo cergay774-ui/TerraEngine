@@ -1,0 +1,49 @@
+name: terra-shader
+
+# Builds the Terra Shader .mcpack for Android (ESSL) and Windows (Direct3D).
+# Direct3D shaders can only be compiled on Windows, so each profile has its own runner.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'terra-shader/**'
+      - '.github/workflows/terra-shader.yml'
+  pull_request:
+    paths:
+      - 'terra-shader/**'
+      - '.github/workflows/terra-shader.yml'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            profile: android
+          - os: windows-2022
+            profile: windows
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: terra-shader
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: terra-shader/requirements.txt
+      - uses: actions/cache@v4
+        with:
+          path: terra-shader/tool/data
+          key: terra-toolchain-${{ runner.os }}-${{ hashFiles('terra-shader/tool/util.py') }}
+      - name: Install glslang (ESSL validation)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y glslang-tools || true
+      - run: python -m pip install -r requirements.txt
+      - run: python tool pack -p ${{ matrix.profile }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: terra-shader-${{ matrix.profile }}
+          path: terra-shader/build/*.mcpack
