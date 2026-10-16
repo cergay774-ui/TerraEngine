@@ -1,0 +1,74 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "Terra Shader",
+    "description": "§cMB Loader (Android) / BetterRenderDragon, Wyvern (Windows)\n§7Optimized Newb X based shader: waves, puddles, nether grading\nv1.0.0-multiplatform",
+    "uuid": "f78a6fdb-5c1d-4a95-b8ab-554b0c67ebb3",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "min_engine_version": [
+      1,
+      26,
+      50
+    ]
+  },
+  "modules": [
+    {
+      "type": "resources",
+      "uuid": "8bb78d7e-74c6-47a5-bd4a-5dddfd75187f",
+      "version": [
+        1,
+        0,
+        0
+      ]
+    }
+  ],
+  "subpacks": [
+    {
+      "folder_name": "potato",
+      "name": "Картошка (Potato)",
+      "memory_tier": 0
+    },
+    {
+      "folder_name": "low",
+      "name": "Низкие (Low)",
+      "memory_tier": 0
+    },
+    {
+      "folder_name": "medium",
+      "name": "Средние (Medium)",
+      "memory_tier": 0
+    },
+    {
+      "folder_name": "high",
+      "name": "Высокие (High)",
+      "memory_tier": 0
+    },
+    {
+      "folder_name": "ultra",
+      "name": "Ультра (Ultra)",
+      "memory_tier": 0
+    },
+    {
+      "folder_name": "high_no_puddles",
+      "name": "Высокие без луж (High, no puddles)",
+      "memory_tier": 0
+    },
+    {
+      "folder_name": "high_blur",
+      "name": "Высокие + размытые отражения (High, blurry reflections)",
+      "memory_tier": 0
+    }
+  ],
+  "metadata": {
+    "authors": [
+      "TerraEngine",
+      "devendrn (Newb X)"
+    ],
+    "url": "https://github.com/cergay774-ui/TerraEngine",
+    "license": "MIT"
+  }
+}

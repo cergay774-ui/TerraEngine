@@ -1,0 +1,213 @@
+# =============================================================================
+#  TERRA SHADER - single config for pack info and quality presets (subpacks)
+# =============================================================================
+#
+#  Every [[preset]] becomes one subpack (one slider position in
+#  "Global Resources -> Terra Shader -> settings"). Each preset is compiled as
+#  a separate set of .material.bin files. Materials that come out identical to
+#  the default preset are not duplicated (the pack stays small).
+#
+#  Parameters: every key from [defaults] becomes a compiler define for the
+#  shaders:  water_waves = 4  ->  TS_WATER_WAVES=4
+#    - true/false -> 1/0
+#    - integers stay integers (usable in #if)
+#    - floats keep the decimal point (1.0); for every float the tool also
+#      defines <NAME>_ON = 1 if value != 0.0 else 0
+#  A preset only lists what differs from [defaults]. Unknown keys are an error
+#  (typo protection). How each define is used: src/newb/config.h.
+#
+#  Artistic options (colors, intensities shared by all presets) live in
+#  src/newb/config.h.
+
+[pack]
+name = "Terra Shader"
+# %w = loader note for the build target, %v = version-profile
+description = """
+§c%w
+§7Optimized Newb X based shader: waves, puddles, nether grading
+%v"""
+version = [1, 0, 0]
+min_engine_version = [1, 26, 50]   # 26.50+ (tested target: 26.52 / 1.26.52.3)
+header_uuid = "f78a6fdb-5c1d-4a95-b8ab-554b0c67ebb3"
+module_uuid = "8bb78d7e-74c6-47a5-bd4a-5dddfd75187f"
+authors = ["TerraEngine", "devendrn (Newb X)"]
+url = "https://github.com/cergay774-ui/TerraEngine"
+license = "MIT"
+
+# compiled into the pack root (used if the game ignores subpacks / none selected)
+default_preset = "medium"
+
+materials = [
+  "Actor", "ActorGlint", "ActorMultiTexture", "Clouds", "EndSky",
+  "ItemInHandColor", "ItemInHandColorGlint", "ItemInHandTextured",
+  "RenderChunk", "Sky", "Stars", "SunMoon", "Weather"
+]
+
+[info]
+copyright = """
+Terra Shader
+Copyright (c) 2026 %a
+
+Built from source: shaders are a modified version of "Newb X Legacy"
+(https://github.com/devendrn/newb-x-mcbe, Copyright (c) 2024 devendrn,
+MIT License). This pack is distributed under the MIT License, see LICENSE in
+the source repository. Textures in textures/ come from Newb X.
+"""
+
+# -----------------------------------------------------------------------------
+#  Base values (= "medium"). Every parameter must be listed here.
+# -----------------------------------------------------------------------------
+[defaults]
+# water
+water_waves = 4              # 0 = flat, 1..6 wave layers (sine + Gerstner)
+water_per_pixel = true       # per pixel normals/reflections (false = per vertex, cheap)
+water_vertex_wave = true     # surface vertices move with the waves
+water_roughness = 0.3        # 0.05 mirror ~ 1.0 blurry; higher = cheaper
+water_cloud_refl = false     # clouds/aurora in water reflections (skipped if roughness >= 0.55)
+water_sun_spec = true        # sun/moon spot on water
+caustics = 1                 # 0 off, 1 per vertex, 2 per pixel
+underwater_distort = 0.08    # underwater wobble, 0.0 = off
+# rain
+puddles = true
+puddle_ripples = false
+puddle_cloud_refl = false
+puddle_dist = 40.0           # blocks
+wet_ground = true            # darken exposed ground while raining
+# light
+ao = 0.5                     # extra corner AO, 0.0 = vanilla
+face_shading = 0.6           # shade faces by sun direction, 0.0 = off
+emissive = 0.8               # glow of light emitting blocks, 0.0 = off
+lava_flow = true             # per pixel lava UV flow + pulsing glow
+grade = 1.0                  # nether biome / end color grading, 0.0 = off
+# misc
+plants_wave = true
+wave_range = 13.0
+glow_shimmer = true
+rain_mist = true
+cloudy_fog = true
+shooting_star = true
+aurora = true
+cloud_type = 1               # 0 vanilla, 1 soft, 2 rounded, 3 realistic
+
+# -----------------------------------------------------------------------------
+#  Presets, left -> right on the in-game slider
+# -----------------------------------------------------------------------------
+
+[[preset]]
+id = "potato"
+name = "Картошка (Potato)"
+memory_tier = 0
+[preset.params]
+water_waves = 0
+water_per_pixel = false
+water_roughness = 0.6
+water_sun_spec = false
+caustics = 0
+underwater_distort = 0.0
+puddles = false
+wet_ground = false
+ao = 0.0
+face_shading = 0.0
+emissive = 0.0
+lava_flow = false
+grade = 0.0
+plants_wave = false
+glow_shimmer = false
+rain_mist = false
+cloudy_fog = false
+shooting_star = false
+aurora = false
+
+[[preset]]
+id = "low"
+name = "Низкие (Low)"
+memory_tier = 0
+[preset.params]
+water_waves = 2
+water_per_pixel = false
+water_roughness = 0.45
+underwater_distort = 0.06
+puddles = false
+ao = 0.0
+face_shading = 0.0
+emissive = 0.0
+lava_flow = false
+wave_range = 10.0
+glow_shimmer = false
+rain_mist = false
+cloudy_fog = false
+aurora = false
+
+[[preset]]
+id = "medium"
+name = "Средние (Medium)"
+memory_tier = 0
+[preset.params]
+
+[[preset]]
+id = "high"
+name = "Высокие (High)"
+memory_tier = 0
+[preset.params]
+water_waves = 5
+water_roughness = 0.15
+water_cloud_refl = true
+caustics = 2
+underwater_distort = 0.1
+puddle_ripples = true
+puddle_dist = 56.0
+ao = 0.8
+face_shading = 0.8
+emissive = 1.0
+wave_range = 18.0
+
+[[preset]]
+id = "ultra"
+name = "Ультра (Ultra)"
+memory_tier = 0
+[preset.params]
+water_waves = 6
+water_roughness = 0.08
+water_cloud_refl = true
+caustics = 2
+underwater_distort = 0.1
+puddle_ripples = true
+puddle_cloud_refl = true
+puddle_dist = 72.0
+ao = 1.0
+face_shading = 1.0
+emissive = 1.2
+wave_range = 24.0
+
+[[preset]]
+id = "high_no_puddles"
+name = "Высокие без луж (High, no puddles)"
+memory_tier = 0
+[preset.params]
+water_waves = 5
+water_roughness = 0.15
+water_cloud_refl = true
+caustics = 2
+underwater_distort = 0.1
+puddles = false
+ao = 0.8
+face_shading = 0.8
+emissive = 1.0
+wave_range = 18.0
+
+[[preset]]
+id = "high_blur"
+name = "Высокие + размытые отражения (High, blurry reflections)"
+memory_tier = 0
+[preset.params]
+water_waves = 5
+water_roughness = 0.7        # wide sun spot, no cloud reflection -> cheaper than high
+water_cloud_refl = false
+caustics = 2
+underwater_distort = 0.1
+puddle_ripples = true
+puddle_dist = 56.0
+ao = 0.8
+face_shading = 0.8
+emissive = 1.0
+wave_range = 18.0
