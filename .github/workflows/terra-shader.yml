@@ -1,6 +1,7 @@
 name: terra-shader
 
-# Builds the Terra Shader .mcpack for Android (ESSL) and Windows (Direct3D).
+# Builds the Terra Shader .mcpack for Android (ESSL) and Windows (Direct3D),
+# and the Terra Vibrant (Vibrant Visuals settings) .mcpack.
 # Direct3D shaders can only be compiled on Windows, so each profile has its own runner.
 on:
   workflow_dispatch:
@@ -46,4 +47,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: terra-shader-${{ matrix.profile }}
-          path: terra-shader/build/*.mcpack
+          path: terra-shader/build/terra-shader-*.mcpack
+      # Vibrant Visuals settings pack: plain JSON, same for every platform
+      - if: matrix.profile == 'android'
+        run: python tool vibrant
+      - if: matrix.profile == 'android'
+        uses: actions/upload-artifact@v4
+        with:
+          name: terra-vibrant
+          path: terra-shader/build/terra-vibrant-*.mcpack

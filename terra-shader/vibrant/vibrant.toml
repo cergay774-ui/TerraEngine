@@ -1,0 +1,107 @@
+# =============================================================================
+#  TERRA VIBRANT - resource pack for Vibrant Visuals (official deferred mode)
+# =============================================================================
+#
+#  No custom shaders and no loader: Vibrant Visuals already renders real
+#  screen-space reflections (blocks and mobs in water), real shadows,
+#  volumetric light. This pack only tunes it through the official JSON
+#  settings (docs: learn.microsoft.com/minecraft/creator/documents/vibrantvisuals):
+#    - waves and water color          -> generated from [water] below
+#    - dawn / dusk / night palettes    -> pack/lighting, pack/atmospherics
+#    - warm torches                    -> pack/local_lighting
+#    - nether biome + End grading      -> pack/color_grading
+#  The game itself blends lighting/atmospherics/color grading between biomes
+#  as the player moves, and water settings per water block.
+#
+#  Vanilla per-biome settings override global files, so the tool downloads the
+#  vanilla client_biome files of `samples_tag` from Mojang/bedrock-samples and
+#  rewrites only the identifiers listed below. Biomes without changes are not
+#  included in the pack.
+
+[pack]
+name = "Terra Vibrant"
+description = """
+§bVibrant Visuals: waves, palettes, nether grading
+§7Turn on Vibrant Visuals in Video settings
+%v"""
+version = [1, 0, 0]
+min_engine_version = [1, 26, 50]
+header_uuid = "4c80a9e9-2de0-4e97-99b6-859c1b959d57"
+module_uuid = "5876d57d-f2d8-4e4c-93d9-52ff6384bf16"
+authors = ["TerraEngine"]
+url = "https://github.com/cergay774-ui/TerraEngine"
+license = "MIT"
+# Mojang/bedrock-samples release tag matching the target game version
+samples_tag = "v1.26.50.4"
+# compiled into the pack root (used if no subpack is selected)
+default_preset = "normal"
+
+# -----------------------------------------------------------------------------
+#  Identifier rewrites in vanilla client_biome files
+# -----------------------------------------------------------------------------
+# for every biome: vanilla identifier -> ours
+[biomes.replace]
+"minecraft:default_lighting" = "terra:default_lighting"
+"minecraft:default_atmospherics" = "terra:default_atmospherics"
+"minecraft:default_color_grading" = "terra:default_color_grading"
+"minecraft:default_water" = "terra:default_water"
+
+# per biome (file name without .client_biome.json): component -> identifier
+[biomes.set.hell]
+color_grading = "terra:nether_wastes_color_grading"
+[biomes.set.crimson_forest]
+color_grading = "terra:crimson_forest_color_grading"
+[biomes.set.warped_forest]
+color_grading = "terra:warped_forest_color_grading"
+[biomes.set.soulsand_valley]
+color_grading = "terra:soulsand_valley_color_grading"
+[biomes.set.basalt_deltas]
+color_grading = "terra:basalt_deltas_color_grading"
+[biomes.set.the_end]
+color_grading = "terra:end_color_grading"
+fog = "newb:fog_the_end"   # same End fog as Terra Shader, so both packs can be active
+[biomes.set.swampland]
+water = "terra:swamp_water"
+[biomes.set.swampland_mutated]
+water = "terra:swamp_water"
+[biomes.set.mangrove_swamp]
+water = "terra:swamp_water"
+
+# -----------------------------------------------------------------------------
+#  Water (water/*.json is generated: [water.base] + body + preset waves)
+#  Ranges: see WaterCustomization docs. Caustics and waves on/off must be the
+#  same in every water schema of the pack (the game can't blend them).
+# -----------------------------------------------------------------------------
+[water.base]
+biome_water_color_contribution = 0.25
+caustics = { enabled = true, frame_length = 0.07, power = 2, scale = 0.5 }
+waves = { direction_increment = 80.0, frequency = 1.0, frequency_scaling = 1.2, mix = 0.2, pull = 0.38, sampleWidth = 0.3, shape = 1.5, speed_scaling = 1.03 }
+
+[water.body.default_water]   # clear blue, a bit of depth color
+particle_concentrations = { chlorophyll = 0.2, suspended_sediment = 0.2, cdom = 0.1 }
+
+[water.body.swamp_water]     # murky green-brown
+particle_concentrations = { chlorophyll = 3.0, suspended_sediment = 15.0, cdom = 4.0 }
+biome_water_color_contribution = 0.5
+
+# presets = subpacks (left -> right on the slider); only water files differ.
+# More octaves = more detailed and more expensive waves.
+[[preset]]
+id = "no_waves"
+name = "Без волн (быстрее)"
+waves = { enabled = false }
+
+[[preset]]
+id = "calm"
+name = "Спокойная вода"
+waves = { enabled = true, octaves = 8, depth = 0.4, speed = 1.2 }
+
+[[preset]]
+id = "normal"
+name = "Обычные волны"
+waves = { enabled = true, octaves = 16, depth = 0.8, speed = 1.8 }
+
+[[preset]]
+id = "storm"
+name = "Штормовые волны"
+waves = { enabled = true, octaves = 28, depth = 1.4, speed = 2.4, shape = 2.0 }

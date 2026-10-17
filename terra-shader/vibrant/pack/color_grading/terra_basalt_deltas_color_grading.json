@@ -1,0 +1,42 @@
+{
+  "format_version": "1.21.90",
+  "minecraft:color_grading_settings": {
+    "description": {
+      "identifier": "terra:basalt_deltas_color_grading"
+    },
+    "color_grading": {
+      "midtones": {
+        "contrast": [
+          0.92,
+          0.92,
+          0.92
+        ],
+        "gain": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "gamma": [
+          2.2,
+          2.2,
+          2.2
+        ],
+        "offset": [
+          0.02,
+          0.02,
+          0.02
+        ],
+        "saturation": [
+          0.55,
+          0.55,
+          0.55
+        ]
+      },
+      "temperature": {
+        "enabled": true,
+        "temperature": 6500,
+        "type": "color_temperature"
+      }
+    }
+  }
+}

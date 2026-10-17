@@ -22,7 +22,8 @@ def ensure_setup():
 def main():
     parser = argparse.ArgumentParser(
         prog='build',
-        description="Terra Shader builder (Lazurite wrapper). Without a command: build all presets into .mcpack",
+        description="Terra Shader builder (Lazurite wrapper). Without a command: build the shader pack "
+                    "(all presets) and the Terra Vibrant pack",
         epilog="Presets: presets.toml, shader options: src/newb/config.h"
     )
     subparsers = parser.add_subparsers(help='sub-command', dest='subcommand')
@@ -31,6 +32,9 @@ def main():
     mats_parser = subparsers.add_parser('mats', help="build materials of one preset (quick test)")
     setup_parser = subparsers.add_parser('setup', help="download shaderc and source materials")
     manifest_parser = subparsers.add_parser('manifest', help="write manifest.json from presets.toml")
+    vibrant_parser = subparsers.add_parser('vibrant', help="build only Terra Vibrant (Vibrant Visuals settings pack)")
+    vibrant_parser.add_argument('--no-zip', action='store_true', help="don't make .mcpack archive")
+    vibrant_parser.add_argument('-v', default="", help="patch version number, eg: 3")
 
     pack_parser.add_argument('-p', choices=PROFILES, nargs='+', default=default_profiles(),
                              help="build profiles (default: android, + windows on Windows)")
@@ -54,13 +58,20 @@ def main():
     elif args.subcommand == 'manifest':
         import pack
         pack.run_manifest(args)
+    elif args.subcommand == 'vibrant':
+        import vibrant
+        vibrant.run(args)
     elif args.subcommand == 'mats':
         ensure_setup()
         import build
         build.run(args)
     else:
-        if args.subcommand is None:
+        build_vibrant = args.subcommand is None
+        if build_vibrant:
             args = pack_parser.parse_args([])
         ensure_setup()
         import pack
         pack.run(args)
+        if build_vibrant:
+            import vibrant
+            vibrant.run(args)

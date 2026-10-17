@@ -1,0 +1,13 @@
+{
+  "format_version": "1.21.120",
+  "minecraft:local_light_settings": {
+    "minecraft:torch": {
+      "light_color": "#FFB45C",
+      "light_type": "point_light"
+    },
+    "minecraft:lantern": {
+      "light_color": "#FF9A3C",
+      "light_type": "point_light"
+    }
+  }
+}
