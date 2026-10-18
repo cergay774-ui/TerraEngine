@@ -1,20 +1,21 @@
 extends Control
-## Мотор в 3D. Модель собирается кодом из простых деталей (блок в разрезе, поршни, шатуны,
-## коленвал, ГБЦ, выхлоп, турбина). Поршни и шатуны считаются по геометрии кривошипа,
-## у каждого цилиндра своя фаза по порядку зажигания, поэтому любой мотор анимируется сам.
-## Пальцем можно покрутить мотор (провести влево-вправо), зажатие даёт газ.
+## Мотор в 3D внутри тёмного гаража. Модель собирается кодом из деталей: блок в разрезе,
+## поршни с кольцами, шатуны, коленвал с противовесами, ГБЦ с крышкой и катушками, ремень ГРМ
+## со звёздочками, выпускной коллектор (краснеет от нагрева), впускные дудки, турбина с конусным
+## фильтром, стенд на колёсиках. Поршни и шатуны считаются по геометрии кривошипа, у каждого
+## цилиндра своя фаза по порядку зажигания. Мотор можно покрутить пальцем, зажатие даёт газ.
 
 signal hold_changed(pressed: bool)
 
-const ROD := 3.0          # длина шатуна в радиусах кривошипа
-const BORE := 1.12        # радиус поршня
-const DECK := 4.7
-const HEAD := 1.1
+const ROD := 3.0
+const BORE := 1.12
+const HEAD := 1.15
 const SPACING := 2.9
+const ENGINE_SIZE := 7.0      # мотор любого типа приводится к одному размеру
 
 var engine_type: String = "inline4"
 var material_index: int = 0
-var demo: bool = false            # загрузка/витрина: обороты задаются снаружи
+var demo: bool = false
 var demo_rpm: float = 900.0
 var interactive: bool = true
 var crank_deg: float = 0.0
@@ -24,60 +25,70 @@ var shake_offset: Vector2 = Vector2.ZERO
 var flash_white: float = 0.0
 var show_hud: bool = true
 var drives_audio: bool = true
+var band: Rect2 = Rect2(0, 0, 1, 1)   # где на экране стоит мотор (доли экрана)
 
-var _container: SubViewportContainer
 var _vp: SubViewport
+var _tex: TextureRect
 var _world: Node3D
 var _cam: Camera3D
-var _root: Node3D            # всё, что трясётся
-var _engine: Node3D          # собранный мотор
+var _env: Environment
+var _root: Node3D
+var _engine: Node3D
+var _garage: Dictionary = {}
 var _hud: Control
 var _flash_light: OmniLight3D
 var _turbo_light: OmniLight3D
+var _tail_light: OmniLight3D
 var _smoke: CPUParticles3D
 var _flames: CPUParticles3D
+var _sparks: CPUParticles3D
 var _steam: CPUParticles3D
+var _tail_flame: MeshInstance3D
 var _cyls: Array = []
-var _shafts: Array = []
+var _spinners: Array = []      # [{node, ratio}] — вращаются вместе с коленвалом
 var _rotors: Array = []
 var _turbine_wheel: Node3D = null
-var _flywheel: Node3D = null
 var _mats: Dictionary = {}
 var _built_key: String = ""
+var _gfx_key: String = ""
 var _center: Vector3 = Vector3.ZERO
-var _radius: float = 6.0
 var _yaw: float = 0.0
 var _yaw_target: float = 0.0
 var _pressed: bool = false
-var _drag_px: float = 0.0
 var _time: float = 0.0
 var _prev_throttle: bool = false
 var _turbine_deg: float = 0.0
 var _tint_acc: float = 1.0
+var _fov_kick: float = 0.0
+var _tail_pos: Vector3 = Vector3.ZERO
+var _pop_glow: float = 0.0
+var _lift: float = 0.0
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP if interactive else Control.MOUSE_FILTER_IGNORE
 	clip_contents = true
-	_container = SubViewportContainer.new()
-	_container.stretch = true
-	_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_container)
 	_vp = SubViewport.new()
 	_vp.own_world_3d = true
-	_vp.transparent_bg = true
-	_vp.msaa_3d = Viewport.MSAA_4X
 	_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	_container.add_child(_vp)
+	add_child(_vp)
+	_tex = TextureRect.new()
+	_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_tex.stretch_mode = TextureRect.STRETCH_SCALE
+	_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tex.texture = _vp.get_texture()
+	add_child(_tex)
 	_world = Node3D.new()
 	_vp.add_child(_world)
-	_setup_world()
 	_hud = Control.new()
 	_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hud.draw.connect(_draw_hud)
 	add_child(_hud)
+	resized.connect(_apply_graphics)
+	G.settings_changed.connect(_on_settings)
+	_setup_world()
 	_rebuild()
 
 
@@ -88,146 +99,180 @@ func set_engine(type: String, material: int) -> void:
 		_rebuild()
 
 
+func _q() -> int:
+	return clampi(int(G.settings.get("quality", 1)), 0, 3)
+
+
+func _on_settings() -> void:
+	if _graphics_key() != _gfx_key:
+		_setup_world()
+		_rebuild()
+	else:
+		_apply_graphics()
+
+
+func _graphics_key() -> String:
+	return "%d|%d|%s|%d" % [_q(), int(G.settings.get("shadows", 1)), str(G.settings.get("garage", true)), int(G.settings.get("particles", 1))]
+
+
 func _gui_input(event: InputEvent) -> void:
 	if not interactive:
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		_pressed = event.pressed
-		_drag_px = 0.0
 		hold_changed.emit(event.pressed)
 		accept_event()
 	elif event is InputEventMouseMotion and _pressed:
-		_drag_px += absf(event.relative.x)
-		_yaw_target = clampf(_yaw_target - event.relative.x * 0.006, -1.4, 1.4)
+		_yaw_target = clampf(_yaw_target - event.relative.x * 0.006, -1.3, 1.3)
 		accept_event()
 
 
 # ---------------------------------------------------------------------
-# Сцена: свет, окружение, частицы
+# Мир: гараж, свет, частицы
 # ---------------------------------------------------------------------
 
 func _setup_world() -> void:
-	var env := Environment.new()
-	env.background_mode = Environment.BG_CLEAR_COLOR
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.55, 0.52, 0.5)
-	env.ambient_light_energy = 0.55
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 1.05
-	env.glow_enabled = true
-	env.glow_intensity = 0.6
-	env.glow_bloom = 0.05
+	_gfx_key = _graphics_key()
+	for c in _world.get_children():
+		_world.remove_child(c)
+		c.queue_free()
+	_engine = null
+	var q := _q()
+	var shadows := int(G.settings.get("shadows", 1))
+	_env = GarageScene.environment(q, G.settings.get("glow", true))
 	var we := WorldEnvironment.new()
-	we.environment = env
+	we.environment = _env
 	_world.add_child(we)
-
-	var key := DirectionalLight3D.new()
-	key.light_color = Color(1.0, 0.9, 0.75)
-	key.light_energy = 1.25
-	key.shadow_enabled = true
-	key.rotation_degrees = Vector3(-58, 35, 0)
-	_world.add_child(key)
-	var rim := DirectionalLight3D.new()
-	rim.light_color = Color(0.45, 0.6, 1.0)
-	rim.light_energy = 0.55
-	rim.rotation_degrees = Vector3(-20, -150, 0)
-	_world.add_child(rim)
-	var lamp := OmniLight3D.new()
-	lamp.light_color = Color(1.0, 0.82, 0.55)
-	lamp.light_energy = 1.2
-	lamp.omni_range = 30.0
-	lamp.position = Vector3(0, 12, 4)
-	_world.add_child(lamp)
+	_garage = {}
+	if G.settings.get("garage", true):
+		_garage = GarageScene.build(_world, 0.0, q)
+		var key: SpotLight3D = _garage.key
+		key.shadow_enabled = shadows > 0
+		key.shadow_blur = 2.0 if shadows >= 2 else 0.8
+	else:
+		var sun := DirectionalLight3D.new()
+		sun.light_energy = 1.2
+		sun.rotation_degrees = Vector3(-55, 30, 0)
+		sun.shadow_enabled = shadows > 0
+		_world.add_child(sun)
 
 	_cam = Camera3D.new()
-	_cam.fov = 32.0
+	_cam.fov = 30.0
+	_cam.far = 300.0
 	_world.add_child(_cam)
-
 	_root = Node3D.new()
 	_world.add_child(_root)
 
-	_flash_light = OmniLight3D.new()
-	_flash_light.light_color = Color(1.0, 0.55, 0.15)
-	_flash_light.omni_range = 4.0
-	_flash_light.light_energy = 0.0
-	_root.add_child(_flash_light)
-	_turbo_light = OmniLight3D.new()
-	_turbo_light.light_color = Color(0.3, 0.55, 1.0)
-	_turbo_light.omni_range = 14.0
-	_turbo_light.light_energy = 0.0
-	_root.add_child(_turbo_light)
+	_flash_light = _omni(Color(1.0, 0.55, 0.15), 6.0)
+	_turbo_light = _omni(Color(0.3, 0.55, 1.0), 16.0)
+	_tail_light = _omni(Color(1.0, 0.5, 0.15), 10.0)
 
-	_smoke = _make_particles(Color(0.8, 0.8, 0.85, 0.35), 0.5, 1.6, 40)
-	_smoke.direction = Vector3(0.3, 1, 0.2)
-	_smoke.initial_velocity_min = 0.8
-	_smoke.initial_velocity_max = 1.8
-	_smoke.gravity = Vector3(0, 0.6, 0)
-	_flames = _make_particles(Color(1.0, 0.6, 0.15, 1.0), 0.35, 0.25, 24, true)
-	_flames.direction = Vector3(0.6, -0.2, 0.3)
-	_flames.initial_velocity_min = 3.0
-	_flames.initial_velocity_max = 6.0
+	var pq := clampi(int(G.settings.get("particles", 1)), 0, 2)
+	_smoke = _make_particles(Color(0.8, 0.8, 0.85, 0.3), 0.7, 2.2, [16, 40, 70][pq])
+	_smoke.direction = Vector3(0, 1, -0.3)
+	_smoke.gravity = Vector3(0, 0.5, 0)
+	_flames = _make_particles(Color(1.0, 0.6, 0.15, 1.0), 0.55, 0.28, [10, 24, 40][pq], true)
+	_flames.direction = Vector3(0, 0.3, -1)
+	_flames.spread = 12.0
+	_flames.initial_velocity_min = 5.0
+	_flames.initial_velocity_max = 9.0
 	_flames.gravity = Vector3.ZERO
 	_flames.emitting = false
 	_flames.one_shot = true
-	_flames.explosiveness = 1.0
-	_steam = _make_particles(Color(0.95, 0.95, 1.0, 0.3), 0.6, 1.4, 30)
+	_flames.explosiveness = 0.9
+	_sparks = _make_particles(Color(1.0, 0.8, 0.35, 1.0), 0.14, 0.8, [1, 30, 60][pq], true)
+	_sparks.direction = Vector3(0, 1, 0)
+	_sparks.spread = 70.0
+	_sparks.initial_velocity_min = 5.0
+	_sparks.initial_velocity_max = 11.0
+	_sparks.gravity = Vector3(0, -22, 0)
+	_sparks.emitting = false
+	_sparks.one_shot = true
+	_sparks.explosiveness = 1.0
+	_sparks.scale_amount_curve = null
+	_steam = _make_particles(Color(0.95, 0.95, 1.0, 0.25), 1.0, 1.6, [1, 24, 40][pq])
 	_steam.direction = Vector3(0, 1, 0)
 	_steam.initial_velocity_min = 1.0
-	_steam.initial_velocity_max = 2.0
+	_steam.initial_velocity_max = 2.5
 	_steam.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
 	_steam.emission_box_extents = Vector3(3, 0.2, 1)
 	_steam.emitting = false
 
+	# языки пламени из выхлопа (светящийся конус)
+	var fm := StandardMaterial3D.new()
+	fm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	fm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	fm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	fm.albedo_color = Color(1.0, 0.55, 0.15, 0.0)
+	fm.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_tail_flame = MeshInstance3D.new()
+	_tail_flame.mesh = MeshKit.cone(0.35, 0.0, 2.2, 12)
+	_tail_flame.material_override = fm
+	_tail_flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_root.add_child(_tail_flame)
+	_apply_graphics()
 
-func _make_particles(color: Color, size: float, life: float, amount: int, glow: bool = false) -> CPUParticles3D:
+
+func _omni(color: Color, rng: float) -> OmniLight3D:
+	var l := OmniLight3D.new()
+	l.light_color = color
+	l.omni_range = rng
+	l.light_energy = 0.0
+	l.shadow_enabled = false
+	_root.add_child(l)
+	return l
+
+
+func _apply_graphics() -> void:
+	if _vp == null or size.x < 2.0:
+		return
+	var sc := clampf(float(G.settings.get("res_scale", 1.0)), 0.4, 1.0)
+	_vp.size = Vector2i(maxi(16, int(size.x * sc)), maxi(16, int(size.y * sc)))
+	var ms := int(G.settings.get("msaa", 2))
+	_vp.msaa_3d = Viewport.MSAA_4X if ms >= 4 else (Viewport.MSAA_2X if ms >= 2 else Viewport.MSAA_DISABLED)
+	if _env != null:
+		_env.glow_enabled = G.settings.get("glow", true)
+	_tex.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+
+
+func _make_particles(color: Color, psize: float, life: float, amount: int, glow: bool = false) -> CPUParticles3D:
 	var p := CPUParticles3D.new()
 	var quad := QuadMesh.new()
-	quad.size = Vector2(size, size)
+	quad.size = Vector2(psize, psize)
 	var m := StandardMaterial3D.new()
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.vertex_color_use_as_albedo = true
-	m.albedo_texture = _soft_dot()
+	m.albedo_texture = GarageScene._soft_dot()
+	m.disable_receive_shadows = true
 	if glow:
 		m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
 	quad.material = m
 	p.mesh = quad
-	p.amount = amount
+	p.amount = maxi(1, amount)
 	p.lifetime = life
-	p.spread = 15.0
+	p.spread = 18.0
+	p.initial_velocity_min = 0.8
+	p.initial_velocity_max = 2.0
 	p.scale_amount_min = 0.6
 	p.scale_amount_max = 1.4
 	var curve := Curve.new()
 	curve.add_point(Vector2(0, 0.5))
-	curve.add_point(Vector2(1, 1.8 if not glow else 0.2))
+	curve.add_point(Vector2(1, 2.2 if not glow else 0.2))
 	p.scale_amount_curve = curve
 	var grad := Gradient.new()
 	grad.set_color(0, color)
 	grad.set_color(1, Color(color.r, color.g, color.b, 0.0))
 	p.color_ramp = grad
 	p.local_coords = false
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_root.add_child(p)
 	return p
 
 
-var _dot_tex: Texture2D = null
-
-func _soft_dot() -> Texture2D:
-	if _dot_tex != null:
-		return _dot_tex
-	var img := Image.create(32, 32, false, Image.FORMAT_RGBA8)
-	for y in 32:
-		for x in 32:
-			var d := Vector2(x - 15.5, y - 15.5).length() / 15.5
-			var a := clampf(1.0 - d, 0.0, 1.0)
-			img.set_pixel(x, y, Color(1, 1, 1, a * a))
-	_dot_tex = ImageTexture.create_from_image(img)
-	return _dot_tex
-
-
 # ---------------------------------------------------------------------
-# Материалы и примитивы
+# Материалы
 # ---------------------------------------------------------------------
 
 func _mat(color: Color, metallic: float = 0.6, rough: float = 0.4, alpha: float = 1.0) -> StandardMaterial3D:
@@ -242,115 +287,67 @@ func _mat(color: Color, metallic: float = 0.6, rough: float = 0.4, alpha: float 
 	return m
 
 
-func _mi(mesh: Mesh, mat: Material, parent: Node3D, pos: Vector3 = Vector3.ZERO, rot_deg: Vector3 = Vector3.ZERO) -> MeshInstance3D:
-	var m := MeshInstance3D.new()
-	m.mesh = mesh
-	m.material_override = mat
-	m.position = pos
-	m.rotation_degrees = rot_deg
-	parent.add_child(m)
-	return m
+func _make_mats() -> void:
+	var md: Dictionary = D.MATERIALS[material_index % D.MATERIALS.size()]
+	var mc: Color = md.color
+	var shine: float = md.shine
+	var racing := _built_key.split("|")[3] == "1"
+	var exp_look := engine_type == "experimental"
+	_mats = {
+		"block": _mat(mc.lightened(0.05), 0.45 + shine * 0.45, 0.5 - shine * 0.3),
+		"case": _mat(mc.darkened(0.1), 0.4 + shine * 0.4, 0.5, 0.5),
+		"head": _mat(mc.lightened(0.15), 0.5 + shine * 0.45, 0.4 - shine * 0.2),
+		"cover": _mat(Color("b81d1d") if racing else (Color("1b1c20") if not exp_look else Color("d8dde3")), 0.55 if racing else 0.3, 0.3 if racing else 0.55),
+		"bore": _mat(Color("1a1b1f"), 0.3, 0.6),
+		"piston": _mat(Color("d4d9df"), 0.95, 0.18),
+		"rod": _mat(Color("9aa1a9"), 0.95, 0.25),
+		"crank": _mat(Color("6f767e"), 0.95, 0.28),
+		"steel": _mat(Color("c8ced6"), 1.0, 0.12),
+		"plug": _mat(Color("efe9da"), 0.1, 0.35),
+		"header": _mat(Color("8a8a8f"), 0.95, 0.3),
+		"coil": _mat(Color("c01818") if racing else Color("161618"), 0.3, 0.4),
+		"stand": _mat(Color("c4471b"), 0.5, 0.35),
+		"rubber": _mat(Color("0d0d0f"), 0.0, 0.8),
+		"belt": _mat(Color("101012"), 0.1, 0.7),
+		"filter": _mat(Color("1d4fa8"), 0.7, 0.3),
+		"airfilter": _mat(Color("16171a"), 0.2, 0.75),
+		"accent": _mat(Color(0.3, 1.0, 0.9), 0.2, 0.3),
+		"brass": _mat(Color("c9a050"), 1.0, 0.25),
+		"flash": _mat(Color(1.0, 0.55, 0.15), 0.0, 1.0, 0.0),
+	}
+	var fm: StandardMaterial3D = _mats.flash
+	fm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	fm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	var ac: StandardMaterial3D = _mats.accent
+	ac.emission_enabled = true
+	ac.emission = Color(0.3, 1.0, 0.9)
+	ac.emission_energy_multiplier = 3.0
+	var hd: StandardMaterial3D = _mats.header
+	hd.emission_enabled = true
+	hd.emission = Color.BLACK
+	if md.get("weave", false):
+		var w := _weave_tex()
+		_mats.block.albedo_texture = w
+		_mats.head.albedo_texture = w
+		_mats.cover.albedo_texture = w
+	for k in ["piston", "rod", "crank", "steel", "coil", "stand"]:
+		var m: StandardMaterial3D = _mats[k]
+		m.cull_mode = BaseMaterial3D.CULL_BACK
 
 
-func _cyl(r: float, h: float, segs: int = 24) -> CylinderMesh:
-	var c := CylinderMesh.new()
-	c.top_radius = r
-	c.bottom_radius = r
-	c.height = h
-	c.radial_segments = segs
-	c.rings = 1
-	return c
-
-
-func _box(s: Vector3) -> BoxMesh:
-	var b := BoxMesh.new()
-	b.size = s
-	return b
-
-
-## Половина трубы (гильза цилиндра в разрезе), открыта в сторону +Z.
-func _half_tube(r_in: float, r_out: float, h: float, segs: int = 18) -> ArrayMesh:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var a0 := PI * 0.5
-	var a1 := PI * 1.5
-	var y0 := -h * 0.5
-	var y1 := h * 0.5
-	for i in segs:
-		var t0 := lerpf(a0, a1, float(i) / segs)
-		var t1 := lerpf(a0, a1, float(i + 1) / segs)
-		var c0 := Vector3(sin(t0), 0, cos(t0))
-		var c1 := Vector3(sin(t1), 0, cos(t1))
-		for r in [r_out, r_in]:
-			_quad(st, c0 * r + Vector3(0, y0, 0), c1 * r + Vector3(0, y0, 0), c1 * r + Vector3(0, y1, 0), c0 * r + Vector3(0, y1, 0))
-		for y in [y0, y1]:
-			_quad(st, c0 * r_in + Vector3(0, y, 0), c1 * r_in + Vector3(0, y, 0), c1 * r_out + Vector3(0, y, 0), c0 * r_out + Vector3(0, y, 0))
-	for t in [a0, a1]:
-		var c := Vector3(sin(t), 0, cos(t))
-		_quad(st, c * r_in + Vector3(0, y0, 0), c * r_out + Vector3(0, y0, 0), c * r_out + Vector3(0, y1, 0), c * r_in + Vector3(0, y1, 0))
-	st.generate_normals()
-	return st.commit()
-
-
-func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
-	st.add_vertex(a)
-	st.add_vertex(b)
-	st.add_vertex(c)
-	st.add_vertex(a)
-	st.add_vertex(c)
-	st.add_vertex(d)
-
-
-## Выдавливание плоского многоугольника (в плоскости YZ) вдоль X.
-func _extrude(poly: PackedVector2Array, depth: float) -> ArrayMesh:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var idx := Geometry2D.triangulate_polygon(poly)
-	for side in [-0.5, 0.5]:
-		for i in range(0, idx.size(), 3):
-			for k in 3:
-				var p := poly[idx[i + k]]
-				st.add_vertex(Vector3(side * depth, p.x, p.y))
-	var n := poly.size()
-	for i in n:
-		var p0 := poly[i]
-		var p1 := poly[(i + 1) % n]
-		_quad(st, Vector3(-depth * 0.5, p0.x, p0.y), Vector3(-depth * 0.5, p1.x, p1.y),
-			Vector3(depth * 0.5, p1.x, p1.y), Vector3(depth * 0.5, p0.x, p0.y))
-	st.generate_normals()
-	return st.commit()
-
-
-## Кольцо между двумя контурами с одинаковым числом точек, выдавленное вдоль X.
-func _extrude_ring(inner: PackedVector2Array, outer: PackedVector2Array, depth: float) -> ArrayMesh:
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var n := inner.size()
-	var x0 := -depth * 0.5
-	var x1 := depth * 0.5
-	for i in n:
-		var j := (i + 1) % n
-		var a := inner[i]
-		var b := inner[j]
-		var c := outer[j]
-		var d := outer[i]
-		for x in [x0, x1]:
-			_quad(st, Vector3(x, a.x, a.y), Vector3(x, b.x, b.y), Vector3(x, c.x, c.y), Vector3(x, d.x, d.y))
-		_quad(st, Vector3(x0, a.x, a.y), Vector3(x0, b.x, b.y), Vector3(x1, b.x, b.y), Vector3(x1, a.x, a.y))
-		_quad(st, Vector3(x0, d.x, d.y), Vector3(x0, c.x, c.y), Vector3(x1, c.x, c.y), Vector3(x1, d.x, d.y))
-	st.generate_normals()
-	return st.commit()
-
-
-func _pipe(parent: Node3D, a: Vector3, b: Vector3, r: float, mat: Material) -> MeshInstance3D:
-	var dir := b - a
-	var m := _mi(_cyl(r, dir.length(), 12), mat, parent, (a + b) * 0.5)
-	m.basis = Basis(Quaternion(Vector3.UP, dir.normalized()))
-	return m
+func _weave_tex() -> Texture2D:
+	var img := Image.create(32, 32, false, Image.FORMAT_RGBA8)
+	for y in 32:
+		for x in 32:
+			var on := ((x / 4) + (y / 4)) % 2 == 0
+			var stripe := (x + (y if on else -y)) % 4 == 0
+			var v := 0.45 + (0.25 if on else 0.0) + (0.12 if stripe else 0.0)
+			img.set_pixel(x, y, Color(v, v, v))
+	return ImageTexture.create_from_image(img)
 
 
 # ---------------------------------------------------------------------
-# Раскладка цилиндров (ряд — позиция вдоль коленвала, bank — угол наклона)
+# Раскладка цилиндров
 # ---------------------------------------------------------------------
 
 func _spec() -> Dictionary:
@@ -396,15 +393,13 @@ func _layout() -> Array:
 func _view_dir() -> Vector3:
 	match _spec().view:
 		"side":
-			return Vector3(0.42, 0.38, 0.82).normalized()
+			return Vector3(0.45, 0.36, 0.82).normalized()
 		"rotary":
-			return Vector3(0.85, 0.3, 0.45).normalized()
-	return Vector3(0.82, 0.4, 0.42).normalized()
+			return Vector3(0.85, 0.32, 0.45).normalized()
+		"radial":
+			return Vector3(0.9, 0.3, 0.35).normalized()
+	return Vector3(0.8, 0.42, 0.45).normalized()
 
-
-# ---------------------------------------------------------------------
-# Сборка модели
-# ---------------------------------------------------------------------
 
 func _build_key() -> String:
 	var tur := "0" if demo else ("1" if not G.equipped("turbine").is_empty() else "0")
@@ -412,299 +407,55 @@ func _build_key() -> String:
 	return "%s|%d|%s|%s" % [engine_type, material_index, tur, race]
 
 
+# ---------------------------------------------------------------------
+# Сборка модели
+# ---------------------------------------------------------------------
+
 func _rebuild() -> void:
 	_built_key = _build_key()
-	if _engine != null:
+	if _engine != null and is_instance_valid(_engine):
 		_engine.queue_free()
 	_engine = Node3D.new()
+	_engine.name = "Engine"
 	_root.add_child(_engine)
 	_cyls.clear()
-	_shafts.clear()
+	_spinners.clear()
 	_rotors.clear()
 	_turbine_wheel = null
-	_flywheel = null
-
-	var mc: Color = D.MATERIALS[material_index % D.MATERIALS.size()].color
-	var shine: float = D.MATERIALS[material_index % D.MATERIALS.size()].shine
-	_mats = {
-		"block": _mat(mc.lightened(0.05), 0.35 + shine * 0.5, 0.55 - shine * 0.3),
-		"case": _mat(mc.darkened(0.1), 0.3 + shine * 0.4, 0.6, 0.55),
-		"head": _mat(mc.lightened(0.15), 0.4 + shine * 0.5, 0.45 - shine * 0.2),
-		"cover": _mat(Color("b81d1d") if _build_key().split("|")[3] == "1" else mc.darkened(0.35), 0.5, 0.35),
-		"bore": _mat(Color("1a1b1f"), 0.2, 0.8),
-		"piston": _mat(Color("cfd4da"), 0.85, 0.25),
-		"rod": _mat(Color("9aa1a9"), 0.9, 0.3),
-		"crank": _mat(Color("7f868e"), 0.9, 0.3),
-		"steel": _mat(Color("b5bcc4"), 0.95, 0.2),
-		"plug": _mat(Color("efe9da"), 0.1, 0.4),
-		"exhaust": _mat(Color("6b5e55"), 0.7, 0.45),
-		"stand": _mat(Color("3a3f47"), 0.7, 0.45),
-		"flash": _mat(Color(1.0, 0.55, 0.15), 0.0, 1.0, 0.0),
-	}
-	var fm: StandardMaterial3D = _mats.flash
-	fm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	fm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	if D.MATERIALS[material_index % D.MATERIALS.size()].get("weave", false):
-		_mats.block.albedo_texture = _weave_tex()
-		_mats.head.albedo_texture = _weave_tex()
-
+	_make_mats()
+	var batch := MeshKit.Batch.new()
+	var exhaust_end: Vector3
 	if _spec().view == "rotary":
-		_build_rotary()
+		exhaust_end = _build_rotary(batch)
 	else:
-		_build_piston_engine()
-	_build_exhaust()
-	_build_stand()
-	_fit_camera()
-	_apply_xray()
-
-
-func _weave_tex() -> Texture2D:
-	var img := Image.create(16, 16, false, Image.FORMAT_RGBA8)
-	for y in 16:
-		for x in 16:
-			var on := ((x / 4) + (y / 4)) % 2 == 0
-			var v := 0.55 + (0.25 if on else 0.0) + 0.1 * float((x + y) % 4 == 0)
-			img.set_pixel(x, y, Color(v, v, v))
-	var t := ImageTexture.create_from_image(img)
-	return t
-
-
-func _rows_info() -> Dictionary:
-	var layout := _layout()
-	var rows := 0
-	for c in layout:
-		rows = maxi(rows, int(c.row) + 1)
-	return {"layout": layout, "rows": rows}
-
-
-func _row_x(row: int, rows: int) -> float:
-	return (row - (rows - 1) * 0.5) * SPACING
-
-
-func _build_piston_engine() -> void:
-	var info := _rows_info()
-	var rows: int = info.rows
-	var layout: Array = info.layout
-	var short := engine_type == "radial"
-	var rod_len := ROD * (0.85 if short else 1.0)
-	var deck := rod_len + 1.7
-	# коленвал целиком
-	var length := rows * SPACING + 1.6
-	var shaft := Node3D.new()
-	_engine.add_child(shaft)
-	_mi(_cyl(0.42, length, 16), _mats.crank, shaft, Vector3.ZERO, Vector3(0, 0, 90))
-	_shafts.append(shaft)
-	# маховик и шкив
-	_flywheel = Node3D.new()
-	_flywheel.position = Vector3(-length * 0.5 - 0.25, 0, 0)
-	_engine.add_child(_flywheel)
-	_mi(_cyl(2.0, 0.35, 32), _mats.steel, _flywheel, Vector3.ZERO, Vector3(0, 0, 90))
-	for k in 6:
-		_mi(_box(Vector3(0.4, 0.25, 0.6)), _mats.crank, _flywheel, Vector3(0, cos(k * TAU / 6) * 1.6, sin(k * TAU / 6) * 1.6))
-	var pulley := Node3D.new()
-	pulley.position = Vector3(length * 0.5 + 0.2, 0, 0)
-	_engine.add_child(pulley)
-	_mi(_cyl(0.9, 0.3, 24), _mats.crank, pulley, Vector3.ZERO, Vector3(0, 0, 90))
-	_shafts.append(pulley)
-	# картер
-	var case_w := rows * SPACING + 0.4
-	_mi(_box(Vector3(case_w, 2.6, 3.4)), _mats.case, _engine, Vector3(0, -0.4, 0))
-	_mi(_box(Vector3(case_w - 0.4, 0.7, 2.8)), _mats.block, _engine, Vector3(0, -2.0, 0))
-
-	var bank_count := {}
-	for c in layout:
-		bank_count[c.bank] = true
-	var banks: Array = bank_count.keys()
-	banks.sort()
-	for c in layout:
-		var frame := Node3D.new()
-		var bi := banks.find(c.bank)
-		var bx := 0.0
-		if banks.size() > 1 and engine_type != "radial":
-			bx = (bi - (banks.size() - 1) * 0.5) * 0.42
-		frame.position = Vector3(_row_x(int(c.row), rows) + bx, 0, 0)
-		frame.rotation_degrees = Vector3(c.bank, 0, 0)
-		_engine.add_child(frame)
-		var cy := {"frame": frame, "tdc": float(c.tdc), "deck": deck, "fins": []}
-		# гильза в разрезе + стенки
-		var liner_h := deck - 1.2
-		var liner := _mi(_half_tube(BORE + 0.06, BORE + 0.38, liner_h), _mats.block, frame, Vector3(0, 1.2 + liner_h * 0.5, 0))
-		cy.liner = liner
-		var bore := _mi(_half_tube(BORE + 0.02, BORE + 0.06, liner_h), _mats.bore, frame, Vector3(0, 1.2 + liner_h * 0.5, 0))
-		cy.bore = bore
-		# ГБЦ, крышка, свеча
-		var head := _mi(_box(Vector3(SPACING * 0.92 if banks.size() == 1 else 2.7, HEAD, 3.0)), _mats.head, frame, Vector3(0, deck + HEAD * 0.5, 0))
-		cy.head = head
-		_mi(_box(Vector3(SPACING * 0.8 if banks.size() == 1 else 2.4, 0.45, 2.4)), _mats.cover, frame, Vector3(0, deck + HEAD + 0.22, 0))
-		if not _spec().diesel:
-			_mi(_cyl(0.12, 0.7, 10), _mats.plug, frame, Vector3(0, deck + HEAD + 0.6, 0.6))
-			_mi(_cyl(0.18, 0.25, 10), _mats.steel, frame, Vector3(0, deck + HEAD + 0.95, 0.6))
-		else:
-			_mi(_cyl(0.16, 0.8, 10), _mats.steel, frame, Vector3(0, deck + HEAD + 0.6, 0.6))
-		# рёбра охлаждения (для одноцилиндрового и звезды)
-		if engine_type in ["single", "radial"]:
-			for k in 5:
-				cy.fins.append(_mi(_half_tube(BORE + 0.38, BORE + 0.75, 0.12), _mats.block, frame, Vector3(0, 2.0 + k * 0.55, 0)))
-		# клапаны
-		var valves: Array = []
-		for side in [-1, 1]:
-			var v := Node3D.new()
-			v.position = Vector3(side * 0.45, deck, 0)
-			frame.add_child(v)
-			_mi(_cyl(0.07, HEAD * 0.9, 8), _mats.steel, v, Vector3(0, HEAD * 0.45, 0))
-			_mi(_cyl(0.33, 0.08, 16), _mats.steel, v, Vector3(0, 0.04, 0))
-			valves.append(v)
-		cy.valves = valves
-		# вспышка в камере
-		var fl := _mi(SphereMesh.new(), _mats.flash, frame, Vector3(0, deck - 0.35, 0))
-		fl.scale = Vector3(BORE * 1.9, 0.6, BORE * 1.9)
-		cy.flash = fl
-		# поршень
-		var piston := Node3D.new()
-		frame.add_child(piston)
-		_mi(_cyl(BORE, 1.3, 24), _mats.piston, piston, Vector3(0, 0.0, 0))
-		for k in 2:
-			_mi(_cyl(BORE + 0.01, 0.07, 24), _mats.crank, piston, Vector3(0, 0.45 - k * 0.18, 0))
-		_mi(_cyl(0.18, BORE * 1.6, 10), _mats.steel, piston, Vector3(0, 0.15, 0), Vector3(0, 0, 90))
-		cy.piston = piston
-		# шатун
-		var rod := Node3D.new()
-		frame.add_child(rod)
-		cy.rod_len = rod_len
-		_mi(_box(Vector3(0.28, rod_len, 0.38)), _mats.rod, rod, Vector3(0, rod_len * 0.5, 0))
-		_mi(_cyl(0.42, 0.34, 16), _mats.rod, rod, Vector3.ZERO, Vector3(0, 0, 90))
-		cy.rod = rod
-		# кривошип
-		var throw := Node3D.new()
-		frame.add_child(throw)
-		_mi(_box(Vector3(0.22, 1.5, 0.75)), _mats.crank, throw, Vector3(0.24, 0.35, 0))
-		_mi(_box(Vector3(0.22, 1.5, 0.75)), _mats.crank, throw, Vector3(-0.24, 0.35, 0))
-		_mi(_cyl(0.75, 0.22, 16), _mats.crank, throw, Vector3(0.24, -0.45, 0), Vector3(0, 0, 90))
-		_mi(_cyl(0.75, 0.22, 16), _mats.crank, throw, Vector3(-0.24, -0.45, 0), Vector3(0, 0, 90))
-		_mi(_cyl(0.3, 0.5, 12), _mats.steel, throw, Vector3(0, 1.0, 0), Vector3(0, 0, 90))
-		cy.throw = throw
-		# выпускной патрубок
-		_pipe(frame, Vector3(0, deck + HEAD * 0.4, -1.2), Vector3(0, deck + HEAD * 0.3, -2.1), 0.28, _mats.exhaust)
-		_cyls.append(cy)
-
-
-func _build_rotary() -> void:
-	var e := 0.7
-	var R := 3.6
-	var inner := PackedVector2Array()
-	var outer := PackedVector2Array()
-	for i in 72:
-		var a := TAU * i / 72.0
-		var p := Vector2(e * cos(3.0 * a) + R * cos(a) * 1.04, e * sin(3.0 * a) + R * sin(a) * 1.04)
-		inner.append(p)
-		outer.append(p * 1.25)
-	var shaft := Node3D.new()
-	_engine.add_child(shaft)
-	_mi(_cyl(0.5, 5.0, 16), _mats.crank, shaft, Vector3.ZERO, Vector3(0, 0, 90))
-	_shafts.append(shaft)
-	_flywheel = Node3D.new()
-	_flywheel.position = Vector3(-2.8, 0, 0)
-	_engine.add_child(_flywheel)
-	_mi(_cyl(2.2, 0.35, 32), _mats.steel, _flywheel, Vector3.ZERO, Vector3(0, 0, 90))
-	var tri := PackedVector2Array()
-	for k in 3:
-		var a0 := TAU * k / 3.0
-		var a1 := TAU * (k + 1) / 3.0
-		var v0 := Vector2(cos(a0), sin(a0)) * R
-		var v1 := Vector2(cos(a1), sin(a1)) * R
-		for s in 8:
-			var t := s / 8.0
-			var mid := v0.lerp(v1, t)
-			tri.append(mid + (-mid).normalized() * -sin(PI * t) * 0.35)
-	for i in 2:
-		var x := -0.9 + i * 1.8
-		_mi(_extrude_ring(inner, outer, 1.2), _mats.block, _engine, Vector3(x, 0, 0))
-		# задняя стенка корпуса
-		_mi(_extrude(outer, 0.15), _mats.bore, _engine, Vector3(x - 0.62, 0, 0))
-		var rotor := Node3D.new()
-		rotor.position = Vector3(x, 0, 0)
-		_engine.add_child(rotor)
-		var body := _mi(_extrude(tri, 1.0), _mats.piston, rotor)
-		_mi(_cyl(1.1, 1.05, 24), _mats.crank, body, Vector3.ZERO, Vector3(0, 0, 90))
-		var fl := _mi(SphereMesh.new(), _mats.flash, _engine, Vector3(x, 0, -R * 0.8))
-		fl.scale = Vector3(1.0, 2.2, 1.2)
-		_rotors.append({"node": rotor, "phase": PI * i, "flash": fl})
-		# свечи
-		for k in 2:
-			_mi(_cyl(0.13, 0.9, 10), _mats.plug, _engine, Vector3(x, -0.6 + 1.2 * k, -R * 1.33), Vector3(90, 0, 0))
-	_mi(_box(Vector3(4.2, 1.0, 3.0)), _mats.case, _engine, Vector3(0, -R * 1.25 - 0.4, 0))
-
-
-func _build_exhaust() -> void:
-	var info := _rows_info()
-	var rows: int = maxi(1, info.rows)
-	var end_x := (rows * SPACING) * 0.5 + 1.2
-	if _spec().view == "rotary":
-		end_x = 2.0
-	# коллектор → глушитель
-	var start := Vector3(0, DECK * 0.6, -2.4)
-	if _spec().view == "rotary":
-		start = Vector3(0, 0, -4.8)
-	# глушитель сзади мотора, чтобы не закрывал вид
-	var muff_pos := Vector3(end_x * 0.5, -1.2, -3.6)
-	if _spec().view == "rotary":
-		muff_pos = Vector3(0.5, -2.0, -5.6)
-	_pipe(_engine, Vector3(-end_x + 1.2, start.y, start.z), Vector3(end_x, start.y, start.z), 0.35, _mats.exhaust)
-	_pipe(_engine, Vector3(end_x, start.y, start.z), muff_pos + Vector3(-0.2, 0.9, 0), 0.32, _mats.exhaust)
-	var muff := _mi(_cyl(0.75, 2.2, 20), _mats.exhaust, _engine, muff_pos)
-	muff.name = "muffler"
-	var tail := muff_pos + Vector3(0.0, 1.6, -0.6)
-	_pipe(_engine, muff_pos + Vector3(0, 0.9, 0), tail, 0.22, _mats.steel)
-	_smoke.position = tail
-	_flames.position = tail
-	_steam.position = Vector3(0, DECK + HEAD + 1.2, 0)
-	# турбина
-	var has_turbine := not demo and not G.equipped("turbine").is_empty()
-	if has_turbine:
-		var tp := Vector3(end_x + 0.2, start.y + 1.2, start.z)
-		var housing := _mi(TorusMesh.new(), _mats.steel, _engine, tp, Vector3(90, 0, 0))
-		housing.scale = Vector3(1.4, 1.4, 1.4)
-		_turbine_wheel = Node3D.new()
-		_turbine_wheel.position = tp
-		_engine.add_child(_turbine_wheel)
-		for k in 8:
-			var blade := _mi(_box(Vector3(0.12, 0.9, 0.3)), _mats.piston, _turbine_wheel, Vector3.ZERO)
-			blade.rotation = Vector3(0, 0, TAU * k / 8.0)
-			blade.position = Vector3(cos(TAU * k / 8.0 + PI * 0.5), sin(TAU * k / 8.0 + PI * 0.5), 0) * -0.45
-		_turbo_light.position = tp
-	else:
-		_turbo_light.position = Vector3(0, 3, 2)
-
-
-func _build_stand() -> void:
-	# стенд: основание под мотором и стойки, держащие коленвал с торцов
+		exhaust_end = _build_piston_engine(batch)
+	_build_exhaust_tail(batch, exhaust_end)
+	batch.commit(_engine, _mats)
+	# приводим к одному размеру, ставим на стенд и на пол (y = 0)
 	var box := _engine_aabb()
-	var y := box.position.y - 0.5
-	var half := box.size.x * 0.5 + 0.3
-	var cx := box.get_center().x
-	_mi(_box(Vector3(box.size.x + 1.4, 0.35, maxf(3.6, box.size.z * 0.7))), _mats.stand, _engine, Vector3(cx, y, 0))
-	for sx in [-1, 1]:
-		var px: float = cx + sx * half
-		_mi(_box(Vector3(0.4, -y, 0.5)), _mats.stand, _engine, Vector3(px, y * 0.5, 0))
-		_mi(_cyl(0.35, 0.5, 12), _mats.steel, _engine, Vector3(px, 0, 0), Vector3(0, 0, 90))
-		_mi(_box(Vector3(0.6, 0.12, 2.4)), _mats.stand, _engine, Vector3(px, y + 0.2, 0))
-	var floor_m := StandardMaterial3D.new()
-	floor_m.albedo_color = Color(0, 0, 0, 0.55)
-	floor_m.shadow_to_opacity = true
-	floor_m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(60, 60)
-	_mi(plane, floor_m, _engine, Vector3(0, y - 0.18, 0))
+	var k := ENGINE_SIZE / maxf(box.size.length() * 0.5, 0.1)
+	_engine.scale = Vector3.ONE * k
+	box = _engine_aabb()
+	var stand_batch := MeshKit.Batch.new()
+	_lift = _build_stand(stand_batch, box, k)
+	stand_batch.commit(_engine, _mats)
+	_engine.position = Vector3(0, _lift, 0)
+	box = _engine_aabb()
+	_center = box.get_center()
+	_steam.position = Vector3(_center.x, box.end.y - 1.0, _center.z)
+	_apply_xray()
+	_update_tints()
 
 
 func _engine_aabb() -> AABB:
 	var aabb := AABB()
 	var first := true
+	var inv := _root.global_transform.affine_inverse()
 	for n in _engine.find_children("*", "MeshInstance3D", true, false):
 		var mi: MeshInstance3D = n
-		if mi.mesh is PlaneMesh:
+		if mi.mesh == null:
 			continue
-		var b: AABB = _engine.global_transform.affine_inverse() * mi.global_transform * mi.get_aabb()
+		var b: AABB = inv * mi.global_transform * mi.get_aabb()
 		if first:
 			aabb = b
 			first = false
@@ -713,32 +464,462 @@ func _engine_aabb() -> AABB:
 	return aabb
 
 
-func _fit_camera() -> void:
-	var aabb := _engine_aabb()
-	_center = aabb.get_center()
-	_radius = aabb.size.length() * 0.5
-	_place_camera()
+func _rows() -> int:
+	var rows := 0
+	for c in _layout():
+		rows = maxi(rows, int(c.row) + 1)
+	return rows
 
 
-func _place_camera() -> void:
-	var dir := _view_dir().rotated(Vector3.UP, _yaw)
-	var aspect := maxf(0.3, size.x / maxf(size.y, 1.0))
-	var half_v := deg_to_rad(_cam.fov * 0.5)
-	var half_h := atan(tan(half_v) * aspect)
-	var dist := _radius / sin(minf(half_v, half_h)) * 0.92
-	_cam.position = _center + dir * dist
-	_cam.look_at(_center + Vector3(0, -_radius * 0.05, 0), Vector3.UP)
+func _row_x(row: int, rows: int) -> float:
+	return (row - (rows - 1) * 0.5) * SPACING
+
+
+func _part(parent: Node3D, mesh: Mesh, mat_key: String, pos: Vector3 = Vector3.ZERO, rot_deg: Vector3 = Vector3.ZERO) -> MeshInstance3D:
+	var m := MeshInstance3D.new()
+	m.mesh = mesh
+	m.material_override = _mats.get(mat_key)
+	m.position = pos
+	m.rotation_degrees = rot_deg
+	parent.add_child(m)
+	return m
+
+
+func _xf(pos: Vector3, rot_deg: Vector3 = Vector3.ZERO) -> Transform3D:
+	return Transform3D(Basis.from_euler(rot_deg * (PI / 180.0)), pos)
+
+
+func _build_piston_engine(batch: MeshKit.Batch) -> Vector3:
+	var rows := _rows()
+	var layout := _layout()
+	var short := engine_type == "radial"
+	var rod_len := ROD * (0.85 if short else 1.0)
+	var deck := rod_len + 1.7
+	var length := rows * SPACING + 1.4
+	var diesel: bool = _spec().diesel
+	var turbo := _built_key.split("|")[2] == "1"
+
+	# прототипы движущихся деталей (одна сетка на деталь, несколько материалов)
+	var pb := MeshKit.Batch.new()
+	pb.add("piston", MeshKit.cyl(BORE, 1.3, 32), Transform3D.IDENTITY)
+	for k in 3:
+		pb.add("crank", MeshKit.cyl(BORE + 0.012, 0.06, 32), _xf(Vector3(0, 0.5 - k * 0.15, 0)))
+	pb.add("steel", MeshKit.cyl(0.19, BORE * 1.7, 12), _xf(Vector3(0, 0.15, 0), Vector3(0, 0, 90)))
+	if diesel:
+		pb.add("crank", MeshKit.cyl(BORE * 0.55, 0.05, 24), _xf(Vector3(0, 0.64, 0)))
+	var piston_mesh := pb.commit_mesh(_mats)
+	pb.add("rod", MeshKit.rounded_box(Vector3(0.26, rod_len, 0.42), 0.08, 3), _xf(Vector3(0, rod_len * 0.5, 0)))
+	pb.add("rod", MeshKit.cyl(0.46, 0.36, 20), _xf(Vector3.ZERO, Vector3(0, 0, 90)))
+	pb.add("steel", MeshKit.cyl(0.24, 0.4, 12), _xf(Vector3.ZERO, Vector3(0, 0, 90)))
+	pb.add("rod", MeshKit.cyl(0.26, 0.32, 16), _xf(Vector3(0, rod_len, 0), Vector3(0, 0, 90)))
+	var rod_mesh := pb.commit_mesh(_mats)
+	for sx in [-0.26, 0.26]:
+		pb.add("crank", MeshKit.extrude(_web_poly(), 0.2), _xf(Vector3(sx, 0, 0)))
+	pb.add("steel", MeshKit.cyl(0.3, 0.6, 16), _xf(Vector3(0, 1.0, 0), Vector3(0, 0, 90)))
+	var throw_mesh := pb.commit_mesh(_mats)
+	pb.add("steel", MeshKit.cyl(0.07, HEAD * 0.95, 8), _xf(Vector3(0, HEAD * 0.47, 0)))
+	pb.add("steel", MeshKit.cone(0.34, 0.1, 0.12, 20), _xf(Vector3(0, 0.06, 0)))
+	pb.add("brass", MeshKit.cyl(0.2, 0.25, 12), _xf(Vector3(0, HEAD * 0.8, 0)))
+	var valve_mesh := pb.commit_mesh(_mats)
+
+	# коленвал, маховик с венцом
+	var shaft := Node3D.new()
+	_engine.add_child(shaft)
+	_part(shaft, MeshKit.cyl(0.42, length, 20), "crank", Vector3.ZERO, Vector3(0, 0, 90))
+	_spinners.append({"node": shaft, "ratio": 1.0})
+	var fly := Node3D.new()
+	fly.position = Vector3(-length * 0.5 - 0.25, 0, 0)
+	_engine.add_child(fly)
+	_part(fly, MeshKit.cyl(2.0, 0.3, 40), "steel", Vector3.ZERO, Vector3(0, 0, 90))
+	_part(fly, MeshKit.gear(2.05, 0.22, 48, 0.1), "crank", Vector3(-0.08, 0, 0))
+	for k in 6:
+		_part(fly, MeshKit.cyl(0.1, 0.36, 6), "crank", Vector3(0, cos(k * TAU / 6) * 0.7, sin(k * TAU / 6) * 0.7), Vector3(0, 0, 90))
+	_spinners.append({"node": fly, "ratio": 1.0})
+	var front_x := length * 0.5 + 0.2
+
+	# картер, поддон с рёбрами, масляный фильтр, щуп
+	var case_w := rows * SPACING + 0.5
+	if engine_type == "radial":
+		_part(_engine, MeshKit.cyl(2.0, 2.6, 32), "case", Vector3.ZERO, Vector3(0, 0, 90))
+	else:
+		_part(_engine, MeshKit.rounded_box(Vector3(case_w, 2.6, 3.4), 0.35, 4), "case", Vector3(0, -0.4, 0))
+		batch.add("block", MeshKit.rounded_box(Vector3(case_w - 0.3, 0.8, 2.9), 0.25, 3), _xf(Vector3(0, -2.05, 0)))
+		for k in int(case_w / 0.6):
+			batch.add("block", MeshKit.box(Vector3(0.08, 0.5, 3.0)), _xf(Vector3(-case_w * 0.5 + 0.4 + k * 0.6, -2.1, 0)))
+		batch.add("filter", MeshKit.cyl(0.42, 0.9, 20), _xf(Vector3(case_w * 0.25, -0.6, 1.95), Vector3(90, 0, 0)))
+		batch.add("rubber", MeshKit.cyl(0.44, 0.08, 20), _xf(Vector3(case_w * 0.25, -0.6, 1.5), Vector3(90, 0, 0)))
+		batch.add("brass", MeshKit.rounded_box(Vector3(0.3, 0.12, 0.3), 0.05, 2), _xf(Vector3(-case_w * 0.3, 1.6, 1.85)))
+		batch.add("steel", MeshKit.cyl(0.04, 1.8, 6), _xf(Vector3(-case_w * 0.3, 0.7, 1.8)))
+
+	var banks: Array = []
+	for c in layout:
+		if not banks.has(c.bank):
+			banks.append(c.bank)
+	banks.sort()
+	var header_ends: Array = []
+	for c in layout:
+		var frame := Node3D.new()
+		var bi := banks.find(c.bank)
+		var bx := 0.0
+		if banks.size() > 1 and engine_type != "radial":
+			bx = (bi - (banks.size() - 1) * 0.5) * 0.44
+		frame.position = Vector3(_row_x(int(c.row), rows) + bx, 0, 0)
+		frame.rotation_degrees = Vector3(c.bank, 0, 0)
+		_engine.add_child(frame)
+		var fx := frame.transform
+		var head_w := SPACING * 0.96 if banks.size() == 1 else 2.75
+		var bank_sign := signf(c.bank) if c.bank != 0.0 else -1.0
+		var out_z := 1.45 * bank_sign  # выпуск наружу (у рядного — назад, от камеры)
+		var cy := {"frame": frame, "tdc": float(c.tdc), "deck": deck, "fins": [], "rod_len": rod_len}
+		# гильза в разрезе (поворачивается к камере)
+		var liner_h := deck - 1.2
+		cy.liner = _part(frame, MeshKit.half_tube(BORE + 0.06, BORE + 0.42, liner_h, 24), "block", Vector3(0, 1.2 + liner_h * 0.5, 0))
+		cy.bore = _part(frame, MeshKit.half_tube(BORE + 0.015, BORE + 0.06, liner_h, 24), "bore", Vector3(0, 1.2 + liner_h * 0.5, 0))
+		if engine_type in ["single", "radial", "experimental"]:
+			for k in 6:
+				cy.fins.append(_part(frame, MeshKit.half_tube(BORE + 0.42, BORE + 0.85, 0.1, 24), "block", Vector3(0, 1.9 + k * 0.48 * (rod_len / ROD), 0)))
+		# ГБЦ: литая головка, рёбристая крышка, болты
+		batch.add("head", MeshKit.rounded_box(Vector3(head_w, HEAD, 3.1), 0.18, 4), fx * _xf(Vector3(0, deck + HEAD * 0.5, 0)))
+		batch.add("cover", MeshKit.rounded_box(Vector3(head_w * 0.9, 0.55, 2.5), 0.22, 4), fx * _xf(Vector3(0, deck + HEAD + 0.25, 0)))
+		for k in 3:
+			batch.add("cover", MeshKit.rounded_box(Vector3(head_w * 0.8, 0.12, 0.18), 0.05, 2), fx * _xf(Vector3(0, deck + HEAD + 0.55, -0.7 + k * 0.7)))
+		for bxp in [-1, 1]:
+			for bzp in [-1, 1]:
+				batch.add("steel", MeshKit.cyl(0.11, 0.14, 6), fx * _xf(Vector3(bxp * head_w * 0.4, deck + HEAD + 0.5, bzp * 1.05)))
+		if engine_type == "experimental":
+			for zz in [-1.58, 1.58]:
+				batch.add("accent", MeshKit.rounded_box(Vector3(head_w * 0.92, 0.07, 0.08), 0.02, 1), fx * _xf(Vector3(0, deck + HEAD * 0.5, zz)))
+		# катушка зажигания или форсунка
+		if not diesel:
+			batch.add("coil", MeshKit.rounded_box(Vector3(0.55, 0.75, 0.55), 0.14, 3), fx * _xf(Vector3(0, deck + HEAD + 0.85, 0)))
+			batch.add("plug", MeshKit.cyl(0.13, 0.5, 10), fx * _xf(Vector3(0, deck + HEAD + 0.25, 0)))
+		else:
+			batch.add("steel", MeshKit.cyl(0.17, 0.9, 10), fx * _xf(Vector3(0, deck + HEAD + 0.75, 0)))
+			batch.add("brass", MeshKit.cyl(0.1, 0.3, 8), fx * _xf(Vector3(0, deck + HEAD + 1.3, 0)))
+		# впускные «дудки» (не у звезды)
+		if engine_type != "radial":
+			var in_z := -out_z * 0.9
+			batch.add("head", MeshKit.rounded_box(Vector3(0.9, 0.7, 0.6), 0.15, 2), fx * _xf(Vector3(0, deck + HEAD * 0.5, in_z * 1.1)))
+			var tr := _xf(Vector3(0, deck + HEAD * 0.9, in_z * 1.25), Vector3(-signf(in_z) * 35.0, 0, 0))
+			batch.add("steel", MeshKit.cyl(0.36, 1.1, 20), fx * tr * _xf(Vector3(0, 0.5, 0)))
+			batch.add("steel", MeshKit.cone(0.36, 0.62, 0.35, 20), fx * tr * _xf(Vector3(0, 1.2, 0)))
+		# выпускной патрубок → точки коллектора
+		var port: Vector3
+		var out_dir: Vector3
+		if engine_type == "radial":
+			port = fx * Vector3(-0.9, deck + HEAD * 0.3, 0)
+			out_dir = Vector3(-1, 0, 0)
+		else:
+			port = fx * Vector3(0, deck + HEAD * 0.45, out_z * 1.08)
+			out_dir = (fx.basis * Vector3(0, -0.25, signf(out_z))).normalized()
+		header_ends.append({"port": port, "dir": out_dir, "bank": c.bank})
+		# клапаны
+		var valves: Array = []
+		for side in [-1, 1]:
+			var v := MeshInstance3D.new()
+			v.mesh = valve_mesh
+			v.position = Vector3(side * 0.42, deck, 0)
+			frame.add_child(v)
+			valves.append(v)
+		cy.valves = valves
+		# вспышка в камере
+		var fl := _part(frame, SphereMesh.new(), "flash", Vector3(0, deck - 0.35, 0))
+		fl.scale = Vector3(BORE * 1.9, 0.6, BORE * 1.9)
+		fl.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		cy.flash = fl
+		var piston := MeshInstance3D.new()
+		piston.mesh = piston_mesh
+		frame.add_child(piston)
+		cy.piston = piston
+		var rod := MeshInstance3D.new()
+		rod.mesh = rod_mesh
+		frame.add_child(rod)
+		cy.rod = rod
+		var throw := MeshInstance3D.new()
+		throw.mesh = throw_mesh
+		frame.add_child(throw)
+		cy.throw = throw
+		_cyls.append(cy)
+
+	if engine_type != "radial":
+		_build_timing(batch, front_x, deck, banks)
+	else:
+		# пропеллер у звездообразного
+		var prop := Node3D.new()
+		prop.position = Vector3(front_x + 1.6, 0, 0)
+		_engine.add_child(prop)
+		_part(prop, MeshKit.cone(0.9, 0.0, 1.6, 24), "steel", Vector3(0.7, 0, 0), Vector3(0, 0, -90))
+		for k in 3:
+			var a := TAU * k / 3.0
+			var blade := _part(prop, MeshKit.rounded_box(Vector3(0.18, 6.5, 0.7), 0.08, 3), "rubber")
+			blade.basis = Basis(Vector3.RIGHT, a) * Basis(Vector3.UP, 0.35)
+			blade.position = Vector3(0, cos(a), sin(a)) * 3.3
+		_spinners.append({"node": prop, "ratio": 1.0})
+		_part(_engine, MeshKit.cyl(0.5, 1.2, 16), "crank", Vector3(front_x + 0.6, 0, 0), Vector3(0, 0, 90))
+		var ring := TorusMesh.new()
+		ring.inner_radius = deck * 0.55
+		ring.outer_radius = deck * 0.55 + 0.45
+		batch.add("header", ring, _xf(Vector3(-1.4, 0, 0), Vector3(0, 0, 90)))
+	return _build_headers(batch, header_ends, length, turbo)
+
+
+func _web_poly() -> PackedVector2Array:
+	# щека коленвала в плоскости (y, z): от шатунной шейки сверху к противовесу-полукругу снизу
+	var p := PackedVector2Array()
+	p.append(Vector2(1.25, -0.4))
+	p.append(Vector2(1.25, 0.4))
+	for i in 17:
+		var a := PI * i / 16.0
+		p.append(Vector2(-0.15 - sin(a) * 1.0, cos(a) * 1.0))
+	return p
+
+
+func _build_timing(batch: MeshKit.Batch, front_x: float, deck: float, banks: Array) -> void:
+	var crank_sp := Node3D.new()
+	crank_sp.position = Vector3(front_x + 0.15, 0, 0)
+	_engine.add_child(crank_sp)
+	_part(crank_sp, MeshKit.gear(0.75, 0.32, 20, 0.08), "steel")
+	_part(crank_sp, MeshKit.cyl(1.0, 0.25, 32), "crank", Vector3(0.3, 0, 0), Vector3(0, 0, 90))
+	_spinners.append({"node": crank_sp, "ratio": 1.0})
+	var belt_pts: Array = [Vector2(0, 0)]
+	var radii: Array = [0.9]
+	for b in banks:
+		var cam_y := deck + HEAD * 0.75
+		var p3 := Basis(Vector3.RIGHT, deg_to_rad(b)) * Vector3(0, cam_y, 0)
+		var sp := Node3D.new()
+		sp.position = Vector3(front_x + 0.15, p3.y, p3.z)
+		_engine.add_child(sp)
+		_part(sp, MeshKit.gear(1.15, 0.3, 30, 0.09), "steel")
+		_part(sp, MeshKit.cyl(0.35, 0.36, 16), "crank", Vector3.ZERO, Vector3(0, 0, 90))
+		for k in 4:
+			_part(sp, MeshKit.cyl(0.18, 0.34, 12), "crank", Vector3(0, cos(k * TAU / 4) * 0.7, sin(k * TAU / 4) * 0.7), Vector3(0, 0, 90))
+		_spinners.append({"node": sp, "ratio": 0.5})
+		belt_pts.append(Vector2(p3.y, p3.z))
+		radii.append(1.25)
+	# натяжной ролик
+	var idler := Vector2(deck * 0.45, 1.7)
+	belt_pts.append(idler)
+	radii.append(0.45)
+	_part(_engine, MeshKit.cyl(0.42, 0.34, 16), "steel", Vector3(front_x + 0.15, idler.x, idler.y), Vector3(0, 0, 90))
+	# ремень — выпуклая оболочка вокруг шкивов
+	var cloud := PackedVector2Array()
+	for i in belt_pts.size():
+		var c: Vector2 = belt_pts[i]
+		var r: float = radii[i]
+		for k in 24:
+			var a := TAU * k / 24.0
+			cloud.append(c + Vector2(cos(a), sin(a)) * r)
+	var hull := Geometry2D.convex_hull(cloud)
+	var path := PackedVector3Array()
+	for v in hull:
+		path.append(Vector3(front_x + 0.15, v.x, v.y))
+	batch.add("belt", MeshKit.sweep(path, 0.1, 4, false), Transform3D.IDENTITY)
+	# генератор с крыльчаткой
+	batch.add("steel", MeshKit.cyl(0.75, 1.1, 24), _xf(Vector3(front_x - 0.4, 1.4, 2.3), Vector3(0, 0, 90)))
+	for k in 8:
+		batch.add("crank", MeshKit.box(Vector3(1.12, 0.08, 0.3)), _xf(Vector3(front_x - 0.4, 1.4, 2.3), Vector3(k * 22.5, 0, 0)))
+
+
+func _build_headers(batch: MeshKit.Batch, ends: Array, length: float, turbo: bool) -> Vector3:
+	# коллектор: трубы от каждого цилиндра плавно уходят вниз к общей трубе
+	var collector_y := -0.6
+	var groups := {}
+	for e in ends:
+		var key: String = "r" if engine_type == "radial" else str(signf(e.bank) if e.bank != 0.0 else -1.0)
+		if not groups.has(key):
+			groups[key] = []
+		groups[key].append(e)
+	var merge_points: Array = []
+	for key in groups:
+		var list: Array = groups[key]
+		if engine_type == "radial":
+			for e in list:
+				var p0: Vector3 = e.port
+				batch.add("header", MeshKit.sweep(MeshKit.bezier(p0, p0 + Vector3(-0.6, 0, 0), p0 + Vector3(-1.2, 0, 0), p0 + Vector3(-1.4, 0, 0), 6), 0.26, 10), Transform3D.IDENTITY)
+			merge_points.append(Vector3(-2.2, -2.0, 0))
+			continue
+		var side_z: float = list[0].port.z
+		var out := signf(side_z) if absf(side_z) > 0.01 else -1.0
+		var col_z := side_z + out * 1.6
+		var col_x := length * 0.5 + 0.4
+		var xs: Array = []
+		for e in list:
+			var p0: Vector3 = e.port
+			var dir: Vector3 = e.dir
+			var p1 := p0 + dir * 1.4
+			var p3 := Vector3(lerpf(p0.x, col_x, 0.35), collector_y, col_z)
+			var p2 := p3 + Vector3(0, 1.4, 0)
+			batch.add("header", MeshKit.sweep(MeshKit.bezier(p0, p1, p2, p3, 14), 0.27, 12), Transform3D.IDENTITY)
+			batch.add("steel", MeshKit.rounded_box(Vector3(0.8, 0.12, 0.8), 0.06, 2), Transform3D(MeshKit.align_y(dir), p0))
+			xs.append(p3.x)
+		xs.sort()
+		var a := Vector3(float(xs[0]) - 0.2, collector_y, col_z)
+		var b := Vector3(col_x, collector_y, col_z)
+		batch.add("header", MeshKit.sweep(PackedVector3Array([a, b]), 0.42, 14), Transform3D.IDENTITY)
+		merge_points.append(b)
+	var m := Vector3.ZERO
+	for p in merge_points:
+		m += p
+	m /= maxf(1.0, merge_points.size())
+	if merge_points.size() > 1:
+		var target := m + Vector3(1.2, -1.2, 0)
+		for p in merge_points:
+			var pp: Vector3 = p
+			batch.add("header", MeshKit.sweep(MeshKit.bezier(pp, pp + Vector3(0.8, 0, 0), target + Vector3(-0.6, 0.4, 0), target, 10), 0.38, 12), Transform3D.IDENTITY)
+		m = target
+	if turbo:
+		m = _build_turbo(batch, m)
+	return m
+
+
+func _build_turbo(batch: MeshKit.Batch, inlet: Vector3) -> Vector3:
+	# улитка, крыльчатка, компрессор с конусным фильтром (как на логотипе)
+	var tp := inlet + Vector3(1.2, 1.6, 0)
+	batch.add("header", MeshKit.sweep(MeshKit.bezier(inlet, inlet + Vector3(0.6, 0, 0), tp + Vector3(-0.4, -1.2, 0), tp + Vector3(0, -0.9, 0), 8), 0.38, 12), Transform3D.IDENTITY)
+	var housing := TorusMesh.new()
+	housing.inner_radius = 0.55
+	housing.outer_radius = 1.25
+	housing.rings = 24
+	batch.add("header", housing, _xf(tp, Vector3(0, 0, 90)))
+	batch.add("steel", MeshKit.cyl(0.65, 0.9, 24), _xf(tp + Vector3(0.6, 0, 0), Vector3(0, 0, 90)))
+	var comp := TorusMesh.new()
+	comp.inner_radius = 0.6
+	comp.outer_radius = 1.35
+	comp.rings = 24
+	batch.add("steel", comp, _xf(tp + Vector3(1.2, 0, 0), Vector3(0, 0, 90)))
+	batch.add("steel", MeshKit.cone(0.7, 0.55, 0.9, 24), _xf(tp + Vector3(1.9, 0, 0), Vector3(0, 0, -90)))
+	batch.add("airfilter", MeshKit.cone(0.62, 0.95, 1.6, 28), _xf(tp + Vector3(3.1, 0, 0), Vector3(0, 0, -90)))
+	for k in 6:
+		batch.add("steel", MeshKit.cyl(0.66 + k * 0.055, 0.04, 28), _xf(tp + Vector3(2.4 + k * 0.27, 0, 0), Vector3(0, 0, 90)))
+	batch.add("steel", MeshKit.cyl(0.98, 0.08, 28), _xf(tp + Vector3(3.92, 0, 0), Vector3(0, 0, 90)))
+	_turbine_wheel = Node3D.new()
+	_turbine_wheel.position = tp + Vector3(1.2, 0, 0)
+	_engine.add_child(_turbine_wheel)
+	for k in 10:
+		var a := TAU * k / 10.0
+		var blade := _part(_turbine_wheel, MeshKit.box(Vector3(0.08, 0.5, 0.18)), "piston")
+		blade.basis = Basis(Vector3.RIGHT, a) * Basis(Vector3.UP, 0.5)
+		blade.position = Vector3(0, cos(a), sin(a)) * 0.3
+	_turbo_light.position = tp
+	var down := tp + Vector3(-0.2, -2.2, 0.8)
+	batch.add("header", MeshKit.sweep(MeshKit.bezier(tp + Vector3(0, -0.6, 0.6), tp + Vector3(0, -1.2, 1.0), down + Vector3(0, 0.6, 0), down, 8), 0.36, 12), Transform3D.IDENTITY)
+	return down
+
+
+func _build_exhaust_tail(batch: MeshKit.Batch, from: Vector3) -> void:
+	# глушитель и хвост — назад и вниз, чтобы не закрывать мотор
+	var muff_c := from + Vector3(0.6, -0.6, -2.4)
+	batch.add("header", MeshKit.sweep(MeshKit.bezier(from, from + Vector3(0.3, -0.4, -0.5), muff_c + Vector3(0, 0.3, 1.8), muff_c + Vector3(0, 0, 1.3), 8), 0.34, 12), Transform3D.IDENTITY)
+	batch.add("steel", MeshKit.rounded_box(Vector3(1.5, 1.2, 2.8), 0.5, 4), _xf(muff_c))
+	var tail0 := muff_c + Vector3(0, 0, -1.3)
+	var tail1 := tail0 + Vector3(0, 0.2, -1.0)
+	batch.add("steel", MeshKit.sweep(PackedVector3Array([tail0, tail1]), 0.3, 16), Transform3D.IDENTITY)
+	batch.add("bore", MeshKit.cyl(0.25, 0.05, 16), _xf(tail1, Vector3(90, 0, 0)))
+	_tail_pos = tail1
+
+
+func _build_rotary(batch: MeshKit.Batch) -> Vector3:
+	var e := 0.7
+	var R := 3.6
+	var inner := PackedVector2Array()
+	var outer := PackedVector2Array()
+	for i in 96:
+		var a := TAU * i / 96.0
+		var p := Vector2(e * cos(3.0 * a) + R * cos(a) * 1.04, e * sin(3.0 * a) + R * sin(a) * 1.04)
+		inner.append(p)
+		outer.append(p * 1.25)
+	var shaft := Node3D.new()
+	_engine.add_child(shaft)
+	_part(shaft, MeshKit.cyl(0.5, 5.2, 16), "crank", Vector3.ZERO, Vector3(0, 0, 90))
+	_spinners.append({"node": shaft, "ratio": 1.0})
+	var fly := Node3D.new()
+	fly.position = Vector3(-2.9, 0, 0)
+	_engine.add_child(fly)
+	_part(fly, MeshKit.cyl(2.3, 0.35, 40), "steel", Vector3.ZERO, Vector3(0, 0, 90))
+	_part(fly, MeshKit.gear(2.35, 0.25, 54, 0.1), "crank", Vector3(-0.08, 0, 0))
+	_spinners.append({"node": fly, "ratio": 1.0})
+	var tri := PackedVector2Array()
+	for k in 3:
+		var a0 := TAU * k / 3.0
+		var a1 := TAU * (k + 1) / 3.0
+		var v0 := Vector2(cos(a0), sin(a0)) * R
+		var v1 := Vector2(cos(a1), sin(a1)) * R
+		for s in 10:
+			var t := s / 10.0
+			var mid := v0.lerp(v1, t)
+			tri.append(mid + (-mid).normalized() * -sin(PI * t) * 0.35)
+	for i in 2:
+		var x := -0.9 + i * 1.8
+		batch.add("block", MeshKit.extrude_ring(inner, outer, 1.2), _xf(Vector3(x, 0, 0)))
+		batch.add("bore", MeshKit.extrude(outer, 0.15), _xf(Vector3(x - 0.62, 0, 0)))
+		for k in 10:
+			var a := TAU * k / 10.0
+			batch.add("steel", MeshKit.cyl(0.12, 1.3, 6), _xf(Vector3(x, cos(a) * R * 1.32, sin(a) * R * 1.32), Vector3(0, 0, 90)))
+		var rotor := Node3D.new()
+		rotor.position = Vector3(x, 0, 0)
+		_engine.add_child(rotor)
+		var body := _part(rotor, MeshKit.extrude(tri, 1.0), "piston")
+		_part(body, MeshKit.gear(1.1, 1.05, 24, 0.08), "crank")
+		var fl := _part(_engine, SphereMesh.new(), "flash", Vector3(x, 0, -R * 0.8))
+		fl.scale = Vector3(1.0, 2.2, 1.2)
+		_rotors.append({"node": rotor, "phase": PI * i, "flash": fl})
+		for k in 2:
+			batch.add("plug", MeshKit.cyl(0.13, 0.9, 10), _xf(Vector3(x, -0.6 + 1.2 * k, -R * 1.33), Vector3(90, 0, 0)))
+			batch.add("coil", MeshKit.rounded_box(Vector3(0.5, 0.5, 0.7), 0.12, 2), _xf(Vector3(x, -0.6 + 1.2 * k, -R * 1.33 - 0.7)))
+		batch.add("steel", MeshKit.sweep(MeshKit.bezier(Vector3(x, R * 1.1, 1.2), Vector3(x, R * 1.6, 1.6), Vector3(x, R * 1.8, 2.4), Vector3(x, R * 1.8, 3.2), 8), 0.35, 14), Transform3D.IDENTITY)
+		batch.add("steel", MeshKit.cone(0.35, 0.6, 0.4, 16), _xf(Vector3(x, R * 1.8, 3.4), Vector3(90, 0, 0)))
+	batch.add("case", MeshKit.rounded_box(Vector3(4.2, 1.0, 3.0), 0.3, 3), _xf(Vector3(0, -R * 1.25 - 0.4, 0)))
+	var col := Vector3(2.4, -2.6, R * 1.6)
+	for i in 2:
+		var p := Vector3(-0.9 + i * 1.8, -1.0, R * 1.2)
+		batch.add("header", MeshKit.sweep(MeshKit.bezier(p, p + Vector3(0, 0, 1.0), col + Vector3(-1.0, 0.8, 0), col, 10), 0.3, 12), Transform3D.IDENTITY)
+	if _built_key.split("|")[2] == "1":
+		return _build_turbo(batch, col)
+	return col
+
+
+func _build_stand(batch: MeshKit.Batch, box: AABB, k: float) -> float:
+	# стенд из труб на колёсиках, стойки держат мотор за торцы коленвала.
+	# Координаты считаются в пространстве корня (мотор уже отмасштабирован) и переводятся в локальные.
+	var inv := 1.0 / k
+	var floor_y := box.position.y - 0.7
+	var cx := box.get_center().x
+	var half_x := box.size.x * 0.5 + 0.5
+	var half_z := maxf(1.8, box.size.z * 0.28)
+	var corners := []
+	for sx in [-1, 1]:
+		for sz in [-1, 1]:
+			corners.append(Vector3(cx + sx * half_x, floor_y + 0.55, sz * half_z))
+	var tube := 0.16
+	for pair in [[0, 1], [2, 3], [0, 2], [1, 3]]:
+		batch.add("stand", MeshKit.sweep(PackedVector3Array([corners[pair[0]], corners[pair[1]]]), tube, 10), _sc(inv))
+	for sx in [-1, 1]:
+		var base := Vector3(cx + sx * half_x, floor_y + 0.55, 0)
+		var top := Vector3(cx + sx * half_x, 0.0, 0)
+		batch.add("stand", MeshKit.sweep(PackedVector3Array([base + Vector3(0, 0, -half_z), top]), tube, 10), _sc(inv))
+		batch.add("stand", MeshKit.sweep(PackedVector3Array([base + Vector3(0, 0, half_z), top]), tube, 10), _sc(inv))
+		batch.add("stand", MeshKit.rounded_box(Vector3(0.55, 0.55, 0.55), 0.12, 2), _sc(inv, top))
+		batch.add("steel", MeshKit.sweep(PackedVector3Array([top, top - Vector3(sx * 0.9, 0, 0)]), 0.12, 10), _sc(inv))
+	for p in corners:
+		batch.add("steel", MeshKit.cyl(0.08, 0.3, 8), _sc(inv, p + Vector3(0, -0.2, 0)))
+		batch.add("rubber", MeshKit.cyl(0.24, 0.16, 16), Transform3D(Basis(Vector3.RIGHT, PI * 0.5).scaled(Vector3.ONE * inv), (p + Vector3(0, -0.36, 0)) * inv))
+	# низ колёс должен стоять на полу (y = 0)
+	return -(floor_y - 0.05)
+
+
+func _sc(inv: float, at: Vector3 = Vector3.ZERO) -> Transform3D:
+	return Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * inv), at * inv)
 
 
 func _apply_xray() -> void:
 	var xr := _xray()
-	var a := 0.25 if xr else 1.0
-	for key in ["block", "head", "cover"]:
+	var a := 0.22 if xr else 1.0
+	for key in ["block", "head", "cover", "coil"]:
 		var m: StandardMaterial3D = _mats[key]
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA if xr else BaseMaterial3D.TRANSPARENCY_DISABLED
 		m.albedo_color.a = a
 	var cm: StandardMaterial3D = _mats.case
-	cm.albedo_color.a = 0.15 if xr else 0.55
+	cm.albedo_color.a = 0.12 if xr else 0.5
 
 
 func _xray() -> bool:
@@ -746,12 +927,12 @@ func _xray() -> bool:
 
 
 # ---------------------------------------------------------------------
-# Обновление
+# Кадр
 # ---------------------------------------------------------------------
 
 func _process(delta: float) -> void:
 	_time += delta
-	if _engine == null:
+	if _engine == null or not is_instance_valid(_engine):
 		return
 	if not demo and _build_key() != _built_key:
 		_rebuild()
@@ -766,10 +947,13 @@ func _process(delta: float) -> void:
 		var target := idle
 		if throttle:
 			target = max_rpm * G.d_max_rpm_mult * (1.08 if G.turbo_time > 0.0 else 1.0)
+			# отсечка: на максимуме обороты «бьются» об ограничитель
+			if rpm > target * 0.97:
+				target *= 0.94 + (0.06 if fmod(_time, 0.12) < 0.06 else 0.0)
 		elif G.is_exhausted:
 			target = idle * (0.75 + 0.2 * sin(_time * 9.0))
-		var k := 3.2 if target > rpm else 1.6
-		rpm = lerpf(rpm, target, 1.0 - exp(-delta * k))
+		var kk := 3.2 if target > rpm else 1.6
+		rpm = lerpf(rpm, target, 1.0 - exp(-delta * kk))
 		if _prev_throttle and not throttle and rpm > max_rpm * 0.55:
 			_pop_flame()
 		_prev_throttle = throttle
@@ -781,9 +965,9 @@ func _process(delta: float) -> void:
 		heat = lerpf(heat, want_heat, 1.0 - exp(-delta * 2.0))
 
 	var rev_per_s := 0.35 + rpm / 1300.0
-	crank_deg = fmod(crank_deg + 360.0 * rev_per_s * delta, 720.0)
+	crank_deg = fmod(crank_deg + 360.0 * rev_per_s * delta, 1440.0)
 	var ratio := clampf(rpm / max_rpm, 0.0, 1.2)
-	_animate(ratio)
+	_animate(delta)
 
 	# тряска мотора и камеры
 	var amp := 0.0
@@ -794,20 +978,21 @@ func _process(delta: float) -> void:
 			if G.is_exhausted:
 				amp *= 1.6
 	var n := Vector3(sin(_time * 53.0) + 0.5 * sin(_time * 97.0), cos(_time * 61.0) + 0.5 * sin(_time * 83.0), sin(_time * 71.0))
-	_root.position = n * amp * 0.6
-	_root.rotation = Vector3(n.y, 0, n.x) * amp * 0.05
+	_engine.rotation = Vector3(n.y, 0, n.x) * amp * 0.04
+	_engine.position = Vector3(n.x * amp * 0.5, _lift, n.z * amp * 0.5)
 	shake_offset = Vector2(n.x, n.y) * amp * 25.0
 
-	# камера: лёгкое покачивание и поворот пальцем
 	if not _pressed:
-		_yaw_target = lerpf(_yaw_target, 0.18 * sin(_time * 0.25), 1.0 - exp(-delta * 0.6))
+		var sway := 0.18 * sin(_time * 0.25) if G.settings.get("cam_sway", true) else 0.0
+		_yaw_target = lerpf(_yaw_target, sway, 1.0 - exp(-delta * 0.6))
 	_yaw = lerpf(_yaw, _yaw_target, 1.0 - exp(-delta * 8.0))
-	_place_camera()
+	_fov_kick = maxf(0.0, _fov_kick - delta * 4.0)
+	_place_camera(n * amp * 0.15)
 
 	_update_effects(delta, ratio, throttle)
 	flash_white = maxf(0.0, flash_white - delta * 2.5)
 	_tint_acc += delta
-	if _tint_acc >= 0.25:
+	if _tint_acc >= 0.2:
 		_tint_acc = 0.0
 		_update_tints()
 
@@ -822,15 +1007,33 @@ func _process(delta: float) -> void:
 	_hud.queue_redraw()
 
 
-func _animate(_ratio: float) -> void:
+func _place_camera(jitter: Vector3) -> void:
+	var dir := _view_dir().rotated(Vector3.UP, _yaw)
+	var aspect := maxf(0.3, size.x / maxf(size.y, 1.0))
+	_cam.fov = 30.0 + _fov_kick * 4.0
+	var half_v := deg_to_rad(_cam.fov * 0.5)
+	var half_h := atan(tan(half_v) * aspect)
+	var zoom := clampf(float(G.settings.get("cam_zoom", 1.0)), 0.7, 1.4)
+	var r := ENGINE_SIZE * 0.86
+	var fit_v := atan(tan(half_v) * band.size.y)
+	var fit_h := atan(tan(half_h) * band.size.x)
+	var dist := r / sin(minf(fit_v, fit_h)) / zoom
+	_cam.position = _center + dir * dist + jitter
+	_cam.look_at(_center, Vector3.UP)
+	# сдвиг кадра, чтобы мотор стоял в своей полосе экрана
+	var ndc_y := 1.0 - 2.0 * (band.position.y + band.size.y * 0.5)
+	var ndc_x := 2.0 * (band.position.x + band.size.x * 0.5) - 1.0
+	_cam.v_offset = -ndc_y * dist * tan(half_v)
+	_cam.h_offset = -ndc_x * dist * tan(half_h)
+
+
+func _animate(delta: float) -> void:
 	var cam_pos := _cam.global_position
 	var max_flash := 0.0
 	var flash_pos := Vector3.ZERO
 	var ultra := not demo and G.ultra > 0
-	for s in _shafts:
-		s.rotation.x = deg_to_rad(crank_deg)
-	if _flywheel != null:
-		_flywheel.rotation.x = deg_to_rad(crank_deg)
+	for s in _spinners:
+		s.node.rotation.x = deg_to_rad(crank_deg * s.ratio)
 	for cy in _cyls:
 		var psi := deg_to_rad(crank_deg - cy.tdc)
 		var L: float = cy.rod_len
@@ -841,7 +1044,6 @@ func _animate(_ratio: float) -> void:
 		var v := Vector3(0, d, 0) - pin
 		cy.rod.position = pin
 		cy.rod.rotation.x = atan2(v.z, v.y)
-		# клапаны: выпуск 160–380°, впуск 340–560° цикла
 		var c := fposmod(crank_deg - cy.tdc, 720.0)
 		cy.valves[0].position.y = cy.deck - 0.3 * _valve_lift(c, 340.0, 560.0)
 		cy.valves[1].position.y = cy.deck - 0.3 * _valve_lift(c, 160.0, 380.0)
@@ -851,7 +1053,6 @@ func _animate(_ratio: float) -> void:
 			max_flash = f
 			flash_pos = cy.frame.to_global(Vector3(0, cy.deck - 0.4, 0))
 		cy.flash.scale = Vector3(BORE * 1.9, 0.4 + 0.5 * f, BORE * 1.9)
-		# разрез гильзы всегда смотрит на камеру
 		var local_cam: Vector3 = cy.frame.to_local(cam_pos)
 		var yaw := atan2(local_cam.x, local_cam.z)
 		cy.liner.rotation.y = yaw
@@ -870,7 +1071,6 @@ func _animate(_ratio: float) -> void:
 		if f2 > max_flash:
 			max_flash = f2
 			flash_pos = r.flash.global_position
-	# общий материал вспышки
 	var flm: StandardMaterial3D = _mats.flash
 	var fc := Color(1.0, 0.55, 0.15)
 	if _spec().diesel:
@@ -879,10 +1079,11 @@ func _animate(_ratio: float) -> void:
 		fc = _ultra_color()
 	flm.albedo_color = Color(fc.r, fc.g, fc.b, 0.85)
 	_flash_light.light_color = fc
-	_flash_light.position = _root.to_local(flash_pos) if max_flash > 0.0 else _flash_light.position
-	_flash_light.light_energy = 3.0 * max_flash
+	if max_flash > 0.0:
+		_flash_light.position = _root.to_local(flash_pos)
+	_flash_light.light_energy = 4.0 * max_flash
 	if _turbine_wheel != null:
-		_turbine_deg = fmod(_turbine_deg + (200.0 + rpm * rpm / 25000.0) * get_process_delta_time() * (2.0 if G.turbo_time > 0.0 else 1.0), 360.0)
+		_turbine_deg = fmod(_turbine_deg + (200.0 + rpm * rpm / 25000.0) * delta * (2.0 if (not demo and G.turbo_time > 0.0) else 1.0), 360.0)
 		_turbine_wheel.rotation.x = deg_to_rad(_turbine_deg)
 
 
@@ -895,29 +1096,70 @@ func _valve_lift(c: float, a: float, b: float) -> float:
 	return sin(PI * (cc - a) / (b - a))
 
 
+func _tail_world() -> Vector3:
+	return _root.to_local(_engine.to_global(_tail_pos))
+
+
 func _pop_flame() -> void:
 	Sfx.pop()
+	_pop_glow = 1.0
+	_flames.position = _tail_world()
 	_flames.restart()
 	_flames.emitting = true
+	if int(G.settings.get("particles", 1)) > 0:
+		_sparks.position = _tail_world()
+		_sparks.direction = Vector3(0, 0.6, -1)
+		_sparks.restart()
+		_sparks.emitting = true
 
 
-func _update_effects(_delta: float, ratio: float, throttle: bool) -> void:
-	var q := clampi(int(G.settings.quality), 0, 2)
+## Сноп искр из мотора (для крита).
+func burst_sparks() -> void:
+	if int(G.settings.get("particles", 1)) == 0:
+		return
+	_sparks.position = _center + Vector3(0, 2.0, 0)
+	_sparks.direction = Vector3(0, 1, 0)
+	_sparks.restart()
+	_sparks.emitting = true
+	_fov_kick = 0.6
+
+
+## Рывок камеры и выстрел пламени при включении турбо.
+func turbo_kick() -> void:
+	_fov_kick = 1.0
+	_pop_flame()
+
+
+func _update_effects(delta: float, ratio: float, throttle: bool) -> void:
 	var black: bool = (not demo and G.is_exhausted) or (_spec().diesel and throttle)
-	_smoke.emitting = q > 0 or ratio > 0.2
+	var tail := _tail_world()
+	_smoke.position = tail
+	_smoke.emitting = int(G.settings.get("particles", 1)) > 0 or ratio > 0.2
 	_smoke.initial_velocity_min = 0.6 + 2.0 * ratio
-	_smoke.initial_velocity_max = 1.4 + 3.0 * ratio
-	_smoke.color_ramp.set_color(0, Color(0.08, 0.08, 0.09, 0.6) if black else Color(0.8, 0.8, 0.85, 0.3))
-	if throttle and ratio > 0.75 and randf() < (0.6 + (2.5 if G.turbo_time > 0.0 else 0.0)) * get_process_delta_time():
+	_smoke.initial_velocity_max = 1.4 + 3.5 * ratio
+	_smoke.color_ramp.set_color(0, Color(0.06, 0.06, 0.07, 0.6) if black else Color(0.8, 0.8, 0.85, 0.22))
+	if throttle and ratio > 0.8 and randf() < (0.5 + (2.5 if G.turbo_time > 0.0 else 0.0)) * delta:
 		_pop_flame()
-	var flame_col := Color(1.0, 0.6, 0.15)
-	if not demo and G.turbo_time > 0.0:
+	var flame_col := Color(1.0, 0.55, 0.15)
+	var turbo_on := not demo and G.turbo_time > 0.0
+	if turbo_on:
 		flame_col = Color(0.35, 0.65, 1.0)
 	if not demo and G.ultra > 0:
 		flame_col = _ultra_color()
 	_flames.color_ramp.set_color(0, flame_col)
-	_steam.emitting = heat > 0.75 and q > 0
-	_turbo_light.light_energy = 2.5 if (not demo and G.turbo_time > 0.0) else 0.0
+	_pop_glow = maxf(0.0, _pop_glow - delta * 5.0)
+	var flame := maxf(_pop_glow, 0.55 if turbo_on and throttle else 0.0)
+	var tfm: StandardMaterial3D = _tail_flame.material_override
+	tfm.albedo_color = Color(flame_col.r, flame_col.g, flame_col.b, flame * (0.7 + 0.3 * randf()))
+	_tail_flame.visible = flame > 0.02
+	_tail_flame.position = tail + Vector3(0, 0.1, -1.0)
+	_tail_flame.rotation_degrees = Vector3(-90, 0, 0)
+	_tail_flame.scale = Vector3(1, 0.6 + flame * (0.8 + 0.4 * randf()), 1)
+	_tail_light.position = tail + Vector3(0, 0.5, -0.8)
+	_tail_light.light_color = flame_col
+	_tail_light.light_energy = flame * 6.0
+	_steam.emitting = heat > 0.75 and int(G.settings.get("particles", 1)) > 0
+	_turbo_light.light_energy = 3.0 if turbo_on else 0.0
 
 
 func _update_tints() -> void:
@@ -927,16 +1169,23 @@ func _update_tints() -> void:
 	var mc: Color = D.MATERIALS[material_index % D.MATERIALS.size()].color
 	var hot := Color(0.85, 0.18, 0.08)
 	var base := {"block": _part_color("block", mc.lightened(0.05)), "head": _part_color("head", mc.lightened(0.15)),
-		"piston": _part_color("pistons", Color("cfd4da")), "crank": _part_color("crank", Color("7f868e")),
-		"exhaust": _part_color("exhaust", Color("6b5e55"))}
+		"piston": _part_color("pistons", Color("d4d9df")), "crank": _part_color("crank", Color("6f767e"))}
 	for key in base:
 		var m: StandardMaterial3D = _mats[key]
-		var col: Color = base[key].lerp(hot, h * (0.55 if key != "crank" else 0.2))
+		var col: Color = base[key].lerp(hot, h * (0.5 if key != "crank" else 0.2))
 		m.albedo_color = Color(col.r, col.g, col.b, m.albedo_color.a)
-		m.emission_enabled = h > 0.05 or _part_glow(key) > 0.0
 		var glow := _part_glow(key)
-		m.emission = hot * h * 0.6 + _glow_color(key) * glow
-		m.emission_energy_multiplier = 1.0
+		m.emission_enabled = h > 0.05 or glow > 0.0
+		m.emission = hot * h * 0.5 + _glow_color(key) * glow
+	# коллектор: побежалость и красное свечение от нагрева и оборотов
+	var hm: StandardMaterial3D = _mats.header
+	var ratio := clampf(rpm / float(_spec().rpm), 0.0, 1.0)
+	var glow_amt := clampf(heat * 0.9 + ratio * 0.5 - 0.2, 0.0, 1.0)
+	if demo:
+		glow_amt = clampf(ratio - 0.4, 0.0, 0.6)
+	var hc := _part_color("exhaust", Color("8a8a8f"))
+	hm.albedo_color = hc.lerp(Color("6a5a7a"), clampf(heat + ratio * 0.3, 0.0, 1.0) * 0.5)
+	hm.emission = Color(1.0, 0.28, 0.05) * glow_amt * glow_amt * 2.2
 	if _xray() != (_mats.block.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA):
 		_apply_xray()
 
@@ -951,7 +1200,7 @@ func _part_color(slot_id: String, fallback: Color) -> Color:
 	var it: Dictionary = G.equipped(slot_id)
 	if it.is_empty():
 		return fallback
-	return fallback.lerp(D.mark_color(int(it.mk)), 0.5)
+	return fallback.lerp(D.mark_color(int(it.mk)), 0.45)
 
 
 func _part_glow(key: String) -> float:
@@ -976,12 +1225,12 @@ func _ultra_color() -> Color:
 
 
 # ---------------------------------------------------------------------
-# 2D-поверх: кружок турбо и белая вспышка
+# 2D поверх: кружок турбо, белая вспышка
 # ---------------------------------------------------------------------
 
 func _draw_hud() -> void:
 	if show_hud and not demo and G.d_turbo_on:
-		var c := Vector2(size.x * 0.5, 34.0)
+		var c := Vector2(size.x * (band.position.x + band.size.x * 0.5), size.y * band.position.y + 34.0)
 		var rad := 22.0
 		_hud.draw_arc(c, rad, 0, TAU, 40, Color(1, 1, 1, 0.15), 6.0)
 		if G.turbo_time > 0.0:

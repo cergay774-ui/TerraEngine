@@ -11,7 +11,7 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	var bgc := ColorRect.new()
-	bgc.color = Color(0.03, 0.03, 0.04, 0.94)
+	bgc.color = Color(0.03, 0.03, 0.04, 0.0)
 	bgc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bgc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bgc)
@@ -37,16 +37,24 @@ func _ready() -> void:
 	_engine.material_index = info.material
 	_engine.demo_rpm = 1500.0
 	_engine.anchor_right = 1.0
-	_engine.offset_top = 280
-	_engine.offset_bottom = 820
+	_engine.anchor_bottom = 1.0
+	_engine.band = Rect2(0.05, 0.22, 0.9, 0.42)
 	_engine.offset_left = -720
 	_engine.offset_right = -720
 	add_child(_engine)
+	move_child(_engine, 0)
 
 	var v := VBoxContainer.new()
 	v.anchor_right = 1.0
 	v.offset_left = 50
 	v.offset_right = -50
+	var shade := ColorRect.new()
+	shade.color = Color(0, 0, 0, 0.6)
+	shade.anchor_right = 1.0
+	shade.anchor_bottom = 1.0
+	shade.offset_top = 830
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(shade)
 	v.offset_top = 840
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(v)

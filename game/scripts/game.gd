@@ -12,6 +12,7 @@ signal exhausted
 signal toast(text: String, color: Color)
 signal rebirth_done
 signal part_gained(slot_id: String, mk: int, rarity: int)
+signal settings_changed
 
 const SAVE_PATH := "user://save.json"
 const SAVE_VERSION := 1
@@ -42,7 +43,17 @@ var engine_choice: String = ""
 var settings: Dictionary = {
 	"quality": 1, "fps": 60, "shake": true, "vibration": true,
 	"sfx": 0.8, "music": 0.6, "sci": false, "lang": "ru", "xray": false,
+	"shadows": 1, "msaa": 2, "glow": true, "particles": 1, "res_scale": 0.85,
+	"garage": true, "cam_sway": true, "cam_zoom": 1.0, "show_fps": false,
 }
+
+## Пресеты графики: Низкое, Среднее, Высокое, Ультра.
+const PRESETS := [
+	{"shadows": 0, "msaa": 0, "glow": false, "particles": 0, "res_scale": 0.6, "garage": true},
+	{"shadows": 1, "msaa": 2, "glow": true, "particles": 1, "res_scale": 0.85, "garage": true},
+	{"shadows": 1, "msaa": 4, "glow": true, "particles": 2, "res_scale": 1.0, "garage": true},
+	{"shadows": 2, "msaa": 4, "glow": true, "particles": 2, "res_scale": 1.0, "garage": true},
+]
 var last_time: float = 0.0
 
 # --- рантайм ---
@@ -1141,10 +1152,18 @@ func claim_daily(i: int) -> String:
 # Настройки
 # =====================================================================
 
+func apply_preset(q: int) -> void:
+	settings.quality = clampi(q, 0, 3)
+	for k in PRESETS[settings.quality]:
+		settings[k] = PRESETS[settings.quality][k]
+	apply_settings()
+
+
 func apply_settings() -> void:
 	Engine.max_fps = int(settings.fps)
 	if has_node("/root/Sfx"):
 		get_node("/root/Sfx").apply_volumes()
+	settings_changed.emit()
 
 
 # =====================================================================
@@ -1216,8 +1235,8 @@ func from_dict(d: Dictionary) -> void:
 	var s: Dictionary = d.get("settings", {})
 	for k in s:
 		settings[k] = s[k]
-	settings.quality = int(settings.quality)
-	settings.fps = int(settings.fps)
+	for k in ["quality", "fps", "shadows", "msaa", "particles"]:
+		settings[k] = int(settings[k])
 	last_time = float(d.get("last_time", 0.0))
 	mark_dirty()
 	recalc()

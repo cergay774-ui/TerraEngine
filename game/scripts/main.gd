@@ -6,8 +6,8 @@ const H := 1280.0
 const ENGINE_TOP := 205.0
 const ENGINE_BOTTOM := 930.0
 
-var bg: Control
 var engine_view: Control
+var _fps_label: Label
 var top_margin: float = 0.0
 
 var _level_tab: Control
@@ -35,15 +35,10 @@ func _ready() -> void:
 	theme = UI.make_theme()
 	_compute_safe_area()
 
-	bg = preload("res://scripts/ui/garage_bg.gd").new()
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bg.lamp_y = top_margin + 205.0
-	add_child(bg)
-
+	# 3D-гараж с мотором — на весь экран, интерфейс поверх
 	engine_view = preload("res://scripts/engine_view.gd").new()
-	engine_view.anchor_right = 1.0
-	engine_view.offset_top = ENGINE_TOP + top_margin
-	engine_view.offset_bottom = ENGINE_BOTTOM
+	engine_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	engine_view.band = _engine_band(false)
 	engine_view.hold_changed.connect(_on_hold)
 	add_child(engine_view)
 	_apply_engine()
@@ -95,6 +90,20 @@ func _ready() -> void:
 	_refresh_all()
 	if G.offline_report != null:
 		call_deferred("_show_offline")
+
+
+## Полоса экрана, где стоит мотор (между верхней плашкой и стаминой).
+func _engine_band(shifted: bool) -> Rect2:
+	var top := (ENGINE_TOP + top_margin) / H
+	var bottom := ENGINE_BOTTOM / H
+	if shifted:
+		return Rect2(0.5, top, 0.5, bottom - top)
+	return Rect2(0.0, top, 1.0, bottom - top)
+
+
+func _engine_point(fx: float, fy: float) -> Vector2:
+	var b: Rect2 = engine_view.band
+	return Vector2(W * (b.position.x + b.size.x * fx), H * (b.position.y + b.size.y * fy))
 
 
 func _compute_safe_area() -> void:
@@ -192,12 +201,17 @@ func _build_engine_hud() -> void:
 	_status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_status_label)
 
-	var hint := UI.label("Зажми мотор пальцем", 20, Color(1, 1, 1, 0.35), HORIZONTAL_ALIGNMENT_CENTER)
+	var hint := UI.label("Зажми мотор пальцем · проведи, чтобы повернуть", 18, Color(1, 1, 1, 0.35), HORIZONTAL_ALIGNMENT_CENTER)
 	hint.name = "Hint"
 	hint.anchor_right = 1.0
 	hint.offset_top = ENGINE_BOTTOM + 120
 	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(hint)
+
+	_fps_label = UI.label("", 16, Color(0.6, 1.0, 0.6), HORIZONTAL_ALIGNMENT_LEFT)
+	_fps_label.position = Vector2(14, ENGINE_TOP + top_margin + 14)
+	_fps_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_fps_label)
 
 	_xray_btn = UI.button("Рентген", 18, UI.PANEL_2, 48)
 	_xray_btn.toggle_mode = true
@@ -313,7 +327,7 @@ func open_panel(p: Control, side: String) -> void:
 			p.offset_right = 0
 			tw.tween_property(p, "offset_left", 0.0, 0.28)
 			tw.tween_property(p, "offset_right", W * 0.56, 0.28)
-			tw.tween_property(engine_view, "offset_left", W * 0.5, 0.28)
+			tw.tween_property(engine_view, "band", _engine_band(true), 0.28)
 			_dim.visible = false
 		"bottom":
 			p.anchor_left = 0.0
@@ -359,7 +373,7 @@ func close_panel(instant: bool = false) -> void:
 	_open_side = ""
 	if instant:
 		p.visible = false
-		engine_view.offset_left = 0.0
+		engine_view.band = _engine_band(false)
 		_dim.visible = false
 		return
 	var tw := create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
@@ -367,7 +381,7 @@ func close_panel(instant: bool = false) -> void:
 		"left":
 			tw.tween_property(p, "offset_left", -W * 0.56, 0.22)
 			tw.tween_property(p, "offset_right", 0.0, 0.22)
-			tw.tween_property(engine_view, "offset_left", 0.0, 0.22)
+			tw.tween_property(engine_view, "band", _engine_band(false), 0.22)
 		"bottom":
 			tw.tween_property(p, "offset_top", 10.0, 0.22)
 			tw.tween_property(p, "offset_bottom", H * 0.66 + 10.0, 0.22)
@@ -414,7 +428,10 @@ func _refresh_numbers() -> void:
 
 func _process(delta: float) -> void:
 	# камера слегка дрожит вместе с мотором
-	bg.offset = engine_view.shake_offset * 0.6
+	if _fps_label != null:
+		_fps_label.visible = G.settings.get("show_fps", false)
+		if _fps_label.visible:
+			_fps_label.text = "%d FPS" % Engine.get_frames_per_second()
 	_stamina_bar.value = G.stamina / maxf(G.d_stamina_max, 0.01)
 	var sb: StyleBoxFlat = _stamina_bar.get_theme_stylebox("fill")
 	sb.bg_color = Color("ff4a3a") if G.is_exhausted else (Color("6fb6ff") if G.has_boost("stamina") else Color("ffb02e"))
@@ -482,7 +499,7 @@ func float_text(text: String, color: Color, size: int = 26, at: Vector2 = Vector
 	var l := UI.label(text, size, color, HORIZONTAL_ALIGNMENT_CENTER)
 	l.add_theme_constant_override("outline_size", 6)
 	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
-	var center := engine_view.position + engine_view.size * Vector2(0.5, 0.3)
+	var center := _engine_point(0.5, 0.3)
 	if at.x < 0.0:
 		at = center + Vector2(randf_range(-150, 150), randf_range(-60, 60))
 	l.size = Vector2(400, 40)
@@ -532,15 +549,17 @@ func _on_new_epoch(ei: int) -> void:
 
 func _on_turbo() -> void:
 	Sfx.play("turbo")
+	engine_view.turbo_kick()
 	float_text("ТУРБО x%s!" % _fmt_mult(G.d_turbo_mult), Color("6fb6ff"), 40,
-		engine_view.position + engine_view.size * Vector2(0.5, 0.15))
+		_engine_point(0.5, 0.15))
 
 
 func _on_crit(amount: Big) -> void:
 	Sfx.play("crit")
+	engine_view.burst_sparks()
 	G.vibrate(40)
 	float_text("КРИТ! +%s" % G.fmt(amount), Color("ffb02e"), 42,
-		engine_view.position + engine_view.size * Vector2(0.5, 0.25))
+		_engine_point(0.5, 0.25))
 
 
 func _on_gold(n: int) -> void:
@@ -551,7 +570,7 @@ func _on_gold(n: int) -> void:
 func _on_exhausted() -> void:
 	Sfx.play("knock")
 	G.vibrate(120)
-	float_text("ПЕРЕГРЕВ!", UI.BAD, 38, engine_view.position + engine_view.size * Vector2(0.5, 0.2))
+	float_text("ПЕРЕГРЕВ!", UI.BAD, 38, _engine_point(0.5, 0.2))
 
 
 func _on_rebirth() -> void:

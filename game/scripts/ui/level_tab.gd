@@ -3,6 +3,7 @@ extends Control
 
 const BG := preload("res://assets/ui/level_bg.png")
 const FILL := preload("res://assets/ui/level_fill.png")
+const AVATAR := preload("res://assets/ui/avatar.png")
 const FILL_RECT := Rect2(414, 144, 392, 75)   # где полоса лежит на фоне (в пикселях фона)
 
 var progress: float = 0.0
@@ -22,6 +23,10 @@ func _draw() -> void:
 	var k := minf(size.x / tex_size.x, size.y / tex_size.y)
 	var origin := Vector2.ZERO
 	draw_texture_rect(BG, Rect2(origin, tex_size * k), false)
+	# аватар игрока внутри кольца
+	var ac := origin + Vector2(152, 160) * k
+	var ar := 106.0 * k
+	draw_texture_rect(AVATAR, Rect2(ac - Vector2(ar, ar), Vector2(ar, ar) * 2.0), false)
 	var p := clampf(_shown, 0.0, 1.0)
 	if p > 0.0:
 		var fr := Rect2(origin + FILL_RECT.position * k, FILL_RECT.size * k)

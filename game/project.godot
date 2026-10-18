@@ -10,14 +10,14 @@ config_version=5
 
 [application]
 
-config/name="Мотор Гараж"
+config/name="My Engine Garage"
 config/description="Кликер-тайкун про сборку моторов"
 config/version="0.1.0"
 run/main_scene="res://scenes/boot.tscn"
 config/features=PackedStringArray("4.3", "GL Compatibility")
 boot_splash/bg_color=Color(0.05, 0.05, 0.06, 1)
 boot_splash/show_image=false
-config/icon="res://icon.svg"
+config/icon="res://icon.png"
 
 [autoload]
 

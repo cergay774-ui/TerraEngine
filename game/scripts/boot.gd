@@ -28,22 +28,7 @@ func _ready() -> void:
 	_loading.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_loading)
 
-	var bg := preload("res://scripts/ui/garage_bg.gd").new()
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	bg.lamp_y = 40.0
-	_loading.add_child(bg)
-
-	var title := UI.label("МОТОР ГАРАЖ", 64, UI.ACCENT, HORIZONTAL_ALIGNMENT_CENTER)
-	title.add_theme_constant_override("outline_size", 10)
-	title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-	title.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	title.position.y = 150
-	_loading.add_child(title)
-	var sub := UI.label("кликер-тайкун про сборку моторов", 22, UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	sub.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	sub.position.y = 232
-	_loading.add_child(sub)
-
+	# 3D-гараж с одноцилиндровым мотором в разрезе на весь экран
 	_engine = preload("res://scripts/engine_view.gd").new()
 	_engine.demo = true
 	_engine.interactive = false
@@ -51,24 +36,40 @@ func _ready() -> void:
 	_engine.engine_type = "single"
 	_engine.demo_rpm = 300.0
 	_engine.rpm = 0.0
-	_engine.anchor_left = 0.0
-	_engine.anchor_right = 1.0
-	_engine.offset_top = 270
-	_engine.offset_bottom = 780
+	_engine.band = Rect2(0.05, 0.33, 0.9, 0.3)
+	_engine.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_loading.add_child(_engine)
+
+	var logo := TextureRect.new()
+	logo.texture = preload("res://assets/ui/logo.png")
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.anchor_left = 0.5
+	logo.anchor_right = 0.5
+	logo.offset_left = -170
+	logo.offset_right = 170
+	logo.offset_top = 50
+	logo.offset_bottom = 390
+	logo.pivot_offset = Vector2(170, 170)
+	_loading.add_child(logo)
+	logo.scale = Vector2(0.85, 0.85)
+	logo.modulate.a = 0.0
+	var ltw := logo.create_tween().set_parallel(true)
+	ltw.tween_property(logo, "scale", Vector2.ONE, 0.8).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	ltw.tween_property(logo, "modulate:a", 1.0, 0.5)
 
 	_tacho = preload("res://scripts/ui/tacho.gd").new()
 	_tacho.anchor_left = 0.5
 	_tacho.anchor_right = 0.5
 	_tacho.offset_left = -170
 	_tacho.offset_right = 170
-	_tacho.offset_top = 800
-	_tacho.offset_bottom = 1040
+	_tacho.offset_top = 840
+	_tacho.offset_bottom = 1060
 	_loading.add_child(_tacho)
 
 	_percent = UI.label("0%", 26, UI.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 	_percent.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_percent.position.y = 1040
+	_percent.position.y = 1062
 	_loading.add_child(_percent)
 
 	_tip = UI.wrap_label("", 22, Color("b9b5aa"))
