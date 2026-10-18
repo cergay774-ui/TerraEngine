@@ -3,19 +3,18 @@ extends Control
 
 const W := 720.0
 const H := 1280.0
-const ENGINE_TOP := 250.0
+const ENGINE_TOP := 205.0
 const ENGINE_BOTTOM := 930.0
 
 var bg: Control
 var engine_view: Control
 var top_margin: float = 0.0
 
-var _chips: HFlowContainer
-var _chip_labels: Dictionary = {}
+var _level_tab: Control
+var _resources: Control
 var _ips_label: Label
 var _rebirth_label: Label
 var _level_label: Label
-var _xp_bar: ProgressBar
 var _stamina_bar: ProgressBar
 var _stamina_label: Label
 var _status_label: Label
@@ -71,6 +70,8 @@ func _ready() -> void:
 			close_panel())
 	_overlay.add_child(_dim)
 
+	add_child(_resources)
+
 	_toast_box = VBoxContainer.new()
 	_toast_box.anchor_right = 1.0
 	_toast_box.offset_left = 30
@@ -108,55 +109,65 @@ func _compute_safe_area() -> void:
 # ---------------------------------------------------------------------
 
 func _build_top_bar() -> void:
-	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", UI.box(Color(0.07, 0.075, 0.09, 0.88), 0, Color(1, 1, 1, 0.05), 0, 14))
-	panel.anchor_right = 1.0
-	panel.offset_top = 0
-	panel.offset_bottom = top_margin + 214
-	add_child(panel)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 8)
-	panel.add_child(v)
-	var spacer := Control.new()
-	spacer.custom_minimum_size.y = top_margin
-	v.add_child(spacer)
+	# лёгкая тень сверху, чтобы плашки читались на фоне гаража
+	var grad := Gradient.new()
+	grad.set_color(0, Color(0, 0, 0, 0.6))
+	grad.set_color(1, Color(0, 0, 0, 0.0))
+	var gt := GradientTexture2D.new()
+	gt.gradient = grad
+	gt.fill_from = Vector2(0, 0)
+	gt.fill_to = Vector2(0, 1)
+	var shade := TextureRect.new()
+	shade.texture = gt
+	shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	shade.stretch_mode = TextureRect.STRETCH_SCALE
+	shade.anchor_right = 1.0
+	shade.offset_bottom = top_margin + 240
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(shade)
 
-	_chips = HFlowContainer.new()
-	_chips.add_theme_constant_override("h_separation", 8)
-	_chips.add_theme_constant_override("v_separation", 6)
-	v.add_child(_chips)
+	_level_tab = preload("res://scripts/ui/level_tab.gd").new()
+	_level_tab.position = Vector2(4, top_margin + 4)
+	_level_tab.size = Vector2(400, 156)
+	_level_tab.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_level_tab)
 
-	var row := HBoxContainer.new()
-	v.add_child(row)
-	_ips_label = UI.label("+0/с", 34, UI.GOOD)
-	_ips_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(_ips_label)
-	_rebirth_label = UI.label("", 20, Color("ffb35c"), HORIZONTAL_ALIGNMENT_RIGHT)
-	row.add_child(_rebirth_label)
+	_resources = preload("res://scripts/ui/resources_box.gd").new()
+	_resources.anchor_left = 1.0
+	_resources.anchor_right = 1.0
+	_resources.offset_left = -310
+	_resources.offset_right = -10
+	_resources.offset_top = top_margin + 18
+	_resources.offset_bottom = top_margin + 90
+	_resources.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	_level_label = UI.label("", 20, UI.MUTED)
+	_rebirth_label = UI.label("", 19, Color("ffb35c"), HORIZONTAL_ALIGNMENT_RIGHT)
+	_rebirth_label.anchor_left = 1.0
+	_rebirth_label.anchor_right = 1.0
+	_rebirth_label.offset_left = -310
+	_rebirth_label.offset_right = -14
+	_rebirth_label.offset_top = top_margin + 92
+	_rebirth_label.add_theme_constant_override("outline_size", 5)
+	_rebirth_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	add_child(_rebirth_label)
+
+	_ips_label = UI.label("+0/с", 38, UI.GOOD)
+	_ips_label.position = Vector2(20, top_margin + 150)
+	_ips_label.size = Vector2(420, 50)
+	_ips_label.add_theme_constant_override("outline_size", 8)
+	_ips_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	add_child(_ips_label)
+
+	_level_label = UI.label("", 19, Color("d8d2c4"), HORIZONTAL_ALIGNMENT_RIGHT)
+	_level_label.anchor_left = 1.0
+	_level_label.anchor_right = 1.0
+	_level_label.offset_left = -420
+	_level_label.offset_right = -14
+	_level_label.offset_top = top_margin + 162
 	_level_label.clip_text = true
-	v.add_child(_level_label)
-	_xp_bar = UI.bar(Color("4da3ff"), 12)
-	v.add_child(_xp_bar)
-
-
-func _rebuild_chips() -> void:
-	UI.clear(_chips)
-	_chip_labels.clear()
-	for id in D.CURRENCY_ORDER:
-		if not G.unlocked_cur.get(id, false):
-			continue
-		var chip := PanelContainer.new()
-		chip.add_theme_stylebox_override("panel", UI.box(Color(1, 1, 1, 0.06), 20, Color(0, 0, 0, 0), 0, 10))
-		var h := HBoxContainer.new()
-		h.add_theme_constant_override("separation", 6)
-		chip.add_child(h)
-		h.add_child(GameIcon.make(id, 26))
-		var l := UI.label("0", 24 if id == "cash" else 20, D.CURRENCIES[id].color)
-		h.add_child(l)
-		_chip_labels[id] = l
-		_chips.add_child(chip)
+	_level_label.add_theme_constant_override("outline_size", 5)
+	_level_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	add_child(_level_label)
 
 
 func _build_engine_hud() -> void:
@@ -206,42 +217,33 @@ func _build_bottom_bar() -> void:
 	bar.anchor_top = 1.0
 	bar.anchor_bottom = 1.0
 	bar.anchor_right = 1.0
-	bar.offset_left = 10
-	bar.offset_right = -10
-	bar.offset_top = -132
-	bar.offset_bottom = -12
-	bar.add_theme_constant_override("separation", 8)
+	bar.offset_left = 8
+	bar.offset_right = -8
+	bar.offset_top = -158
+	bar.offset_bottom = -10
+	bar.alignment = BoxContainer.ALIGNMENT_CENTER
+	bar.add_theme_constant_override("separation", 4)
 	add_child(bar)
-	var defs := [
-		["settings", "Настройки"], ["upgrades", "Улучшения"], ["parts", "Запчасти"],
-		["shop", "Магазин"], ["rebirth", "Перерождение"],
-	]
-	for d in defs:
-		var b := Button.new()
+	for id in ["settings", "upgrades", "parts", "shop", "rebirth"]:
+		var big: bool = id == "parts"
+		var b := TextureButton.new()
+		b.texture_normal = load("res://assets/icons/%s.png" % id)
+		b.ignore_texture_size = true
+		b.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+		b.custom_minimum_size = Vector2(148, 148) if big else Vector2(130, 130)
+		b.size_flags_vertical = Control.SIZE_SHRINK_END
 		b.focus_mode = Control.FOCUS_NONE
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.text = d[1]
-		b.add_theme_font_size_override("font_size", 15)
-		b.clip_text = true
-		var st := UI.box(UI.PANEL, 16, Color(1, 1, 1, 0.08), 2, 4)
-		st.content_margin_top = 64
-		b.add_theme_stylebox_override("normal", st)
-		var st2 := st.duplicate()
-		st2.border_color = UI.ACCENT
-		b.add_theme_stylebox_override("pressed", st2)
-		b.add_theme_stylebox_override("hover", st)
-		var ic := GameIcon.make(d[0], 46, Color("e8e2d4"))
-		ic.anchor_left = 0.5
-		ic.anchor_right = 0.5
-		ic.offset_left = -23
-		ic.offset_right = 23
-		ic.offset_top = 12
-		ic.offset_bottom = 58
-		b.add_child(ic)
-		var id: String = d[0]
+		var bid: String = id
+		b.button_down.connect(func():
+			b.pivot_offset = b.size * 0.5
+			b.scale = Vector2(0.9, 0.9))
+		b.button_up.connect(func():
+			var tw := b.create_tween()
+			tw.tween_property(b, "scale", Vector2.ONE, 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
 		b.pressed.connect(func():
 			Sfx.play("click")
-			_toggle_panel(id))
+			_resources.set_open(false)
+			_toggle_panel(bid))
 		bar.add_child(b)
 
 
@@ -305,7 +307,7 @@ func open_panel(p: Control, side: String) -> void:
 			p.anchor_top = 0.0
 			p.anchor_bottom = 1.0
 			p.offset_top = top_margin + 222
-			p.offset_bottom = -140
+			p.offset_bottom = -168
 			p.size.x = W * 0.56
 			p.offset_left = -W * 0.56
 			p.offset_right = 0
@@ -390,20 +392,13 @@ func _apply_engine() -> void:
 
 
 func _refresh_all() -> void:
-	var shown := 0
-	for id in D.CURRENCY_ORDER:
-		if G.unlocked_cur.get(id, false):
-			shown += 1
-	if shown != _chip_labels.size():
-		_rebuild_chips()
 	_refresh_numbers()
 	if _open_panel != null and _open_panel.has_method("refresh"):
 		_open_panel.refresh()
 
 
 func _refresh_numbers() -> void:
-	for id in _chip_labels:
-		_chip_labels[id].text = G.fmt(G.cur[id])
+	_resources.refresh()
 	_ips_label.text = "+%s/с" % G.fmt(G.income_now.mul(G.d_time_mult))
 	_ips_label.add_theme_color_override("font_color", Color("6fb6ff") if G.turbo_time > 0.0 else (UI.GOOD if G.throttle else Color("b9d7a8")))
 	var mult := Big.power(1.25, G.rebirths).mul(Big.power(100.0, G.ultra))
@@ -412,9 +407,9 @@ func _refresh_numbers() -> void:
 		rtxt = "Ультра %d · " % G.ultra + rtxt
 	_rebirth_label.text = rtxt
 	var ep := D.epoch_info(G.level)
-	_level_label.text = "Ур. %d · %s · %s" % [G.level, D.ENGINES[G.current_engine()].name, D.MATERIALS[ep.material].name]
-	var need := G.xp_need(G.level)
-	_xp_bar.value = clampf(G.xp.div(need).to_float(), 0.0, 1.0)
+	_level_label.text = "%s · %s" % [D.ENGINES[G.current_engine()].name, D.MATERIALS[ep.material].name]
+	_level_tab.level = G.level
+	_level_tab.progress = clampf(G.xp.div(G.xp_need(G.level)).to_float(), 0.0, 1.0)
 
 
 func _process(delta: float) -> void:

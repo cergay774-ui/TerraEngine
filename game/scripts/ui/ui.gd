@@ -2,10 +2,10 @@ class_name UI
 extends RefCounted
 ## Общие стили и конструкторы элементов интерфейса.
 
-const ACCENT := Color("ff8a2a")
+const ACCENT := Color("ffb81c")
 const BG := Color("121317")
-const PANEL := Color("1b1d23")
-const PANEL_2 := Color("23262e")
+const PANEL := Color("1b1f29")
+const PANEL_2 := Color("272c39")
 const TEXT := Color("ecebe6")
 const MUTED := Color("8d9099")
 const GOOD := Color("8fe36b")
@@ -19,6 +19,11 @@ static func box(color: Color, radius: int = 14, border: Color = Color(0, 0, 0, 0
 	if border_w > 0:
 		s.border_color = border
 		s.set_border_width_all(border_w)
+	# объём: тень снизу, как у иконок в стиле игры
+	s.shadow_color = Color(0, 0, 0, 0.45)
+	s.shadow_size = 2
+	s.shadow_offset = Vector2(0, 5)
+	s.anti_aliasing = true
 	s.content_margin_left = pad
 	s.content_margin_right = pad
 	s.content_margin_top = pad * 0.7
@@ -37,7 +42,9 @@ static func make_theme() -> Theme:
 	t.set_color("font_disabled_color", "Button", Color(0.6, 0.6, 0.62))
 	t.set_stylebox("normal", "Button", box(PANEL_2, 12, Color(1, 1, 1, 0.08), 2))
 	t.set_stylebox("hover", "Button", box(PANEL_2.lightened(0.06), 12, Color(1, 1, 1, 0.12), 2))
-	t.set_stylebox("pressed", "Button", box(PANEL_2.darkened(0.2), 12, ACCENT, 2))
+	var pressed := box(PANEL_2.darkened(0.2), 12, ACCENT, 2)
+	pressed.shadow_offset = Vector2(0, 1)
+	t.set_stylebox("pressed", "Button", pressed)
 	t.set_stylebox("disabled", "Button", box(PANEL_2.darkened(0.25), 12, Color(1, 1, 1, 0.04), 2))
 	t.set_stylebox("focus", "Button", StyleBoxEmpty.new())
 	t.set_stylebox("panel", "PanelContainer", box(PANEL, 18, Color(1, 1, 1, 0.07), 2, 16))
@@ -87,17 +94,21 @@ static func button(text: String, size: int = 24, color: Color = PANEL_2, min_h: 
 	b.add_theme_font_size_override("font_size", size)
 	b.custom_minimum_size.y = min_h
 	if color != PANEL_2:
-		b.add_theme_stylebox_override("normal", box(color, 12, color.lightened(0.25), 2))
-		b.add_theme_stylebox_override("hover", box(color.lightened(0.08), 12, color.lightened(0.3), 2))
-		b.add_theme_stylebox_override("pressed", box(color.darkened(0.2), 12, Color.WHITE, 2))
+		b.add_theme_stylebox_override("normal", box(color, 12, color.lightened(0.3), 3))
+		b.add_theme_stylebox_override("hover", box(color.lightened(0.08), 12, color.lightened(0.35), 3))
+		var pr := box(color.darkened(0.2), 12, Color.WHITE, 3)
+		pr.shadow_offset = Vector2(0, 1)
+		b.add_theme_stylebox_override("pressed", pr)
 	b.focus_mode = Control.FOCUS_NONE
 	b.pressed.connect(func(): Sfx.play("click"))
 	return b
 
 
 static func accent_button(text: String, size: int = 24, min_h: int = 64) -> Button:
-	var b := button(text, size, ACCENT.darkened(0.15), min_h)
-	b.add_theme_color_override("font_color", Color.WHITE)
+	var b := button(text, size, ACCENT.darkened(0.1), min_h)
+	b.add_theme_color_override("font_color", Color("2a1c00"))
+	b.add_theme_color_override("font_hover_color", Color("2a1c00"))
+	b.add_theme_color_override("font_pressed_color", Color("2a1c00"))
 	return b
 
 

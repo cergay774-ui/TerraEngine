@@ -50,18 +50,29 @@ func _ready() -> void:
 	for i in D.UPGRADES.size():
 		var u: Dictionary = D.UPGRADES[i]
 		var card := UI.card(UI.PANEL_2, Color(1, 1, 1, 0.05), 10)
+		var outer := HBoxContainer.new()
+		outer.add_theme_constant_override("separation", 10)
+		card.add_child(outer)
+		var icon := TextureRect.new()
+		icon.texture = load("res://assets/icons/upg_%s.png" % u.id)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size = Vector2(112, 112)
+		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		outer.add_child(icon)
 		var cv := VBoxContainer.new()
 		cv.add_theme_constant_override("separation", 4)
-		card.add_child(cv)
+		cv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		outer.add_child(cv)
 		var top := HBoxContainer.new()
 		cv.add_child(top)
-		var name_l := UI.label("%d. %s" % [i + 1, u.name], 20, UI.TEXT)
+		var name_l := UI.label(u.name, 18, UI.TEXT)
 		name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_l.clip_text = true
 		top.add_child(name_l)
 		var lvl_l := UI.label("", 16, UI.MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
 		top.add_child(lvl_l)
-		var desc := UI.wrap_label(u.desc, 15, UI.MUTED)
+		var desc := UI.wrap_label(u.desc, 14, UI.MUTED)
 		cv.add_child(desc)
 		var eff := UI.wrap_label("", 16, Color("b9d7a8"))
 		cv.add_child(eff)
