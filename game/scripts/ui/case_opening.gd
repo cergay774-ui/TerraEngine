@@ -79,7 +79,7 @@ func _show_card() -> void:
 	_card.anchor_right = 0.5
 	_card.offset_left = -270
 	_card.offset_right = 270
-	_card.offset_top = 690
+	_card.offset_top = size.y * 0.42 + 150.0
 	_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var v := VBoxContainer.new()
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE

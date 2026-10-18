@@ -8,6 +8,7 @@ var _tab_btns: Array = []
 var _content: VBoxContainer
 var _timer_label: Label
 var _price_btns: Array = []
+var _daily_rows: Array = []
 
 
 func _ready() -> void:
@@ -53,6 +54,7 @@ func refresh() -> void:
 		_tab_btns[i].button_pressed = i == _tab
 	UI.clear(_content)
 	_price_btns.clear()
+	_daily_rows.clear()
 	_timer_label = null
 	match _tab:
 		0:
@@ -185,6 +187,7 @@ func _build_daily() -> void:
 					main.show_toast("Задание выполнено: %s" % txt, UI.GOOD)
 				refresh())
 		v.add_child(btn)
+		_daily_rows.append({"bar": bar, "btn": btn, "i": i})
 		_content.add_child(card)
 	_content.add_child(UI.wrap_label("Задания обновляются каждый день. Награда — в редких валютах (пока они не открыты — в кэше или золоте).", 15, UI.MUTED))
 
@@ -197,3 +200,12 @@ func tick() -> void:
 			return
 	for p in _price_btns:
 		p.btn.disabled = not G.can_pay(p.cur, p.price)
+	# задания: прогресс и кнопка «забрать» живые
+	var tasks := G.daily_tasks()
+	for r in _daily_rows:
+		if r.i >= tasks.size():
+			continue
+		var t: Dictionary = tasks[r.i]
+		r.bar.value = t.progress / maxf(t.goal, 0.001)
+		if not t.claimed:
+			r.btn.disabled = t.progress < t.goal

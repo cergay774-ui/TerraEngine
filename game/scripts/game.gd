@@ -13,6 +13,7 @@ signal toast(text: String, color: Color)
 signal rebirth_done
 signal part_gained(slot_id: String, mk: int, rarity: int)
 signal settings_changed
+signal offline_ready
 
 const SAVE_PATH := "user://save.json"
 const SAVE_VERSION := 1
@@ -69,6 +70,8 @@ var guaranteed_turbo: bool = false
 var income_now: Big = Big.zero()
 var offline_report: Big = null
 var offline_seconds: float = 0.0
+var _paused_at: float = 0.0
+var _load_failed: bool = false
 
 var _roll_acc: float = 0.0
 var _save_acc: float = 0.0
@@ -131,9 +134,10 @@ func _reset_all() -> void:
 		"parts": 0, "cases": 0, "playtime": 0.0, "ultras": 0, "rebirths_total": 0}
 	ach = {}
 	boosts = []
-	shop_state = {"hour": -1, "bought": []}
+	shop_state = {"hour": -1, "bought": [], "picks": {}}
 	daily = {"day": "", "tasks": []}
 	engine_choice = ""
+	guaranteed_turbo = false
 	stamina = 4.0
 	is_exhausted = false
 
@@ -243,6 +247,8 @@ func set_holding(v: bool) -> void:
 
 
 func _process(delta: float) -> void:
+	# после сворачивания или долгого кадра не прогоняем огромный шаг: офлайн считается отдельно
+	delta = minf(delta, 0.5)
 	if _dirty:
 		recalc()
 	var now := Time.get_unix_time_from_system()
@@ -321,9 +327,12 @@ func _process(delta: float) -> void:
 
 
 func _roll_second() -> void:
-	if d_turbo_on and turbo_time <= 0.0 and turbo_cd <= 0.0:
-		if guaranteed_turbo or _rng.randf() < d_turbo_chance:
-			guaranteed_turbo = false
+	if guaranteed_turbo and turbo_time <= 0.0:
+		guaranteed_turbo = false
+		turbo_cd = 0.0
+		start_turbo(TURBO_TIME)
+	elif d_turbo_on and turbo_time <= 0.0 and turbo_cd <= 0.0:
+		if _rng.randf() < d_turbo_chance:
 			start_turbo(TURBO_TIME)
 	if d_crit_on and _rng.randf() < d_crit_chance:
 		var amount := d_hold.mul(d_crit_power)
@@ -404,8 +413,9 @@ func vibrate(ms: int) -> void:
 # =====================================================================
 
 func has_boost(type: String) -> bool:
+	var now := Time.get_unix_time_from_system()
 	for b in boosts:
-		if b.type == type:
+		if b.type == type and float(b.until) > now:
 			return true
 	return false
 
@@ -475,14 +485,22 @@ func upgrade_affordable(id: String) -> int:
 	if money.lt(start):
 		return 0
 	var ratio := money.mul(g - 1.0).div(start).add(1.0)
-	var n := int(floor(ratio.log10() / (log(g) / log(10.0))))
-	n = maxi(n, 1)
-	while n > 1 and upgrade_cost(id, n).cmp(money) > 0:
-		n -= 1
+	var est := ratio.log10() / (log(g) / log(10.0))
+	var n := 1
+	if est > 1.0 and est < 1.0e7:
+		n = int(floor(est + 1e-9))
 	var cap := upgrade_cap(id)
-	if cap >= 0:
-		n = mini(n, cap - upg[id])
-	return maxi(n, 0)
+	var left := cap - int(upg[id]) if cap >= 0 else 1000000000
+	n = clampi(n, 1, maxi(left, 1))
+	var guard := 0
+	while n > 1 and upgrade_cost(id, n).cmp(money) > 0 and guard < 64:
+		n -= 1
+		guard += 1
+	guard = 0
+	while n < left and upgrade_cost(id, n + 1).cmp(money) <= 0 and guard < 64:
+		n += 1
+		guard += 1
+	return maxi(mini(n, left), 0)
 
 
 func buy_upgrade(id: String, n: int) -> int:
@@ -509,7 +527,8 @@ func upgrade_effect_text(id: String, l: int) -> String:
 		"press":
 			return "x%s дохода" % Big.power(2.0, l / 25).mul(1.0 + 0.1 * l).fmt(settings.sci)
 		"stamina":
-			return "%.1f с" % (4.0 + 0.1 * l)
+			var mult := d_stamina_max / maxf(4.0 + 0.1 * upg.stamina, 0.001)
+			return "%.1f с" % ((4.0 + 0.1 * l) * mult)
 		"passive":
 			return "%.1f%% от полного" % (minf(1.0, 0.10 + 0.005 * l) * 100.0)
 		"turbo":
@@ -736,8 +755,10 @@ func hour_left() -> float:
 
 func hourly_offers() -> Array:
 	var h := hour_index()
-	if shop_state.hour != h:
-		shop_state = {"hour": h, "bought": []}
+	if int(shop_state.get("hour", -1)) != h:
+		shop_state = {"hour": h, "bought": [], "picks": {}}
+	if not (shop_state.get("picks") is Dictionary):
+		shop_state.picks = {}
 	var rng := RandomNumberGenerator.new()
 	rng.seed = h * 7919 + 1337
 	var hot := rng.randi_range(0, 5)
@@ -750,13 +771,46 @@ func hourly_offers() -> Array:
 			disc = rng.randf_range(0.1, 0.3)
 		if i == hot:
 			disc = rng.randf_range(0.35, 0.5)
-		var o := {"i": i, "kind": kind, "disc": disc, "hot": i == hot, "pick": rng.randi()}
+		var key := str(i)
+		var pick: Dictionary = shop_state.picks.get(key, {})
+		if pick.is_empty():
+			pick = _choose_offer_target(kind, rng.randi())
+			shop_state.picks[key] = pick
+		else:
+			rng.randi()
+		var o := {"i": i, "kind": str(pick.kind), "disc": disc, "hot": i == hot, "target": str(pick.get("target", ""))}
 		res.append(_resolve_offer(o))
 	return res
 
 
+## Выбор цели предложения из того, что игроку реально доступно. Нет вариантов — буст дохода.
+func _choose_offer_target(kind: String, pick: int) -> Dictionary:
+	var pool: Array = []
+	match kind:
+		"upgrade":
+			for u in D.UPGRADES:
+				var cap := upgrade_cap(u.id)
+				if u.cur == "cash" and upgrade_unlocked(u.id) and (cap < 0 or int(upg[u.id]) + 10 <= cap):
+					pool.append(u.id)
+		"part":
+			for sl in D.SLOTS:
+				if not slot_visible(sl.id):
+					continue
+				var off := mark_offer(sl.id, best_mark(sl.id) + 1)
+				if off.ok and not off.free:
+					pool.append(sl.id)
+		"case":
+			for c in D.CASES:
+				if case_available(c):
+					pool.append(c.id)
+		_:
+			return {"kind": kind}
+	if pool.is_empty():
+		return {"kind": "boost_income"}
+	return {"kind": kind, "target": pool[absi(pick) % pool.size()]}
+
+
 func _resolve_offer(o: Dictionary) -> Dictionary:
-	var pick: int = o.pick
 	match o.kind:
 		"boost_income":
 			o.title = "x2 дохода на 10 мин"
@@ -771,21 +825,14 @@ func _resolve_offer(o: Dictionary) -> Dictionary:
 			o.cur = "cash"
 			o.price = d_hold.mul(60.0)
 		"upgrade":
-			var ids: Array = []
-			for u in D.UPGRADES:
-				if u.cur == "cash" and upgrade_unlocked(u.id):
-					ids.append(u.id)
-			var id: String = ids[pick % ids.size()]
-			o.target = id
+			var id: String = o.target
 			o.title = "%s +10 ур." % D.upgrade(id).name
 			o.cur = "cash"
 			o.price = upgrade_cost(id, 10)
+			var cap := upgrade_cap(id)
+			o.blocked = not upgrade_unlocked(id) or (cap >= 0 and int(upg[id]) + 10 > cap)
 		"part":
-			var sids: Array = []
-			for s in D.SLOTS:
-				if slot_visible(s.id):
-					sids.append(s.id)
-			var sid: String = sids[pick % sids.size()]
+			var sid: String = o.target
 			var mk := best_mark(sid) + 1
 			var off := mark_offer(sid, mk)
 			o.target = sid
@@ -795,15 +842,14 @@ func _resolve_offer(o: Dictionary) -> Dictionary:
 			o.price = off.price
 			o.blocked = not off.ok or off.free
 		"case":
-			var avail: Array = []
+			var c2: Dictionary = D.CASES[0]
 			for c in D.CASES:
-				if case_available(c):
-					avail.append(c)
-			var c2: Dictionary = avail[pick % avail.size()]
-			o.target = c2.id
+				if c.id == o.target:
+					c2 = c
 			o.title = "%s кейс" % c2.name
 			o.cur = c2.cur
 			o.price = case_price(c2)
+			o.blocked = not case_available(c2)
 	o.final = Big.of(o.price).mul(1.0 - o.disc)
 	o.bought = shop_state.bought.has(o.i)
 	return o
@@ -825,11 +871,8 @@ func buy_offer(o: Dictionary) -> Dictionary:
 		"boost_turbo":
 			if not pay(o.cur, o.final):
 				return {}
-			if d_turbo_on:
-				guaranteed_turbo = true
-				turbo_cd = 0.0
-			else:
-				start_turbo(TURBO_TIME)
+			# сработает при следующем зажатии мотора, без ожидания перезарядки
+			guaranteed_turbo = true
 		"upgrade":
 			var cap := upgrade_cap(o.target)
 			if cap >= 0 and upg[o.target] + 10 > cap:
@@ -837,6 +880,7 @@ func buy_offer(o: Dictionary) -> Dictionary:
 			if not pay(o.cur, o.final):
 				return {}
 			upg[o.target] += 10
+			_daily_progress("upgrades", 10)
 			mark_dirty()
 		"part":
 			if not buy_mark(o.target, o.mk, o.disc):
@@ -1116,6 +1160,7 @@ func _refresh_daily() -> void:
 func _daily_progress(type: String, amount: float) -> void:
 	if type == "earn":
 		return
+	_refresh_daily()
 	for t in daily.tasks:
 		if t.type == type and not t.claimed:
 			t.progress = minf(t.goal, t.progress + amount)
@@ -1172,8 +1217,19 @@ func apply_settings() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_APPLICATION_FOCUS_OUT \
-			or what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_WM_GO_BACK_REQUEST:
+			or what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_paused_at = Time.get_unix_time_from_system()
 		save_game()
+	elif what == NOTIFICATION_APPLICATION_RESUMED or what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		if _paused_at > 0.0:
+			last_time = _paused_at
+			_paused_at = 0.0
+			_update_boosts(Time.get_unix_time_from_system())
+			mark_dirty()
+			recalc()
+			_compute_offline()
+			if offline_report != null:
+				offline_ready.emit()
 
 
 func to_dict() -> Dictionary:
@@ -1186,64 +1242,120 @@ func to_dict() -> Dictionary:
 		"level": level, "xp": xp.to_arr(), "run_earned": run_earned.to_arr(),
 		"total_earned": total_earned.to_arr(), "stats": stats, "ach": ach, "boosts": boosts,
 		"shop": shop_state, "daily": daily, "engine": engine_choice, "settings": settings,
+		"guaranteed_turbo": guaranteed_turbo,
 		"last_time": Time.get_unix_time_from_system(),
 	}
 
 
+static func _dict(v) -> Dictionary:
+	return v if v is Dictionary else {}
+
+
+static func _arr(v) -> Array:
+	return v if v is Array else []
+
+
+static func _num(v, def: float = 0.0) -> float:
+	if v is int or v is float:
+		return float(v)
+	return def
+
+
+static func _big(v) -> Big:
+	if v is Array and v.size() >= 2 and (v[0] is int or v[0] is float) and (v[1] is int or v[1] is float):
+		return Big.new(float(v[0]), int(v[1]))
+	if v is int or v is float:
+		return Big.of(float(v))
+	return Big.zero()
+
+
+## Сохранение похоже на наше? Проверяем основные поля до того, как что-то стирать.
+static func valid_save(d) -> bool:
+	if not (d is Dictionary):
+		return false
+	if not (d.get("version") is int or d.get("version") is float) or int(d.version) > SAVE_VERSION:
+		return false
+	for k in ["cur", "upg", "parts"]:
+		if not (d.get(k) is Dictionary):
+			return false
+	return d.get("level") is int or d.get("level") is float
+
+
 func from_dict(d: Dictionary) -> void:
 	_reset_all()
-	var c: Dictionary = d.get("cur", {})
+	var c := _dict(d.get("cur"))
 	for id in c:
 		if cur.has(id):
-			cur[id] = Big.of(c[id])
-	unlocked_cur = d.get("unlocked_cur", unlocked_cur)
-	var u: Dictionary = d.get("upg", {})
+			cur[id] = _big(c[id])
+	var uc := _dict(d.get("unlocked_cur"))
+	for id in uc:
+		if uc[id] == true:
+			unlocked_cur[id] = true
+	var u := _dict(d.get("upg"))
 	for id in u:
 		if upg.has(id):
-			upg[id] = int(u[id])
-	var p: Dictionary = d.get("parts", {})
+			upg[id] = maxi(0, int(_num(u[id])))
+	var p := _dict(d.get("parts"))
 	for sid in p:
-		if parts.has(sid):
-			var owned: Array = []
-			for it in p[sid].get("owned", []):
-				owned.append({"mk": int(it.mk), "rar": int(it.rar), "src": str(it.src)})
-			parts[sid] = {"owned": owned, "eq": int(p[sid].get("eq", -1))}
-	rebirths = int(d.get("rebirths", 0))
-	ultra = int(d.get("ultra", 0))
+		if not parts.has(sid):
+			continue
+		var slot := _dict(p[sid])
+		var owned: Array = []
+		for it in _arr(slot.get("owned")):
+			if it is Dictionary:
+				owned.append({"mk": maxi(1, int(_num(it.get("mk"), 1))), "rar": clampi(int(_num(it.get("rar"))), 0, D.RARITIES.size() - 1), "src": str(it.get("src", "case"))})
+		var eq := int(_num(slot.get("eq"), -1))
+		if eq < -1 or eq >= owned.size():
+			eq = 0 if not owned.is_empty() else -1
+		parts[sid] = {"owned": owned, "eq": eq}
+	rebirths = maxi(0, int(_num(d.get("rebirths"))))
+	ultra = maxi(0, int(_num(d.get("ultra"))))
 	for pair in [["sapph", sapph], ["quant", quant], ["uskill", uskill], ["ach", ach]]:
-		var src: Dictionary = d.get(pair[0], {})
+		var src := _dict(d.get(pair[0]))
 		for k in src:
-			pair[1][k] = int(src[k])
-	level = maxi(1, int(d.get("level", 1)))
-	xp = Big.of(d.get("xp", [0, 0]))
-	run_earned = Big.of(d.get("run_earned", [0, 0]))
-	total_earned = Big.of(d.get("total_earned", [0, 0]))
-	var st: Dictionary = d.get("stats", {})
-	for k in st:
-		stats[k] = st[k]
+			pair[1][k] = maxi(0, int(_num(src[k])))
+	level = maxi(1, int(_num(d.get("level"), 1)))
+	xp = _big(d.get("xp"))
+	run_earned = _big(d.get("run_earned"))
+	total_earned = _big(d.get("total_earned"))
+	var st := _dict(d.get("stats"))
+	for k in stats:
+		if st.has(k):
+			if k == "best_ips":
+				stats[k] = _big(st[k]).to_arr()
+			else:
+				stats[k] = _num(st[k], 0.0)
 	for k in ["presses", "turbos", "crits", "parts", "cases", "ultras", "rebirths_total"]:
 		stats[k] = int(stats[k])
-	boosts = d.get("boosts", [])
-	shop_state = d.get("shop", shop_state)
-	shop_state.hour = int(shop_state.get("hour", -1))
-	var bought: Array = []
-	for b in shop_state.get("bought", []):
-		bought.append(int(b))
-	shop_state.bought = bought
-	daily = d.get("daily", daily)
+	for b in _arr(d.get("boosts")):
+		if b is Dictionary and b.has("type") and b.has("until"):
+			boosts.append({"type": str(b.type), "until": _num(b.until)})
+	var sh := _dict(d.get("shop"))
+	shop_state = {"hour": int(_num(sh.get("hour"), -1)), "bought": [], "picks": _dict(sh.get("picks"))}
+	for b in _arr(sh.get("bought")):
+		shop_state.bought.append(int(_num(b)))
+	var dl := _dict(d.get("daily"))
+	if dl.get("day") is String and dl.get("tasks") is Array:
+		daily = dl
 	engine_choice = str(d.get("engine", ""))
-	var s: Dictionary = d.get("settings", {})
+	guaranteed_turbo = d.get("guaranteed_turbo", false) == true
+	var s := _dict(d.get("settings"))
 	for k in s:
-		settings[k] = s[k]
+		if settings.has(k) and typeof(s[k]) in [TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING]:
+			settings[k] = s[k]
 	# старые сохранения: графика была тяжелее — переводим на новый пресет
 	if not s.has("fps3d"):
-		var q := clampi(int(settings.get("quality", 1)), 0, 3)
+		var q := clampi(int(_num(settings.get("quality"), 1)), 0, 3)
 		settings.quality = q
 		for k in PRESETS[q]:
 			settings[k] = PRESETS[q][k]
 	for k in ["quality", "fps", "shadows", "msaa", "particles", "fps3d"]:
-		settings[k] = int(settings[k])
-	last_time = float(d.get("last_time", 0.0))
+		settings[k] = int(_num(settings[k]))
+	for k in ["sfx", "music", "res_scale", "cam_zoom"]:
+		settings[k] = _num(settings[k], 1.0)
+	last_time = _num(d.get("last_time"))
+	_update_boosts(Time.get_unix_time_from_system())
+	_refresh_daily()
 	mark_dirty()
 	recalc()
 	stamina = d_stamina_max
@@ -1264,21 +1376,47 @@ func _compute_offline() -> void:
 
 
 func save_game() -> void:
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if _load_failed:
+		return  # не перезаписываем сохранение, которое не смогли прочитать
+	var tmp := SAVE_PATH + ".tmp"
+	var f := FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:
 		return
 	f.store_string(JSON.stringify(to_dict()))
+	var err := f.get_error()
 	f.close()
+	if err != OK:
+		return
+	var dir := DirAccess.open("user://")
+	if dir == null:
+		return
+	if dir.file_exists("save.json"):
+		dir.remove("save.json.bak")
+		dir.rename("save.json", "save.json.bak")
+	dir.rename("save.json.tmp", "save.json")
+
+
+func _read_save(path: String):
+	if not FileAccess.file_exists(path):
+		return null
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return null
+	var data = JSON.parse_string(f.get_as_text())
+	f.close()
+	return data if valid_save(data) else null
 
 
 func load_game() -> void:
-	if not FileAccess.file_exists(SAVE_PATH):
-		return
-	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
-	if f == null:
-		return
-	var data = JSON.parse_string(f.get_as_text())
-	f.close()
+	var data = _read_save(SAVE_PATH)
+	if data == null:
+		data = _read_save(SAVE_PATH + ".bak")
+	if data == null and FileAccess.file_exists(SAVE_PATH):
+		# файл есть, но битый и копии нет — откладываем его в сторону, чтобы не затереть
+		var dir := DirAccess.open("user://")
+		if dir != null:
+			dir.copy("save.json", "save.corrupt.json")
+		_load_failed = false
 	if data is Dictionary:
 		from_dict(data)
 
@@ -1288,11 +1426,21 @@ func export_save() -> String:
 
 
 func import_save(text: String) -> bool:
-	var raw := Marshalls.base64_to_utf8(text.strip_edges())
-	var data = JSON.parse_string(raw)
-	if not (data is Dictionary) or not data.has("version"):
+	var t := text.strip_edges()
+	if t.is_empty():
 		return false
+	var raw := Marshalls.base64_to_utf8(t)
+	var data = JSON.parse_string(raw)
+	if not valid_save(data):
+		return false
+	# графику оставляем от этого телефона — она зависит от устройства
+	var keep := {}
+	for k in ["quality", "shadows", "msaa", "glow", "particles", "res_scale", "fps3d", "fps", "garage"]:
+		keep[k] = settings[k]
 	from_dict(data)
+	for k in keep:
+		settings[k] = keep[k]
+	apply_settings()
 	save_game()
 	changed.emit()
 	return true
@@ -1302,9 +1450,12 @@ func reset_progress() -> void:
 	var keep := settings.duplicate()
 	_reset_all()
 	settings = keep
+	_refresh_daily()
 	mark_dirty()
 	recalc()
+	stamina = d_stamina_max
 	save_game()
+	apply_settings()
 	changed.emit()
 
 

@@ -52,10 +52,11 @@ func _ready() -> void:
 	shade.color = Color(0, 0, 0, 0.6)
 	shade.anchor_right = 1.0
 	shade.anchor_bottom = 1.0
-	shade.offset_top = 830
+	shade.anchor_top = 0.645
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(shade)
-	v.offset_top = 840
+	v.anchor_top = 0.655
+	v.offset_top = 0
 	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(v)
 	var names: Array = []

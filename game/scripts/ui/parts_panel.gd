@@ -153,6 +153,10 @@ func _slot_card(s: Dictionary) -> Control:
 	var ghost := _tile("Mk %s\n???" % D.roman(next_mk + 1), Color(0.18, 0.18, 0.2), false, true)
 	ghost.disabled = true
 	row.add_child(ghost)
+	# покупка и силуэт — в начало ряда: их видно сразу, прокрутка после покупки не нужна
+	var n := row.get_child_count()
+	row.move_child(row.get_child(n - 2), 0)
+	row.move_child(row.get_child(n - 1), 1)
 	return card
 
 

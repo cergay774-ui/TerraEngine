@@ -115,7 +115,7 @@ func _draw() -> void:
 	if boost:
 		txt = "∞"
 	elif hot:
-		txt = "ОСТЫВ"
+		txt = "%d%%" % int(G.stamina / maxf(G.d_stamina_max, 0.01) * 100.0)
 	else:
 		txt = "%.1fс" % G.stamina
 	var fs := 18

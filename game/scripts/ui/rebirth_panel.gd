@@ -75,10 +75,14 @@ func _line(title: String, value: String, color: Color = UI.TEXT) -> void:
 func _build_rebirth() -> void:
 	var req := G.rebirth_req()
 	_content.add_child(UI.label("Следующее: перерождение %d" % (G.rebirths + 1), 24, UI.TEXT))
-	_content.add_child(UI.wrap_label("Заработано в этом перерождении: %s / %s" % [G.fmt(G.run_earned), G.fmt(req)], 18, UI.TEXT))
+	var earn_l := UI.wrap_label("", 18, UI.TEXT)
+	_content.add_child(earn_l)
 	var bar := UI.bar(UI.ACCENT, 18)
-	bar.value = clampf(G.run_earned.div(req).to_float(), 0.0, 1.0)
 	_content.add_child(bar)
+	_live.append({"btn": null, "check": func():
+		earn_l.text = "Заработано в этом перерождении: %s / %s" % [G.fmt(G.run_earned), G.fmt(G.rebirth_req())]
+		bar.value = clampf(G.run_earned.div(G.rebirth_req()).to_float(), 0.0, 1.0)
+		return true})
 	_line("Множитель сейчас", "x" + Big.power(1.25, G.rebirths).fmt(G.settings.sci))
 	_line("Станет", "x" + Big.power(1.25, G.rebirths + 1).fmt(G.settings.sci), UI.GOOD)
 	var rw := G.rebirth_rewards(G.rebirths + 1)
@@ -183,4 +187,6 @@ func _build_ultra() -> void:
 
 func tick() -> void:
 	for l in _live:
-		l.btn.disabled = not l.check.call()
+		var ok: bool = l.check.call()
+		if l.btn != null:
+			l.btn.disabled = not ok

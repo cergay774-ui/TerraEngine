@@ -66,6 +66,7 @@ var _tail_pos: Vector3 = Vector3.ZERO
 var _pop_glow: float = 0.0
 var _lift: float = 0.0
 var _frame_i: int = 0
+var _warm_frames: int = 0   # первые кадры после сборки: все эффекты включены — шейдеры компилируются сразу, а не посреди игры
 var _anchors: Dictionary = {}     # слот запчасти -> точка на моторе (локально в _engine)
 
 
@@ -97,10 +98,17 @@ func _ready() -> void:
 
 
 func set_engine(type: String, material: int) -> void:
+	# пересобираем модель только если она реально изменилась (тип, материал, турбина, гоночный облик):
+	# сборка тяжёлая, а уровни/покупки меняют только цвета, их обновляет _update_tints
+	var same := type == engine_type and material == material_index and _engine != null and is_instance_valid(_engine)
 	engine_type = type
 	material_index = material
-	if is_inside_tree():
-		_rebuild()
+	if not is_inside_tree():
+		return
+	if same and _build_key() == _built_key:
+		_tint_acc = 1.0
+		return
+	_rebuild()
 
 
 func _q() -> int:
@@ -331,6 +339,13 @@ func _make_mats() -> void:
 	var hd: StandardMaterial3D = _mats.header
 	hd.emission_enabled = true
 	hd.emission = Color.BLACK
+	# свечение у этих материалов включено всегда (просто чёрное, когда не нужно):
+	# переключение emission_enabled на лету заставляет движок заново компилировать шейдеры,
+	# на телефоне это секундные зависания
+	for k in ["block", "head", "piston", "crank"]:
+		var em: StandardMaterial3D = _mats[k]
+		em.emission_enabled = true
+		em.emission = Color.BLACK
 	if md.get("weave", false):
 		var w := _weave_tex()
 		_mats.block.albedo_texture = w
@@ -453,6 +468,7 @@ func _rebuild() -> void:
 	_steam.position = Vector3(_center.x, box.end.y - 1.0, _center.z)
 	_apply_xray()
 	_update_tints()
+	_warm_frames = 3
 
 
 func _engine_aabb() -> AABB:
@@ -1062,7 +1078,9 @@ func _process(delta: float) -> void:
 ## Экономия: 3D рисуется через кадр на слабых пресетах и не рисуется вовсе, когда мотор закрыт меню.
 func _update_render_mode() -> void:
 	_frame_i += 1
-	if render_paused:
+	if _warm_frames > 0:
+		_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	elif render_paused:
 		_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	elif int(G.settings.get("fps3d", 1)) == 0:
 		if _frame_i % 2 == 0:
@@ -1146,7 +1164,8 @@ func _animate(delta: float) -> void:
 	if max_flash > 0.0:
 		_flash_light.position = _root.to_local(flash_pos)
 	_flash_light.light_energy = 4.0 * max_flash
-	_flash_light.visible = max_flash > 0.02 and _q() >= 1
+	# свет вспышки — лишний проход отрисовки для всех деталей рядом: только на «Высоком» и «Ультра»
+	_flash_light.visible = (max_flash > 0.02 and _q() >= 2) or (_warm_frames > 0 and _q() >= 2)
 	if _turbine_wheel != null:
 		_turbine_deg = fmod(_turbine_deg + (200.0 + rpm * rpm / 25000.0) * delta * (2.0 if (not demo and G.turbo_time > 0.0) else 1.0), 360.0)
 		_turbine_wheel.rotation.x = deg_to_rad(_turbine_deg)
@@ -1223,10 +1242,20 @@ func _update_effects(delta: float, ratio: float, throttle: bool) -> void:
 	_tail_light.position = tail + Vector3(0, 0.5, -0.8)
 	_tail_light.light_color = flame_col
 	_tail_light.light_energy = flame * 6.0
-	_tail_light.visible = flame > 0.02
+	_tail_light.visible = (flame > 0.02 or _warm_frames > 0) and _q() >= 1
 	_steam.emitting = heat > 0.75 and int(G.settings.get("particles", 1)) > 0
 	_turbo_light.light_energy = 3.0 if turbo_on else 0.0
-	_turbo_light.visible = turbo_on
+	_turbo_light.visible = turbo_on or _warm_frames > 0
+	if _warm_frames > 0:
+		_warm_frames -= 1
+		_tail_flame.visible = true
+		for cy in _cyls:
+			cy.flash.visible = true
+		if _warm_frames == 2:
+			_flames.restart()
+			_flames.emitting = true
+			_sparks.restart()
+			_sparks.emitting = int(G.settings.get("particles", 1)) > 0
 
 
 func _update_tints() -> void:
@@ -1242,7 +1271,6 @@ func _update_tints() -> void:
 		var col: Color = base[key].lerp(hot, h * (0.5 if key != "crank" else 0.2))
 		m.albedo_color = Color(col.r, col.g, col.b, m.albedo_color.a)
 		var glow := _part_glow(key)
-		m.emission_enabled = h > 0.05 or glow > 0.0
 		m.emission = hot * h * 0.5 + _glow_color(key) * glow
 	# коллектор: побежалость и красное свечение от нагрева и оборотов
 	var hm: StandardMaterial3D = _mats.header

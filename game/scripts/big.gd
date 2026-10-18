@@ -54,6 +54,9 @@ static func power(base: float, ex: float) -> Big:
 	if base <= 0.0:
 		return Big.zero()
 	var l := ex * log(base) / log(10.0)
+	# в обычном диапазоне считаем напрямую — так 2^4 ровно 16, а не 15.999…
+	if absf(l) < 300.0:
+		return Big.new(pow(base, ex), 0)
 	var ie := int(floor(l))
 	return Big.new(pow(10.0, l - ie), ie)
 
@@ -182,20 +185,21 @@ func fmt(sci: bool = false) -> String:
 	var am := absf(m)
 	if e < 3:
 		var v := am * pow(10.0, e)
-		if v < 10.0 and v != floor(v):
+		var vi := floorf(v + 1e-9)
+		if v < 10.0 and absf(v - roundf(v)) > 1e-9:
 			return sign + ("%.1f" % v)
-		return sign + str(int(floor(v)))
+		return sign + str(int(vi))
 	if sci:
 		return sign + ("%.2fe%d" % [am, e])
 	var group := e / 3
-	var v2 := am * pow(10.0, e - group * 3)
+	var v2 := am * pow(10.0, e - group * 3) + 1e-9
 	var num: String
 	if v2 < 10.0:
 		num = "%.2f" % v2
 	elif v2 < 100.0:
 		num = "%.1f" % v2
 	else:
-		num = "%d" % int(floor(v2))
+		num = "%d" % int(floorf(v2))
 	return sign + num + suffix_for(group)
 
 

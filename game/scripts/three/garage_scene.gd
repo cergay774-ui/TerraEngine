@@ -203,7 +203,9 @@ static func build(parent: Node3D, floor_y: float, quality: int) -> Dictionary:
 		batch.add("rubber", tire, Transform3D(Basis.IDENTITY.scaled(Vector3(1, 0.7, 1)), Vector3(9.0, floor_y + 0.42 + k * 0.82, back_z + 3.0)))
 	batch.add("rubber", tire, Transform3D(Basis(Vector3.RIGHT, PI * 0.5).scaled(Vector3(1, 1, 0.7)), Vector3(16.5, floor_y + 1.7, back_z + 13.0)))
 
-	batch.commit(root, mats)
+	# обстановка гаража тени не отбрасывает: стоит у стен, а проход теней дорогой
+	for mi in batch.commit(root, mats):
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	# лампы-трубки под потолком
 	var lights: Array = []
@@ -278,7 +280,7 @@ static func build(parent: Node3D, floor_y: float, quality: int) -> Dictionary:
 	rim.light_color = Color(0.35, 0.55, 1.0)
 	rim.light_energy = 3.0
 	rim.omni_range = 18.0
-	rim.visible = quality >= 1
+	rim.visible = quality >= 2
 	rim.position = Vector3(-6.0, floor_y + 9.0, back_z + 3.0)
 	root.add_child(rim)
 	return {"root": root, "key": key}

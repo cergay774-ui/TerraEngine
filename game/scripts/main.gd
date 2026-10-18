@@ -1,7 +1,7 @@
 extends Control
 ## Главный экран: верхняя панель с валютами, мотор по центру, стамина, 5 кнопок внизу.
 
-const W := 720.0
+var W: float = 720.0           # ширина экрана в единицах интерфейса (на широких экранах больше)
 var H: float = 1280.0          # высота экрана в единицах интерфейса (на вытянутых телефонах больше)
 const ENGINE_TOP := 205.0
 var ENGINE_BOTTOM: float = 930.0  # низ полосы мотора — считается от низа экрана
@@ -11,6 +11,12 @@ var _fps_label: Label
 var _garage_mode: bool = false
 var _garage_ui: Control = null
 var _door_busy: bool = false
+var _panel_tween: Tween = null
+var _epoch_screen: Control = null
+var _pending_level: int = 0
+var _fps_low_time: float = 0.0
+var _fps_check_acc: float = 0.0
+var _auto_cooldown: float = 20.0
 var top_margin: float = 0.0
 
 var _level_tab: Control
@@ -40,6 +46,7 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	theme = UI.make_theme()
 	H = maxf(1280.0, get_viewport_rect().size.y)
+	W = maxf(720.0, get_viewport_rect().size.x)
 	ENGINE_BOTTOM = H - 350.0
 	_compute_safe_area()
 
@@ -94,6 +101,8 @@ func _ready() -> void:
 	G.toast.connect(show_toast)
 	G.rebirth_done.connect(_on_rebirth)
 	G.part_gained.connect(func(_s, _m, _r): _apply_engine())
+	G.settings_changed.connect(func(): _xray_btn.set_pressed_no_signal(G.settings.xray))
+	G.offline_ready.connect(func(): call_deferred("_show_offline"))
 
 	_refresh_all()
 	if G.offline_report != null:
@@ -222,7 +231,9 @@ func _build_engine_hud() -> void:
 	_xray_btn.offset_top = ENGINE_TOP + top_margin + 10
 	_xray_btn.offset_bottom = ENGINE_TOP + top_margin + 58
 	_xray_btn.button_pressed = G.settings.xray
-	_xray_btn.toggled.connect(func(on: bool): G.settings.xray = on)
+	_xray_btn.toggled.connect(func(on: bool):
+		G.settings.xray = on
+		G.apply_settings())
 	add_child(_xray_btn)
 
 
@@ -333,7 +344,9 @@ func open_panel(p: Control, side: String) -> void:
 	p.visible = true
 	if p.has_method("refresh"):
 		p.refresh()
+	_kill_panel_tween()
 	var tw := create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_panel_tween = tw
 	match side:
 		"left":
 			# до середины экрана, мотор остаётся виден справа
@@ -348,7 +361,8 @@ func open_panel(p: Control, side: String) -> void:
 			p.offset_right = 0
 			tw.tween_property(p, "offset_left", 0.0, 0.28)
 			tw.tween_property(p, "offset_right", W * 0.56, 0.28)
-			tw.tween_property(engine_view, "band", _engine_band(true), 0.28)
+			if not _garage_mode:
+				tw.tween_property(engine_view, "band", _engine_band(true), 0.28)
 			_dim.visible = false
 		"bottom":
 			p.anchor_left = 0.0
@@ -377,12 +391,27 @@ func open_panel(p: Control, side: String) -> void:
 			p.pivot_offset = Vector2(W * 0.46, H * 0.38)
 			p.scale = Vector2(0.85, 0.85)
 			p.modulate.a = 0.0
-			tw.tween_property(p, "scale", Vector2.ONE, 0.22)
+			tw.tween_property(p, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK)
 			tw.tween_property(p, "modulate:a", 1.0, 0.18)
 			_dim.visible = true
 			_dim.modulate.a = 0.0
 			tw.tween_property(_dim, "modulate:a", 1.0, 0.2)
 	_overlay.move_child(_dim, 0)
+
+
+func _kill_panel_tween() -> void:
+	if _panel_tween != null and _panel_tween.is_valid():
+		_panel_tween.kill()
+	_panel_tween = null
+
+
+## Обычное положение мотора: в гараже — своя рамка между карточками.
+func _base_band() -> Rect2:
+	if _garage_mode:
+		var top := (ENGINE_TOP + top_margin + 90.0) / H
+		var bottom := (ENGINE_BOTTOM + 60.0) / H
+		return Rect2(0.16, top, 0.68, bottom - top)
+	return _engine_band(false)
 
 
 func close_panel(instant: bool = false) -> void:
@@ -392,18 +421,20 @@ func close_panel(instant: bool = false) -> void:
 	var side := _open_side
 	_open_panel = null
 	_open_side = ""
-	engine_view.render_paused = false
+	engine_view.render_paused = _epoch_screen != null
+	_kill_panel_tween()
 	if instant:
 		p.visible = false
-		engine_view.band = _engine_band(false)
+		engine_view.band = _base_band()
 		_dim.visible = false
 		return
 	var tw := create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	_panel_tween = tw
 	match side:
 		"left":
 			tw.tween_property(p, "offset_left", -W * 0.56, 0.22)
 			tw.tween_property(p, "offset_right", 0.0, 0.22)
-			tw.tween_property(engine_view, "band", _engine_band(false), 0.22)
+			tw.tween_property(engine_view, "band", _base_band(), 0.22)
 		"bottom":
 			tw.tween_property(p, "offset_top", 10.0, 0.22)
 			tw.tween_property(p, "offset_bottom", H * 0.66 + 10.0, 0.22)
@@ -439,9 +470,7 @@ func _set_garage(on: bool) -> void:
 	engine_view.locked = on
 	engine_view.mouse_filter = Control.MOUSE_FILTER_IGNORE if on else Control.MOUSE_FILTER_STOP
 	G.set_holding(false)
-	var top := (ENGINE_TOP + top_margin + 90.0) / H
-	var bottom := (ENGINE_BOTTOM + 60.0) / H
-	engine_view.band = Rect2(0.16, top, 0.68, bottom - top) if on else _engine_band(false)
+	engine_view.band = _base_band()
 	for n in [_stamina_gauge, _status_label, _xray_btn, get_node_or_null("Hint")]:
 		if n:
 			n.visible = not on
@@ -481,7 +510,7 @@ func _apply_engine() -> void:
 
 func _refresh_all() -> void:
 	_refresh_numbers()
-	if _open_panel != null and _open_panel.has_method("refresh"):
+	if _open_panel != null and _open_panel.has_method("refresh") and _open_panel != _panels.get("settings"):
 		_open_panel.refresh()
 
 
@@ -517,14 +546,20 @@ func _process(delta: float) -> void:
 			_open_panel.tick()
 
 	# доход всплывает «+X» вокруг мотора: при зажатии часто и ярко, на холостых реже и бледнее
-	_float_gain = _float_gain.add(G.income_now.mul(delta * G.d_time_mult))
-	_float_acc += delta
+	if _garage_mode:
+		_float_gain = Big.zero()
+		_float_acc = 0.0
+	else:
+		_float_gain = _float_gain.add(G.income_now.mul(delta * G.d_time_mult))
+		_float_acc += delta
 	if _float_acc >= _float_next and not _garage_mode:
 		_float_acc = 0.0
 		_float_next = randf_range(0.35, 0.55) if G.throttle else randf_range(1.4, 1.9)
 		if not _float_gain.is_zero():
 			_income_popup(_float_gain)
 		_float_gain = Big.zero()
+
+	_auto_quality(delta)
 
 	_badge_acc += delta
 	if _badge_acc >= 0.5:
@@ -534,6 +569,29 @@ func _process(delta: float) -> void:
 		var dot: Control = _badges[id].dot
 		if dot.visible:
 			dot.queue_redraw()
+
+
+## Если телефон не тянет (FPS долго ниже 22), графика сама снижается на ступень.
+func _auto_quality(delta: float) -> void:
+	_auto_cooldown = maxf(0.0, _auto_cooldown - delta)
+	_fps_check_acc += delta
+	if _fps_check_acc < 1.0:
+		return
+	_fps_check_acc = 0.0
+	if _open_panel != null or _garage_mode or _epoch_screen != null:
+		_fps_low_time = 0.0
+		return
+	var fps := Engine.get_frames_per_second()
+	if fps > 0 and fps < 22:
+		_fps_low_time += 1.0
+	else:
+		_fps_low_time = 0.0
+	var q := int(G.settings.quality)
+	if _fps_low_time >= 5.0 and _auto_cooldown <= 0.0 and q > 0:
+		_fps_low_time = 0.0
+		_auto_cooldown = 20.0
+		G.apply_preset(q - 1)
+		show_toast("Графика снижена до «%s» для плавности" % ["Низкое", "Среднее", "Высокое", "Ультра"][q - 1], Color("ffc21a"))
 
 
 ## Зелёные точки на кнопках: есть доступное улучшение, запчасть, награда или перерождение.
@@ -685,6 +743,14 @@ func show_toast(text: String, color: Color = UI.TEXT) -> void:
 
 
 func _on_level_up(lvl: int) -> void:
+	if _pending_level == 0:
+		call_deferred("_flush_level_up")
+	_pending_level = maxi(_pending_level, lvl)
+
+
+func _flush_level_up() -> void:
+	var lvl := _pending_level
+	_pending_level = 0
 	_apply_engine()
 	if (lvl - 1) % 10 != 0:
 		show_toast("Уровень %d! Доход x1.05" % lvl, Color("8fc4ff"))
@@ -693,10 +759,19 @@ func _on_level_up(lvl: int) -> void:
 
 func _on_new_epoch(ei: int) -> void:
 	_apply_engine()
+	# одна заставка за раз; под ней основной 3D не рисуем (две 3D-сцены сразу — тяжело)
+	if _epoch_screen != null and is_instance_valid(_epoch_screen):
+		_epoch_screen.queue_free()
 	var scr := preload("res://scripts/ui/epoch_screen.gd").new()
 	scr.epoch_index = ei
 	scr.level = G.level
 	add_child(scr)
+	_epoch_screen = scr
+	engine_view.render_paused = true
+	scr.tree_exited.connect(func():
+		if _epoch_screen == scr:
+			_epoch_screen = null
+			engine_view.render_paused = _open_panel != null and _open_side != "left")
 
 
 func _on_turbo() -> void:
@@ -733,10 +808,14 @@ func _on_rebirth() -> void:
 
 
 func _show_offline() -> void:
+	if G.offline_report == null:
+		return
+	var old := get_node_or_null("OfflinePopup")
+	if old:
+		old.queue_free()
 	var p := UI.card(UI.PANEL, UI.ACCENT, 20)
-	p.set_anchors_preset(Control.PRESET_CENTER)
+	p.name = "OfflinePopup"
 	p.custom_minimum_size = Vector2(560, 0)
-	p.position = Vector2(80, 470)
 	var v := VBoxContainer.new()
 	p.add_child(v)
 	v.add_child(UI.label("Офлайн-гараж", 32, UI.ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
@@ -748,6 +827,19 @@ func _show_offline() -> void:
 		Sfx.play("coin")
 		p.queue_free())
 	add_child(p)
+	p.anchor_left = 0.5
+	p.anchor_right = 0.5
+	p.anchor_top = 0.5
+	p.anchor_bottom = 0.5
+	p.offset_left = -280
+	p.offset_right = 280
+	p.offset_top = -150
+	p.offset_bottom = 150
+	p.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	p.grow_vertical = Control.GROW_DIRECTION_BOTH
+	p.pivot_offset = Vector2(280, 150)
+	p.scale = Vector2(0.8, 0.8)
+	p.create_tween().tween_property(p, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	G.offline_report = null
 
 
@@ -758,3 +850,34 @@ func play_case_opening(result: Dictionary) -> void:
 	var scr := preload("res://scripts/ui/case_opening.gd").new()
 	scr.result = result
 	add_child(scr)
+
+
+# ---------------------------------------------------------------------
+# Кнопка «Назад» Android: закрывает окно/меню/гараж, а не игру
+# ---------------------------------------------------------------------
+
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_WM_GO_BACK_REQUEST:
+		return
+	var off := get_node_or_null("OfflinePopup")
+	if off:
+		off.queue_free()
+		return
+	if _epoch_screen != null and is_instance_valid(_epoch_screen):
+		_epoch_screen.queue_free()
+		return
+	for c in get_children():
+		if c.get_script() == preload("res://scripts/ui/case_opening.gd"):
+			c.queue_free()
+			return
+	if _resources.get("_open"):
+		_resources.set_open(false)
+		return
+	if _open_panel != null:
+		close_panel()
+		return
+	if _garage_mode:
+		_toggle_garage()
+		return
+	G.save_game()
+	get_tree().quit()

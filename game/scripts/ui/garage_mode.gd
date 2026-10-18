@@ -9,7 +9,8 @@ var _sides: Dictionary = {}       # слот -> -1 (слева) / 1 (справ�
 var _lines: Control
 var _time: float = 0.0
 var _layout_key: String = ""
-var _appear: float = 0.0      # 0..1 — линии «прорастают» от карточек к деталям
+var _appear: float = 0.0
+var _card_acc: float = 0.0      # 0..1 — линии «прорастают» от карточек к деталям
 
 const CARD_W := 196.0
 const CARD_H := 86.0
@@ -76,9 +77,19 @@ func rebuild() -> void:
 		cx += pts[sid].x
 	cx /= maxf(1.0, slots.size())
 	slots.sort_custom(func(a, b): return pts[a].x < pts[b].x)
-	var half := int(ceil(slots.size() / 2.0))
-	var left := slots.slice(0, half)
-	var right := slots.slice(half)
+	# детали левее центра мотора — в левую колонку, правее — в правую; если колонка переполнена, лишние уходят в другую
+	var left: Array = []
+	var right: Array = []
+	for sid in slots:
+		if pts[sid].x < cx:
+			left.append(sid)
+		else:
+			right.append(sid)
+	var per_col := int(ceil(slots.size() / 2.0)) + 1
+	while left.size() > per_col:
+		right.push_front(left.pop_back())
+	while right.size() > per_col:
+		left.push_back(right.pop_front())
 	left.sort_custom(func(a, b): return pts[a].y < pts[b].y)
 	right.sort_custom(func(a, b): return pts[a].y < pts[b].y)
 	var top: float = main.ENGINE_TOP + main.top_margin + 70.0
@@ -162,7 +173,14 @@ func _refresh_cards() -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	_appear = minf(1.0, _appear + delta * 1.6)
-	var key := G.current_engine() + "|" + str(G.level) + "|" + str(G.equipped("turbine").is_empty())
+	var vis := ""
+	for sl in D.SLOTS:
+		vis += "1" if G.slot_visible(sl.id) else "0"
+	var key := "%s|%d|%s|%s|%s" % [G.current_engine(), D.epoch_info(G.level).material, str(D.epoch_info(G.level).racing), str(G.equipped("turbine").is_empty()), vis]
+	_card_acc += delta
+	if _card_acc >= 0.5:
+		_card_acc = 0.0
+		_refresh_cards()
 	if key != _layout_key and engine_view.part_screen_pos("block").x >= 0.0:
 		_layout_key = key
 		rebuild()
