@@ -1,0 +1,594 @@
+extends Control
+## Главный экран: верхняя панель с валютами, мотор по центру, стамина, 5 кнопок внизу.
+
+const W := 720.0
+const H := 1280.0
+const ENGINE_TOP := 250.0
+const ENGINE_BOTTOM := 930.0
+
+var bg: Control
+var engine_view: Control
+var top_margin: float = 0.0
+
+var _chips: HFlowContainer
+var _chip_labels: Dictionary = {}
+var _ips_label: Label
+var _rebirth_label: Label
+var _level_label: Label
+var _xp_bar: ProgressBar
+var _stamina_bar: ProgressBar
+var _stamina_label: Label
+var _status_label: Label
+var _xray_btn: Button
+var _float_layer: Control
+var _toast_box: VBoxContainer
+var _overlay: Control
+var _dim: ColorRect
+var _open_panel: Control = null
+var _open_side: String = ""
+var _panels: Dictionary = {}
+var _float_acc: float = 0.0
+var _ui_acc: float = 0.0
+
+
+func _ready() -> void:
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	theme = UI.make_theme()
+	_compute_safe_area()
+
+	bg = preload("res://scripts/ui/garage_bg.gd").new()
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.lamp_y = top_margin + 205.0
+	add_child(bg)
+
+	engine_view = preload("res://scripts/engine_view.gd").new()
+	engine_view.anchor_right = 1.0
+	engine_view.offset_top = ENGINE_TOP + top_margin
+	engine_view.offset_bottom = ENGINE_BOTTOM
+	engine_view.hold_changed.connect(_on_hold)
+	add_child(engine_view)
+	_apply_engine()
+
+	_build_top_bar()
+	_build_engine_hud()
+	_build_bottom_bar()
+
+	_float_layer = Control.new()
+	_float_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_float_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_float_layer)
+
+	_overlay = Control.new()
+	_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_overlay)
+	_dim = ColorRect.new()
+	_dim.color = Color(0, 0, 0, 0.55)
+	_dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_dim.visible = false
+	_dim.gui_input.connect(func(e: InputEvent):
+		if e is InputEventMouseButton and e.pressed:
+			close_panel())
+	_overlay.add_child(_dim)
+
+	_toast_box = VBoxContainer.new()
+	_toast_box.anchor_right = 1.0
+	_toast_box.offset_left = 30
+	_toast_box.offset_right = -30
+	_toast_box.offset_top = ENGINE_BOTTOM + 92
+	_toast_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast_box.alignment = BoxContainer.ALIGNMENT_BEGIN
+	add_child(_toast_box)
+
+	G.changed.connect(_refresh_all)
+	G.level_up.connect(_on_level_up)
+	G.new_epoch.connect(_on_new_epoch)
+	G.turbo_started.connect(_on_turbo)
+	G.crit.connect(_on_crit)
+	G.gold_dropped.connect(_on_gold)
+	G.exhausted.connect(_on_exhausted)
+	G.toast.connect(show_toast)
+	G.rebirth_done.connect(_on_rebirth)
+	G.part_gained.connect(func(_s, _m, _r): _apply_engine())
+
+	_refresh_all()
+	if G.offline_report != null:
+		call_deferred("_show_offline")
+
+
+func _compute_safe_area() -> void:
+	var safe := DisplayServer.get_display_safe_area()
+	var win := DisplayServer.window_get_size()
+	if win.y > 0 and safe.size.y > 0:
+		top_margin = clampf(safe.position.y * get_viewport_rect().size.y / float(win.y), 0.0, 90.0)
+
+
+# ---------------------------------------------------------------------
+# Построение интерфейса
+# ---------------------------------------------------------------------
+
+func _build_top_bar() -> void:
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", UI.box(Color(0.07, 0.075, 0.09, 0.88), 0, Color(1, 1, 1, 0.05), 0, 14))
+	panel.anchor_right = 1.0
+	panel.offset_top = 0
+	panel.offset_bottom = top_margin + 214
+	add_child(panel)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	panel.add_child(v)
+	var spacer := Control.new()
+	spacer.custom_minimum_size.y = top_margin
+	v.add_child(spacer)
+
+	_chips = HFlowContainer.new()
+	_chips.add_theme_constant_override("h_separation", 8)
+	_chips.add_theme_constant_override("v_separation", 6)
+	v.add_child(_chips)
+
+	var row := HBoxContainer.new()
+	v.add_child(row)
+	_ips_label = UI.label("+0/с", 34, UI.GOOD)
+	_ips_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(_ips_label)
+	_rebirth_label = UI.label("", 20, Color("ffb35c"), HORIZONTAL_ALIGNMENT_RIGHT)
+	row.add_child(_rebirth_label)
+
+	_level_label = UI.label("", 20, UI.MUTED)
+	_level_label.clip_text = true
+	v.add_child(_level_label)
+	_xp_bar = UI.bar(Color("4da3ff"), 12)
+	v.add_child(_xp_bar)
+
+
+func _rebuild_chips() -> void:
+	UI.clear(_chips)
+	_chip_labels.clear()
+	for id in D.CURRENCY_ORDER:
+		if not G.unlocked_cur.get(id, false):
+			continue
+		var chip := PanelContainer.new()
+		chip.add_theme_stylebox_override("panel", UI.box(Color(1, 1, 1, 0.06), 20, Color(0, 0, 0, 0), 0, 10))
+		var h := HBoxContainer.new()
+		h.add_theme_constant_override("separation", 6)
+		chip.add_child(h)
+		h.add_child(GameIcon.make(id, 26))
+		var l := UI.label("0", 24 if id == "cash" else 20, D.CURRENCIES[id].color)
+		h.add_child(l)
+		_chip_labels[id] = l
+		_chips.add_child(chip)
+
+
+func _build_engine_hud() -> void:
+	_stamina_bar = UI.bar(Color("ffb02e"), 18)
+	_stamina_bar.anchor_left = 0.15
+	_stamina_bar.anchor_right = 0.85
+	_stamina_bar.offset_top = ENGINE_BOTTOM + 8
+	_stamina_bar.offset_bottom = ENGINE_BOTTOM + 26
+	_stamina_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_stamina_bar)
+	_stamina_label = UI.label("", 18, UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	_stamina_label.anchor_right = 1.0
+	_stamina_label.offset_top = ENGINE_BOTTOM + 30
+	_stamina_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_stamina_label)
+	_status_label = UI.label("", 20, Color("8fc4ff"), HORIZONTAL_ALIGNMENT_CENTER)
+	_status_label.anchor_right = 1.0
+	_status_label.offset_left = 20
+	_status_label.offset_right = -20
+	_status_label.offset_top = ENGINE_BOTTOM + 60
+	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_status_label)
+
+	var hint := UI.label("Зажми мотор пальцем", 20, Color(1, 1, 1, 0.35), HORIZONTAL_ALIGNMENT_CENTER)
+	hint.name = "Hint"
+	hint.anchor_right = 1.0
+	hint.offset_top = ENGINE_BOTTOM + 120
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(hint)
+
+	_xray_btn = UI.button("Рентген", 18, UI.PANEL_2, 48)
+	_xray_btn.toggle_mode = true
+	_xray_btn.anchor_left = 1.0
+	_xray_btn.anchor_right = 1.0
+	_xray_btn.offset_left = -150
+	_xray_btn.offset_right = -14
+	_xray_btn.offset_top = ENGINE_TOP + top_margin + 10
+	_xray_btn.offset_bottom = ENGINE_TOP + top_margin + 58
+	_xray_btn.button_pressed = G.settings.xray
+	_xray_btn.toggled.connect(func(on: bool): G.settings.xray = on)
+	add_child(_xray_btn)
+
+
+func _build_bottom_bar() -> void:
+	var bar := HBoxContainer.new()
+	bar.anchor_top = 1.0
+	bar.anchor_bottom = 1.0
+	bar.anchor_right = 1.0
+	bar.offset_left = 10
+	bar.offset_right = -10
+	bar.offset_top = -132
+	bar.offset_bottom = -12
+	bar.add_theme_constant_override("separation", 8)
+	add_child(bar)
+	var defs := [
+		["settings", "Настройки"], ["upgrades", "Улучшения"], ["parts", "Запчасти"],
+		["shop", "Магазин"], ["rebirth", "Перерождение"],
+	]
+	for d in defs:
+		var b := Button.new()
+		b.focus_mode = Control.FOCUS_NONE
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.text = d[1]
+		b.add_theme_font_size_override("font_size", 15)
+		b.clip_text = true
+		var st := UI.box(UI.PANEL, 16, Color(1, 1, 1, 0.08), 2, 4)
+		st.content_margin_top = 64
+		b.add_theme_stylebox_override("normal", st)
+		var st2 := st.duplicate()
+		st2.border_color = UI.ACCENT
+		b.add_theme_stylebox_override("pressed", st2)
+		b.add_theme_stylebox_override("hover", st)
+		var ic := GameIcon.make(d[0], 46, Color("e8e2d4"))
+		ic.anchor_left = 0.5
+		ic.anchor_right = 0.5
+		ic.offset_left = -23
+		ic.offset_right = 23
+		ic.offset_top = 12
+		ic.offset_bottom = 58
+		b.add_child(ic)
+		var id: String = d[0]
+		b.pressed.connect(func():
+			Sfx.play("click")
+			_toggle_panel(id))
+		bar.add_child(b)
+
+
+# ---------------------------------------------------------------------
+# Панели
+# ---------------------------------------------------------------------
+
+func _panel_for(id: String) -> Control:
+	if _panels.has(id):
+		return _panels[id]
+	var p: Control
+	match id:
+		"settings":
+			p = preload("res://scripts/ui/settings_panel.gd").new()
+		"upgrades":
+			p = preload("res://scripts/ui/upgrades_panel.gd").new()
+		"parts":
+			p = preload("res://scripts/ui/parts_panel.gd").new()
+		"shop":
+			p = preload("res://scripts/ui/shop_panel.gd").new()
+		"rebirth":
+			p = preload("res://scripts/ui/rebirth_panel.gd").new()
+	p.set("main", self)
+	p.visible = false
+	_overlay.add_child(p)
+	_panels[id] = p
+	return p
+
+
+func _side_of(id: String) -> String:
+	match id:
+		"upgrades":
+			return "left"
+		"parts", "shop":
+			return "bottom"
+	return "center"
+
+
+func _toggle_panel(id: String) -> void:
+	var p := _panel_for(id)
+	if _open_panel == p:
+		close_panel()
+		return
+	if _open_panel != null:
+		close_panel(true)
+	open_panel(p, _side_of(id))
+
+
+func open_panel(p: Control, side: String) -> void:
+	_open_panel = p
+	_open_side = side
+	p.visible = true
+	if p.has_method("refresh"):
+		p.refresh()
+	var tw := create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	match side:
+		"left":
+			# до середины экрана, мотор остаётся виден справа
+			p.anchor_left = 0.0
+			p.anchor_right = 0.0
+			p.anchor_top = 0.0
+			p.anchor_bottom = 1.0
+			p.offset_top = top_margin + 222
+			p.offset_bottom = -140
+			p.size.x = W * 0.56
+			p.offset_left = -W * 0.56
+			p.offset_right = 0
+			tw.tween_property(p, "offset_left", 0.0, 0.28)
+			tw.tween_property(p, "offset_right", W * 0.56, 0.28)
+			tw.tween_property(engine_view, "offset_left", W * 0.5, 0.28)
+			_dim.visible = false
+		"bottom":
+			p.anchor_left = 0.0
+			p.anchor_right = 1.0
+			p.anchor_top = 1.0
+			p.anchor_bottom = 1.0
+			p.offset_left = 0
+			p.offset_right = 0
+			var h := H * 0.66
+			p.offset_top = 10
+			p.offset_bottom = h + 10
+			tw.tween_property(p, "offset_top", -h, 0.3)
+			tw.tween_property(p, "offset_bottom", 0.0, 0.3)
+			_dim.visible = true
+			_dim.modulate.a = 0.0
+			tw.tween_property(_dim, "modulate:a", 1.0, 0.25)
+		"center":
+			p.anchor_left = 0.5
+			p.anchor_right = 0.5
+			p.anchor_top = 0.5
+			p.anchor_bottom = 0.5
+			p.offset_left = -W * 0.46
+			p.offset_right = W * 0.46
+			p.offset_top = -H * 0.38
+			p.offset_bottom = H * 0.38
+			p.pivot_offset = Vector2(W * 0.46, H * 0.38)
+			p.scale = Vector2(0.85, 0.85)
+			p.modulate.a = 0.0
+			tw.tween_property(p, "scale", Vector2.ONE, 0.22)
+			tw.tween_property(p, "modulate:a", 1.0, 0.18)
+			_dim.visible = true
+			_dim.modulate.a = 0.0
+			tw.tween_property(_dim, "modulate:a", 1.0, 0.2)
+	_overlay.move_child(_dim, 0)
+
+
+func close_panel(instant: bool = false) -> void:
+	var p := _open_panel
+	if p == null:
+		return
+	var side := _open_side
+	_open_panel = null
+	_open_side = ""
+	if instant:
+		p.visible = false
+		engine_view.offset_left = 0.0
+		_dim.visible = false
+		return
+	var tw := create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	match side:
+		"left":
+			tw.tween_property(p, "offset_left", -W * 0.56, 0.22)
+			tw.tween_property(p, "offset_right", 0.0, 0.22)
+			tw.tween_property(engine_view, "offset_left", 0.0, 0.22)
+		"bottom":
+			tw.tween_property(p, "offset_top", 10.0, 0.22)
+			tw.tween_property(p, "offset_bottom", H * 0.66 + 10.0, 0.22)
+		"center":
+			tw.tween_property(p, "modulate:a", 0.0, 0.15)
+			tw.tween_property(p, "scale", Vector2(0.9, 0.9), 0.15)
+	tw.tween_property(_dim, "modulate:a", 0.0, 0.2)
+	tw.chain().tween_callback(func():
+		if _open_panel != p:
+			p.visible = false
+		if _open_panel == null:
+			_dim.visible = false)
+
+
+# ---------------------------------------------------------------------
+# Обновление
+# ---------------------------------------------------------------------
+
+func _apply_engine() -> void:
+	var ep := D.epoch_info(G.level)
+	engine_view.set_engine(G.current_engine(), ep.material)
+
+
+func _refresh_all() -> void:
+	var shown := 0
+	for id in D.CURRENCY_ORDER:
+		if G.unlocked_cur.get(id, false):
+			shown += 1
+	if shown != _chip_labels.size():
+		_rebuild_chips()
+	_refresh_numbers()
+	if _open_panel != null and _open_panel.has_method("refresh"):
+		_open_panel.refresh()
+
+
+func _refresh_numbers() -> void:
+	for id in _chip_labels:
+		_chip_labels[id].text = G.fmt(G.cur[id])
+	_ips_label.text = "+%s/с" % G.fmt(G.income_now.mul(G.d_time_mult))
+	_ips_label.add_theme_color_override("font_color", Color("6fb6ff") if G.turbo_time > 0.0 else (UI.GOOD if G.throttle else Color("b9d7a8")))
+	var mult := Big.power(1.25, G.rebirths).mul(Big.power(100.0, G.ultra))
+	var rtxt := "Перерождение %d (x%s)" % [G.rebirths, G.fmt(mult)]
+	if G.ultra > 0:
+		rtxt = "Ультра %d · " % G.ultra + rtxt
+	_rebirth_label.text = rtxt
+	var ep := D.epoch_info(G.level)
+	_level_label.text = "Ур. %d · %s · %s" % [G.level, D.ENGINES[G.current_engine()].name, D.MATERIALS[ep.material].name]
+	var need := G.xp_need(G.level)
+	_xp_bar.value = clampf(G.xp.div(need).to_float(), 0.0, 1.0)
+
+
+func _process(delta: float) -> void:
+	# камера слегка дрожит вместе с мотором
+	bg.offset = engine_view.shake_offset * 0.6
+	_stamina_bar.value = G.stamina / maxf(G.d_stamina_max, 0.01)
+	var sb: StyleBoxFlat = _stamina_bar.get_theme_stylebox("fill")
+	sb.bg_color = Color("ff4a3a") if G.is_exhausted else (Color("6fb6ff") if G.has_boost("stamina") else Color("ffb02e"))
+	if G.has_boost("stamina"):
+		_stamina_label.text = "Стамина: бесконечная"
+	elif G.is_exhausted:
+		_stamina_label.text = "Перегрев! Мотор остывает…"
+	else:
+		_stamina_label.text = "Стамина %.1f / %.1f с" % [G.stamina, G.d_stamina_max]
+	var hint := get_node_or_null("Hint")
+	if hint:
+		hint.visible = G.stats.presses < 5 and _toast_box.get_child_count() == 0
+
+	_ui_acc += delta
+	if _ui_acc >= 0.1:
+		_ui_acc = 0.0
+		_refresh_numbers()
+		_status_label.text = _status_text()
+		if _open_panel != null and _open_panel.has_method("tick"):
+			_open_panel.tick()
+
+	if G.throttle:
+		_float_acc += delta
+		if _float_acc >= 0.5:
+			_float_acc = 0.0
+			var amt := G.income_now.mul(0.5 * G.d_time_mult)
+			var col := Color("8fc4ff") if G.turbo_time > 0.0 else UI.GOOD
+			float_text("+" + G.fmt(amt), col, 26)
+	else:
+		_float_acc = 0.0
+
+
+func _status_text() -> String:
+	var parts: Array = []
+	if G.turbo_time > 0.0:
+		parts.append("ТУРБО x%s" % _fmt_mult(G.d_turbo_mult))
+	if G.has_boost("income"):
+		parts.append("x2 доход %s" % UI.time_text(G.boost_left("income")))
+	if G.has_boost("stamina"):
+		parts.append("стамина ∞ %s" % UI.time_text(G.boost_left("stamina")))
+	if G.guaranteed_turbo:
+		parts.append("турбо гарантирован")
+	if G.d_autogas_on and not G.holding:
+		parts.append("автогаз через %.0f с" % maxf(0.0, G.d_autogas_int - G.autogas_timer))
+	return "  ·  ".join(parts)
+
+
+func _fmt_mult(v: float) -> String:
+	if v < 100.0:
+		return ("%.1f" % v).trim_suffix(".0")
+	return G.fmt(v)
+
+
+# ---------------------------------------------------------------------
+# События
+# ---------------------------------------------------------------------
+
+func _on_hold(pressed: bool) -> void:
+	G.set_holding(pressed)
+	if pressed:
+		G.vibrate(15)
+
+
+func float_text(text: String, color: Color, size: int = 26, at: Vector2 = Vector2(-1, -1)) -> void:
+	var l := UI.label(text, size, color, HORIZONTAL_ALIGNMENT_CENTER)
+	l.add_theme_constant_override("outline_size", 6)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
+	var center := engine_view.position + engine_view.size * Vector2(0.5, 0.3)
+	if at.x < 0.0:
+		at = center + Vector2(randf_range(-150, 150), randf_range(-60, 60))
+	l.size = Vector2(400, 40)
+	l.position = at - Vector2(200, 20)
+	_float_layer.add_child(l)
+	var tw := l.create_tween().set_parallel(true)
+	tw.tween_property(l, "position:y", l.position.y - 90.0, 1.1).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "modulate:a", 0.0, 1.1).set_delay(0.3)
+	tw.chain().tween_callback(l.queue_free)
+
+
+func show_toast(text: String, color: Color = UI.TEXT) -> void:
+	var p := UI.card(Color(0.08, 0.085, 0.1, 0.95), Color(color.r, color.g, color.b, 0.6), 10)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var l := UI.wrap_label(text, 18, color)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	p.add_child(l)
+	_toast_box.add_child(p)
+	var hint := get_node_or_null("Hint")
+	if hint:
+		hint.visible = false
+	while _toast_box.get_child_count() > 2:
+		_toast_box.get_child(0).queue_free()
+		_toast_box.remove_child(_toast_box.get_child(0))
+	p.modulate.a = 0.0
+	var tw := p.create_tween()
+	tw.tween_property(p, "modulate:a", 1.0, 0.2)
+	tw.tween_interval(2.6)
+	tw.tween_property(p, "modulate:a", 0.0, 0.4)
+	tw.tween_callback(p.queue_free)
+
+
+func _on_level_up(lvl: int) -> void:
+	_apply_engine()
+	if (lvl - 1) % 10 != 0:
+		show_toast("Уровень %d! Доход x1.05" % lvl, Color("8fc4ff"))
+		Sfx.play("buy", 1.2)
+
+
+func _on_new_epoch(ei: int) -> void:
+	_apply_engine()
+	var scr := preload("res://scripts/ui/epoch_screen.gd").new()
+	scr.epoch_index = ei
+	scr.level = G.level
+	add_child(scr)
+
+
+func _on_turbo() -> void:
+	Sfx.play("turbo")
+	float_text("ТУРБО x%s!" % _fmt_mult(G.d_turbo_mult), Color("6fb6ff"), 40,
+		engine_view.position + engine_view.size * Vector2(0.5, 0.15))
+
+
+func _on_crit(amount: Big) -> void:
+	Sfx.play("crit")
+	G.vibrate(40)
+	float_text("КРИТ! +%s" % G.fmt(amount), Color("ffb02e"), 42,
+		engine_view.position + engine_view.size * Vector2(0.5, 0.25))
+
+
+func _on_gold(n: int) -> void:
+	Sfx.play("coin")
+	float_text("+%d золото" % n, D.CURRENCIES.gold.color, 30)
+
+
+func _on_exhausted() -> void:
+	Sfx.play("knock")
+	G.vibrate(120)
+	float_text("ПЕРЕГРЕВ!", UI.BAD, 38, engine_view.position + engine_view.size * Vector2(0.5, 0.2))
+
+
+func _on_rebirth() -> void:
+	Sfx.play("rebirth")
+	engine_view.flash_white = 0.9
+	_apply_engine()
+	_refresh_all()
+
+
+func _show_offline() -> void:
+	var p := UI.card(UI.PANEL, UI.ACCENT, 20)
+	p.set_anchors_preset(Control.PRESET_CENTER)
+	p.custom_minimum_size = Vector2(560, 0)
+	p.position = Vector2(80, 470)
+	var v := VBoxContainer.new()
+	p.add_child(v)
+	v.add_child(UI.label("Офлайн-гараж", 32, UI.ACCENT, HORIZONTAL_ALIGNMENT_CENTER))
+	v.add_child(UI.wrap_label("Пока вас не было (%s), гараж заработал:" % UI.time_text(G.offline_seconds), 22, UI.TEXT))
+	v.add_child(UI.label("+%s" % G.fmt(G.offline_report), 40, UI.GOOD, HORIZONTAL_ALIGNMENT_CENTER))
+	var ok := UI.accent_button("Забрать", 26)
+	v.add_child(ok)
+	ok.pressed.connect(func():
+		Sfx.play("coin")
+		p.queue_free())
+	add_child(p)
+	G.offline_report = null
+
+
+## Анимация открытия кейса (вызывается из магазина).
+func play_case_opening(result: Dictionary) -> void:
+	if result.is_empty():
+		return
+	var scr := preload("res://scripts/ui/case_opening.gd").new()
+	scr.result = result
+	add_child(scr)

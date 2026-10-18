@@ -1,0 +1,76 @@
+name: Android APK
+
+on:
+  push:
+    paths:
+      - "game/**"
+      - ".github/workflows/android.yml"
+  pull_request:
+    paths:
+      - "game/**"
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.3"
+  PROJECT_PATH: game
+  HAS_RELEASE_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+
+jobs:
+  android:
+    name: Сборка APK
+    runs-on: ubuntu-22.04
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Настройка Godot (шаблоны экспорта, Android SDK, debug-ключ)
+        run: |
+          mkdir -v -p ~/.local/share/godot/export_templates/ ~/.config/
+          if [ "$HOME" != "/root" ]; then
+            mv /root/.config/godot ~/.config/godot
+            mv /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          fi
+          ls ~/.config/godot ~/.local/share/godot/export_templates
+
+      - name: Импорт ресурсов
+        run: |
+          cd $PROJECT_PATH
+          godot --headless --import || true
+          godot --headless --path . --quit-after 5 2>&1 | tee ../run.log
+          if grep -q "SCRIPT ERROR" ../run.log; then echo "Ошибки в скриптах"; exit 1; fi
+
+      - name: Сборка debug APK
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /root/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          mkdir -v -p build
+          EXPORT_DIR="$(readlink -f build)"
+          cd $PROJECT_PATH
+          godot --headless --verbose --export-debug "Android" "$EXPORT_DIR/motor-garage-debug.apk" 2>&1 | tail -n 80
+          test -f "$EXPORT_DIR/motor-garage-debug.apk"
+          ls -la "$EXPORT_DIR"
+
+      - name: Сборка release APK (если в секретах есть ключ)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        if: env.HAS_RELEASE_KEY == 'true'
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > /tmp/release.keystore
+          export GODOT_ANDROID_KEYSTORE_RELEASE_PATH=/tmp/release.keystore
+          EXPORT_DIR="$(readlink -f build)"
+          cd $PROJECT_PATH
+          godot --headless --export-release "Android" "$EXPORT_DIR/motor-garage-release.apk" 2>&1 | tail -n 40
+          test -f "$EXPORT_DIR/motor-garage-release.apk"
+
+      - name: Загрузить APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: motor-garage-apk
+          path: build/*.apk
+          if-no-files-found: error

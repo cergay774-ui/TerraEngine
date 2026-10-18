@@ -17,3 +17,8 @@ A dark, modern landing page for the TerraEngine FNF engine.
 
 ## Customize
 Replace the placeholder GitHub links in `index.html` with your repository and release links.
+
+## Игра «Мотор Гараж»
+
+В папке [`game/`](game/) — Godot-проект мобильной игры про сборку моторов. APK собирается
+автоматически в GitHub Actions, подробности — в [`game/README.md`](game/README.md).
