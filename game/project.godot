@@ -22,6 +22,7 @@ config/icon="res://icon.png"
 
 [autoload]
 
+Diag="*res://scripts/diag.gd"
 D="*res://scripts/data.gd"
 G="*res://scripts/game.gd"
 Sfx="*res://scripts/audio.gd"

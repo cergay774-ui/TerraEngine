@@ -66,12 +66,16 @@ static func rounded_box(size: Vector3, radius: float, res: int = 6) -> ArrayMesh
 		var n: Vector3 = f[0]
 		var u: Vector3 = f[1]
 		var v: Vector3 = f[2]
+		var hu: float = absf(u.dot(half))
+		var hv: float = absf(v.dot(half))
+		var hn: float = absf(n.dot(half))
+		var su := _round_samples(hu, hu - radius, res)
+		var sv := _round_samples(hv, hv - radius, res)
 		var grid := []
-		for i in res + 1:
+		for i in su.size():
 			var row := []
-			for j in res + 1:
-				var p: Vector3 = n + u * (2.0 * i / res - 1.0) + v * (2.0 * j / res - 1.0)
-				var q := p * half
+			for j in sv.size():
+				var q: Vector3 = n * hn + u * su[i] + v * sv[j]
 				var cl := q.clamp(-inner, inner)
 				var dir := (q - cl)
 				if dir.length() < 0.00001:
@@ -79,14 +83,25 @@ static func rounded_box(size: Vector3, radius: float, res: int = 6) -> ArrayMesh
 				dir = dir.normalized()
 				row.append([cl + dir * radius, dir])
 			grid.append(row)
-		for i in res:
-			for j in res:
+		for i in su.size() - 1:
+			for j in sv.size() - 1:
 				var a: Array = grid[i][j]
 				var b: Array = grid[i + 1][j]
 				var c: Array = grid[i + 1][j + 1]
 				var d: Array = grid[i][j + 1]
 				oquad(st, a[0], b[0], c[0], d[0], n, a[1], b[1], c[1], d[1])
+	st.index()
 	return st.commit()
+
+
+## Координаты вдоль оси грани: res шагов на каждом скруглении и один пролёт по плоской части.
+static func _round_samples(h: float, w: float, res: int) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	for k in res + 1:
+		out.append(-h + (h - w) * k / float(res))
+	for k in res + 1:
+		out.append(w + (h - w) * k / float(res))
+	return out
 
 
 ## Труба по ломаной с плавными рамками (выпускные коллекторы, патрубки).
@@ -141,6 +156,7 @@ static func sweep(points: PackedVector3Array, radius: float, sides: int = 12, ca
 			var dirn := -(points[1] - points[0]).normalized() if end == 0 else (points[n - 1] - points[n - 2]).normalized()
 			for k in sides:
 				tri(st, center, ring[k][0], ring[(k + 1) % sides][0], dirn, dirn, dirn, dirn)
+	st.index()
 	return st.commit()
 
 
@@ -173,6 +189,7 @@ static func gear(radius: float, width: float, teeth: int, tooth_h: float = 0.12)
 		oquad(st, Vector3(x0, a.x, a.y), Vector3(x1, a.x, a.y), Vector3(x1, b.x, b.y), Vector3(x0, b.x, b.y), Vector3(0, mid.x, mid.y))
 		tri(st, Vector3(x0, 0, 0), Vector3(x0, a.x, a.y), Vector3(x0, b.x, b.y), Vector3(-1, 0, 0))
 		tri(st, Vector3(x1, 0, 0), Vector3(x1, a.x, a.y), Vector3(x1, b.x, b.y), Vector3(1, 0, 0))
+	st.index()
 	return st.commit()
 
 
@@ -200,6 +217,7 @@ static func half_tube(r_in: float, r_out: float, h: float, segs: int = 20) -> Ar
 	for t in [a0, a1]:
 		var c := Vector3(sin(t), 0, cos(t))
 		oquad(st, c * r_in + up * y0, c * r_out + up * y0, c * r_out + up * y1, c * r_in + up * y1, Vector3(0, 0, 1))
+	st.index()
 	return st.commit()
 
 
@@ -233,6 +251,7 @@ static func extrude(poly: PackedVector2Array, depth: float) -> ArrayMesh:
 		var o2 := Vector2(e.y, -e.x) if ccw else Vector2(-e.y, e.x)
 		oquad(st, Vector3(-depth * 0.5, p0.x, p0.y), Vector3(-depth * 0.5, p1.x, p1.y),
 			Vector3(depth * 0.5, p1.x, p1.y), Vector3(depth * 0.5, p0.x, p0.y), Vector3(0, o2.x, o2.y))
+	st.index()
 	return st.commit()
 
 
@@ -255,6 +274,7 @@ static func extrude_ring(inner: PackedVector2Array, outer: PackedVector2Array, d
 		var mo := (c + d) * 0.5
 		oquad(st, Vector3(x0, a.x, a.y), Vector3(x0, b.x, b.y), Vector3(x1, b.x, b.y), Vector3(x1, a.x, a.y), -Vector3(0, mi.x, mi.y))
 		oquad(st, Vector3(x0, d.x, d.y), Vector3(x0, c.x, c.y), Vector3(x1, c.x, c.y), Vector3(x1, d.x, d.y), Vector3(0, mo.x, mo.y))
+	st.index()
 	return st.commit()
 
 
@@ -268,9 +288,11 @@ static func cyl(r: float, h: float, segs: int = 24) -> CylinderMesh:
 	return c
 
 
-static func cone(r0: float, r1: float, h: float, segs: int = 24) -> CylinderMesh:
+static func cone(r0: float, r1: float, h: float, segs: int = 24, caps: bool = true) -> CylinderMesh:
 	var c := cyl(r0, h, segs)
 	c.top_radius = r1
+	c.cap_top = caps
+	c.cap_bottom = caps
 	return c
 
 

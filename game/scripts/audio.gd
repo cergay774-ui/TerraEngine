@@ -10,7 +10,8 @@ const SOUND_NAMES := ["starter", "knock", "crit", "coin", "turbo", "case_shake",
 
 # параметры мотора, их выставляет EngineView каждый кадр
 var rpm: float = 0.0
-var max_rpm: float = 7000.0
+var max_rpm: float = 7000.0      # фактическая отсечка (с учётом улучшений)
+var idle_rpm: float = 800.0
 var cylinders: int = 4
 var pitch: float = 1.0
 var diesel: bool = false
@@ -23,6 +24,9 @@ var _engine_player: AudioStreamPlayer
 var _load_player: AudioStreamPlayer
 var _load_smooth: float = 0.0
 var _whistle_player: AudioStreamPlayer
+var _whistle_smooth: float = 0.0
+var _steal_i: int = 0
+var _pending: Array = []          # звуки, которые ещё предстоит синтезировать (по одному за кадр)
 var _music: AudioStreamPlayer
 var _pool: Array[AudioStreamPlayer] = []
 var _sounds: Dictionary = {}
@@ -67,8 +71,13 @@ func _ready() -> void:
 		_music.stream = ms
 		_music.play()
 
+	# файлы грузим сразу, а синтез растягиваем на первые кадры (по звуку за кадр),
+	# чтобы запуск не стоял полсекунды на телефоне
 	for n in SOUND_NAMES:
-		_sounds[n] = _load_or_synth(n)
+		if ResourceLoader.exists("res://assets/sounds/%s.ogg" % n):
+			_sounds[n] = load("res://assets/sounds/%s.ogg" % n)
+		else:
+			_pending.append(n)
 	apply_volumes()
 
 
@@ -94,17 +103,25 @@ func apply_volumes() -> void:
 
 func play(sound_name: String, pitch_scale: float = 1.0, volume_db: float = 0.0) -> void:
 	var st = _sounds.get(sound_name)
+	if st == null and _pending.has(sound_name):
+		_pending.erase(sound_name)
+		st = _load_or_synth(sound_name)
+		_sounds[sound_name] = st
 	if st == null:
 		return
+	var player: AudioStreamPlayer = null
 	for p in _pool:
 		if not p.playing:
-			p.stream = st
-			p.pitch_scale = pitch_scale
-			p.volume_db = volume_db
-			p.play()
-			return
-	_pool[0].stream = st
-	_pool[0].play()
+			player = p
+			break
+	if player == null:
+		# все заняты — по кругу забираем самый давний
+		player = _pool[_steal_i % _pool.size()]
+		_steal_i += 1
+	player.stream = st
+	player.pitch_scale = pitch_scale
+	player.volume_db = volume_db
+	player.play()
 
 
 ## Хлопок в выхлопе.
@@ -113,7 +130,10 @@ func pop() -> void:
 
 
 func _process(delta: float) -> void:
-	if engine_type != _loop_type:
+	if not _pending.is_empty():
+		var n: String = _pending.pop_front()
+		_sounds[n] = _load_or_synth(n)
+	if engine_type != "" and engine_type != _loop_type:
 		_switch_loop()
 	var target := 1.0 if engine_on else 0.0
 	_vol = move_toward(_vol, target, delta * 1.5)
@@ -130,12 +150,14 @@ func _process(delta: float) -> void:
 			_engine_player.play()
 			if has_load:
 				_load_player.play()
-		var ratio := clampf(rpm / maxf(max_rpm, 1.0), 0.0, 1.3)
+		# 0 — холостые, 1 — отсечка; улучшения оборотов не уводят тон в писк
+		var ratio := clampf((rpm - idle_rpm) / maxf(max_rpm - idle_rpm, 1.0), -0.3, 1.1)
 		var ps: float
 		if _uses_file:
-			ps = clampf(pitch * (0.82 + 1.45 * ratio), 0.45, 2.8)
+			ps = clampf(pitch * (0.85 + 1.2 * ratio), 0.5, 2.3)
 		else:
 			ps = clampf(rpm / REF_RPM, 0.3, 4.0)
+		ratio = clampf(ratio, 0.0, 1.0)
 		_engine_player.pitch_scale = ps
 		var idle_v := _vol * (0.6 + 0.4 * ratio)
 		if has_load:
@@ -143,11 +165,12 @@ func _process(delta: float) -> void:
 			_load_player.pitch_scale = ps
 			_load_player.volume_db = linear_to_db(maxf(0.0001, _vol * _load_smooth * (0.45 + 0.3 * ratio)))
 		_engine_player.volume_db = linear_to_db(maxf(0.0001, idle_v))
-	# свист турбины
-	if turbo_level > 0.02 and _vol > 0.01:
+	# свист турбины: плавно нарастает и затихает, без щелчков
+	_whistle_smooth = lerpf(_whistle_smooth, turbo_level if _vol > 0.01 else 0.0, 1.0 - exp(-delta * 5.0))
+	if _whistle_smooth > 0.01:
 		if not _whistle_player.playing:
 			_whistle_player.play()
-		_whistle_player.volume_db = linear_to_db(turbo_level * 0.5 * _vol)
+		_whistle_player.volume_db = linear_to_db(maxf(0.0001, _whistle_smooth * 0.5 * _vol))
 		_whistle_player.pitch_scale = clampf(0.7 + rpm / maxf(max_rpm, 1.0), 0.5, 2.5)
 	elif _whistle_player.playing:
 		_whistle_player.stop()
@@ -158,14 +181,14 @@ func _switch_loop() -> void:
 	var type_file := "res://assets/sounds/engine_%s.ogg" % engine_type
 	var generic := "res://assets/sounds/engine.ogg"
 	var st: AudioStream = null
-	_uses_file = false
 	for path in [type_file, generic]:
 		if ResourceLoader.exists(path):
-			st = load(path)
+			st = load(path) as AudioStream
 			if st is AudioStreamOggVorbis:
 				st.loop = true
-			_uses_file = true
-			break
+			if st != null:
+				break
+	_uses_file = st != null
 	if st == null:
 		if not _loops.has(engine_type):
 			_loops[engine_type] = _synth_engine_loop()
@@ -179,6 +202,8 @@ func _switch_loop() -> void:
 				if load_st is AudioStreamOggVorbis:
 					load_st.loop = true
 				break
+	if st == _engine_player.stream and load_st == _load_player.stream:
+		return  # тот же файл для нового типа мотора — петлю не перезапускаем
 	var was := _engine_player.playing
 	_engine_player.stop()
 	_load_player.stop()

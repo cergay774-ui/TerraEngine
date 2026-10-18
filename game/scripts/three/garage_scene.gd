@@ -12,6 +12,7 @@ static func environment(quality: int, glow: bool) -> Environment:
 	pano.panorama = _studio_panorama()
 	pano.energy_multiplier = 1.3
 	sky.sky_material = pano
+	sky.radiance_size = Sky.RADIANCE_SIZE_64  # отражения размытые — большая карта не нужна
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.ambient_light_energy = 0.55
@@ -35,7 +36,7 @@ static func environment(quality: int, glow: bool) -> Environment:
 static func _studio_panorama() -> Texture2D:
 	var w := 256
 	var h := 128
-	var img := Image.create(w, h, false, Image.FORMAT_RGBAF)
+	var img := Image.create(w, h, false, Image.FORMAT_RGBAH)
 	for y in h:
 		for x in w:
 			var v := 0.02 + 0.05 * (1.0 - float(y) / h)
@@ -225,7 +226,7 @@ static func build(parent: Node3D, floor_y: float, quality: int) -> Dictionary:
 		beam_m.albedo_color = Color(1.0, 0.92, 0.75, 0.035)
 		beam_m.disable_receive_shadows = true
 		var beam := MeshInstance3D.new()
-		beam.mesh = MeshKit.cone(14.0, 2.0, 15.0, 32)
+		beam.mesh = MeshKit.cone(14.0, 2.0, 15.0, 32, false)
 		beam.material_override = beam_m
 		beam.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		beam.position = Vector3(0, floor_y + 7.6, 0)
@@ -259,12 +260,21 @@ static func build(parent: Node3D, floor_y: float, quality: int) -> Dictionary:
 		root.add_child(dust)
 
 	# свет: ключевой прожектор сверху с тенью, заполняющий, контровой
-	var key := SpotLight3D.new()
+	var key: Light3D
+	if quality >= 1:
+		var spot := SpotLight3D.new()
+		spot.light_energy = 11.0
+		spot.spot_range = 60.0
+		spot.spot_angle = 42.0
+		spot.spot_angle_attenuation = 0.8
+		key = spot
+	else:
+		# на «Низком» — направленный свет: в упрощённом рендере он идёт в основном проходе,
+		# а прожектор добавляет ещё по проходу на каждую деталь (для слабых телефонов это много)
+		var dl := DirectionalLight3D.new()
+		dl.light_energy = 1.5
+		key = dl
 	key.light_color = Color(1.0, 0.93, 0.82)
-	key.light_energy = 11.0
-	key.spot_range = 60.0
-	key.spot_angle = 42.0
-	key.spot_angle_attenuation = 0.8
 	key.shadow_enabled = quality >= 1
 	key.shadow_blur = 1.5 if quality >= 2 else 0.8
 	key.position = Vector3(2.0, floor_y + 16.0, 6.0)

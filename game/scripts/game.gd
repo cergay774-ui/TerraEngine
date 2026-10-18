@@ -56,6 +56,7 @@ const PRESETS := [
 	{"shadows": 2, "msaa": 4, "glow": true, "particles": 2, "res_scale": 1.0, "fps3d": 1, "garage": true},
 ]
 var last_time: float = 0.0
+var stall_downgraded: bool = false   # графику снизили из-за зависания в прошлый раз
 
 # --- рантайм ---
 var holding: bool = false
@@ -107,6 +108,14 @@ func _ready() -> void:
 	load_game()
 	recalc()
 	_refresh_daily()
+	# прошлый запуск завис — начинаем с «Низкой» графики (если зависание было из-за видеокарты
+	# или перегрева, это его снимет; вернуть можно в настройках)
+	if Diag.prev_stalled and int(settings.quality) > 0:
+		stall_downgraded = true
+		for k in PRESETS[0]:
+			settings[k] = PRESETS[0][k]
+		settings.quality = 0
+		Diag.event("прошлая сессия зависала — графика снижена до «Низкой»")
 	apply_settings()
 
 
@@ -1378,6 +1387,12 @@ func _compute_offline() -> void:
 func save_game() -> void:
 	if _load_failed:
 		return  # не перезаписываем сохранение, которое не смогли прочитать
+	var t0 := Time.get_ticks_msec()
+	_save_inner()
+	Diag.event("сохранение за %d мс" % (Time.get_ticks_msec() - t0))
+
+
+func _save_inner() -> void:
 	var tmp := SAVE_PATH + ".tmp"
 	var f := FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:

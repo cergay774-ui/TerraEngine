@@ -52,6 +52,9 @@ func _ready() -> void:
 
 	# 3D-гараж с мотором — на весь экран, интерфейс поверх
 	engine_view = preload("res://scripts/engine_view.gd").new()
+	# сразу нужный мотор — иначе при старте собирается сначала мотор «по умолчанию», потом нужный
+	engine_view.engine_type = G.current_engine()
+	engine_view.material_index = D.epoch_info(G.level).material
 	engine_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	engine_view.band = _engine_band(false)
 	engine_view.hold_changed.connect(_on_hold)
@@ -107,6 +110,10 @@ func _ready() -> void:
 	_refresh_all()
 	if G.offline_report != null:
 		call_deferred("_show_offline")
+	if G.stall_downgraded:
+		G.stall_downgraded = false
+		get_tree().create_timer(1.5).timeout.connect(func():
+			show_toast("Прошлый запуск подвисал — графика снижена до «Низкой». Вернуть можно в настройках.", Color("ffc21a")))
 
 
 ## Полоса экрана, где стоит мотор (между верхней плашкой и стаминой).
@@ -335,6 +342,7 @@ func _toggle_panel(id: String) -> void:
 
 
 func open_panel(p: Control, side: String) -> void:
+	Diag.event("меню открыто: " + str(p.get_script().resource_path.get_file()))
 	_open_panel = p
 	_open_side = side
 	if side != "left":
@@ -465,6 +473,7 @@ func _toggle_garage() -> void:
 
 
 func _set_garage(on: bool) -> void:
+	Diag.event("гараж " + ("вход" if on else "выход"))
 	_garage_mode = on
 	close_panel(true)
 	engine_view.locked = on
@@ -590,6 +599,7 @@ func _auto_quality(delta: float) -> void:
 	if _fps_low_time >= 5.0 and _auto_cooldown <= 0.0 and q > 0:
 		_fps_low_time = 0.0
 		_auto_cooldown = 20.0
+		Diag.event("автоснижение графики, fps=%d" % Engine.get_frames_per_second())
 		G.apply_preset(q - 1)
 		show_toast("Графика снижена до «%s» для плавности" % ["Низкое", "Среднее", "Высокое", "Ультра"][q - 1], Color("ffc21a"))
 
@@ -750,6 +760,7 @@ func _on_level_up(lvl: int) -> void:
 
 func _flush_level_up() -> void:
 	var lvl := _pending_level
+	Diag.event("уровень %d" % lvl)
 	_pending_level = 0
 	_apply_engine()
 	if (lvl - 1) % 10 != 0:
@@ -758,6 +769,7 @@ func _flush_level_up() -> void:
 
 
 func _on_new_epoch(ei: int) -> void:
+	Diag.event("новая эпоха %d" % ei)
 	_apply_engine()
 	# одна заставка за раз; под ней основной 3D не рисуем (две 3D-сцены сразу — тяжело)
 	if _epoch_screen != null and is_instance_valid(_epoch_screen):

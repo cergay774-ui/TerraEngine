@@ -158,6 +158,19 @@ func _build_data() -> void:
 		main.close_panel()
 		main.show_toast("Прогресс сброшен", UI.BAD))
 	_content.add_child(reset)
+	_content.add_child(UI.hsep())
+	_content.add_child(UI.label("Диагностика", 22, UI.TEXT))
+	_hint("Если игра зависла — перезапустите её и нажмите кнопку ниже: журнал прошлой сессии скопируется, его можно прислать разработчику.")
+	var rep := UI.button("Отчёт о прошлой сессии", 18, UI.PANEL_2, 52)
+	rep.pressed.connect(func():
+		var txt: String = Diag.previous_report()
+		if txt == "":
+			main.show_toast("Журнала прошлой сессии нет", UI.MUTED)
+			return
+		_save_text.text = txt
+		DisplayServer.clipboard_set(txt)
+		main.show_toast("Отчёт скопирован в буфер обмена", UI.GOOD))
+	_content.add_child(rep)
 	_content.add_child(UI.label("My Engine Garage · версия %s" % ProjectSettings.get_setting("application/config/version", "0.1"), 14, UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 
 

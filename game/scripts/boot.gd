@@ -63,13 +63,20 @@ func _ready() -> void:
 	_tacho.anchor_right = 0.5
 	_tacho.offset_left = -170
 	_tacho.offset_right = 170
-	_tacho.offset_top = 840
-	_tacho.offset_bottom = 1060
+	# тахометр, проценты и подсказка привязаны к низу: на длинных экранах не висят посередине
+	_tacho.anchor_top = 1.0
+	_tacho.anchor_bottom = 1.0
+	_tacho.offset_top = -440
+	_tacho.offset_bottom = -220
 	_loading.add_child(_tacho)
 
 	_percent = UI.label("0%", 26, UI.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
-	_percent.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_percent.position.y = 1062
+	_percent.anchor_left = 0.0
+	_percent.anchor_right = 1.0
+	_percent.anchor_top = 1.0
+	_percent.anchor_bottom = 1.0
+	_percent.offset_top = -218
+	_percent.offset_bottom = -180
 	_loading.add_child(_percent)
 
 	_tip = UI.wrap_label("", 22, Color("b9b5aa"))
@@ -78,8 +85,10 @@ func _ready() -> void:
 	_tip.anchor_right = 1.0
 	_tip.offset_left = 50
 	_tip.offset_right = -50
-	_tip.offset_top = 1110
-	_tip.offset_bottom = 1220
+	_tip.anchor_top = 1.0
+	_tip.anchor_bottom = 1.0
+	_tip.offset_top = -170
+	_tip.offset_bottom = -60
 	_loading.add_child(_tip)
 	_tip_i = randi() % D.TIPS.size()
 	_tip.text = D.TIPS[_tip_i]
@@ -152,7 +161,10 @@ func _finish() -> void:
 	tw.tween_interval(0.25)
 	tw.tween_callback(_show_main)
 	tw.tween_property(_slats, "modulate:a", 1.0, 0.18)
-	tw.tween_callback(func(): Sfx.play("garage_door"))
+	tw.tween_callback(func():
+		# мотор загрузки закрыт воротами — больше его не рисуем, второй 3D-вид не нужен
+		_engine.render_paused = true
+		Sfx.play("garage_door"))
 	tw.tween_property(_loading, "position:y", -size.y - 40.0, 0.9).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 	tw.tween_callback(func(): _loading.queue_free())
 
@@ -162,3 +174,7 @@ func _show_main() -> void:
 	var main := _main_packed.instantiate()
 	add_child(main)
 	move_child(main, 0)
+	# обороты не падают скачком при переходе к игре
+	var ev = main.get("engine_view")
+	if ev != null:
+		ev.rpm = _engine.rpm

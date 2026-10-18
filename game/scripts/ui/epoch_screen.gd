@@ -39,10 +39,13 @@ func _ready() -> void:
 	_engine.anchor_right = 1.0
 	_engine.anchor_bottom = 1.0
 	_engine.band = Rect2(0.05, 0.22, 0.9, 0.42)
-	_engine.offset_left = -720
-	_engine.offset_right = -720
+	# выезжает из-за левого края экрана любой ширины
+	var w := get_viewport_rect().size.x
+	_engine.offset_left = -w
+	_engine.offset_right = -w
 	add_child(_engine)
 	move_child(_engine, 0)
+	move_child(bgc, 0)  # фон под мотором
 
 	var v := VBoxContainer.new()
 	v.anchor_right = 1.0
@@ -72,7 +75,10 @@ func _ready() -> void:
 
 	Sfx.play("fanfare")
 	G.vibrate(150)
-	var tw := create_tween().set_parallel(true).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	# фон затемняется до непрозрачного (под ним замерший кадр игры), мотор въезжает без
+	# перелёта — иначе на миг открывается правый край
+	var tw := create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_property(bgc, "color:a", 1.0, 0.35)
 	tw.tween_property(_engine, "offset_left", 0.0, 1.1)
 	tw.tween_property(_engine, "offset_right", 0.0, 1.1)
 

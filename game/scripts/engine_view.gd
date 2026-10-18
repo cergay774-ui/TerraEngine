@@ -40,6 +40,8 @@ var _garage: Dictionary = {}
 var _hud: Control
 var _flash_light: OmniLight3D
 var _turbo_light: OmniLight3D
+var _turbo_pos: Vector3 = Vector3.ZERO
+var _has_turbo: bool = false
 var _tail_light: OmniLight3D
 var _smoke: CPUParticles3D
 var _flames: CPUParticles3D
@@ -117,6 +119,7 @@ func _q() -> int:
 
 func _on_settings() -> void:
 	if _graphics_key() != _gfx_key:
+		Diag.event("смена графики: " + _graphics_key())
 		_setup_world()
 		_rebuild()
 	else:
@@ -135,7 +138,7 @@ func _gui_input(event: InputEvent) -> void:
 		hold_changed.emit(event.pressed)
 		accept_event()
 	elif event is InputEventMouseMotion and _pressed and not locked:
-		_yaw_target = clampf(_yaw_target - event.relative.x * 0.006, -1.3, 1.3)
+		_yaw_target = clampf(_yaw_target - event.relative.x * 0.006, -1.0, 1.0)
 		accept_event()
 
 
@@ -158,7 +161,7 @@ func _setup_world() -> void:
 	_garage = {}
 	if G.settings.get("garage", true):
 		_garage = GarageScene.build(_world, 0.0, q)
-		var key: SpotLight3D = _garage.key
+		var key: Light3D = _garage.key
 		key.shadow_enabled = shadows > 0
 		key.shadow_blur = 2.0 if shadows >= 2 else 0.8
 	else:
@@ -348,9 +351,12 @@ func _make_mats() -> void:
 		em.emission = Color.BLACK
 	if md.get("weave", false):
 		var w := _weave_tex()
-		_mats.block.albedo_texture = w
-		_mats.head.albedo_texture = w
-		_mats.cover.albedo_texture = w
+		# у процедурных сеток нет UV — карбоновое плетение кладём трипланарно
+		for k in ["block", "head", "cover"]:
+			var wm: StandardMaterial3D = _mats[k]
+			wm.albedo_texture = w
+			wm.uv1_triplanar = true
+			wm.uv1_scale = Vector3(0.6, 0.6, 0.6)
 	# вспышка и полупрозрачный картер видны с обеих сторон
 	for k in ["flash", "case"]:
 		var m: StandardMaterial3D = _mats[k]
@@ -434,6 +440,12 @@ func _build_key() -> String:
 # ---------------------------------------------------------------------
 
 func _rebuild() -> void:
+	var t0 := Time.get_ticks_msec()
+	_rebuild_inner()
+	Diag.event("сборка мотора %s (%s) за %d мс" % [engine_type, "витрина" if demo else "игра", Time.get_ticks_msec() - t0])
+
+
+func _rebuild_inner() -> void:
 	_built_key = _build_key()
 	if _engine != null and is_instance_valid(_engine):
 		_engine.queue_free()
@@ -445,6 +457,7 @@ func _rebuild() -> void:
 	_rotors.clear()
 	_anchors.clear()
 	_turbine_wheel = null
+	_has_turbo = false
 	_make_mats()
 	var batch := MeshKit.Batch.new()
 	var exhaust_end: Vector3
@@ -692,10 +705,6 @@ func _build_piston_engine(batch: MeshKit.Batch) -> Vector3:
 			blade.position = Vector3(0, cos(a), sin(a)) * 3.3
 		_spinners.append({"node": prop, "ratio": 1.0})
 		_part(_engine, MeshKit.cyl(0.5, 1.2, 16), "crank", Vector3(front_x + 0.6, 0, 0), Vector3(0, 0, 90))
-		var ring := TorusMesh.new()
-		ring.inner_radius = deck * 0.55
-		ring.outer_radius = deck * 0.55 + 0.45
-		batch.add("header", ring, _xf(Vector3(-1.4, 0, 0), Vector3(0, 0, 90)))
 	return _build_headers(batch, header_ends, length, turbo)
 
 
@@ -762,6 +771,14 @@ func _build_headers(batch: MeshKit.Batch, ends: Array, length: float, turbo: boo
 	var collector_y := -0.6
 	var groups := {}
 	for e in ends:
+		if engine_type == "experimental" and e.bank == 0.0:
+			# средний ряд W-образного: короткие прямоточные трубы вверх-назад —
+			# общий коллектор с боковым рядом пронзал бы его головки
+			var s0: Vector3 = e.port
+			var tip := s0 + Vector3(0, 1.9, -1.0)
+			batch.add("header", MeshKit.sweep(MeshKit.bezier(s0, s0 + Vector3(0, 0.2, -0.7), tip + Vector3(0, -0.8, 0), tip, 10), 0.24, 12), Transform3D.IDENTITY)
+			batch.add("header", MeshKit.cone(0.24, 0.34, 0.3, 14), _xf(tip + Vector3(0, 0.12, 0)))
+			continue
 		var key: String = "r" if engine_type == "radial" else str(signf(e.bank) if e.bank != 0.0 else -1.0)
 		if not groups.has(key):
 			groups[key] = []
@@ -770,10 +787,20 @@ func _build_headers(batch: MeshKit.Batch, ends: Array, length: float, turbo: boo
 	for key in groups:
 		var list: Array = groups[key]
 		if engine_type == "radial":
+			# звездообразный: патрубки назад и внутрь, в кольцевой коллектор между картером и маховиком
+			var ring_x := -2.3
+			var ring_r := 2.56
 			for e in list:
 				var p0: Vector3 = e.port
-				batch.add("header", MeshKit.sweep(MeshKit.bezier(p0, p0 + Vector3(-0.6, 0, 0), p0 + Vector3(-1.2, 0, 0), p0 + Vector3(-1.4, 0, 0), 6), 0.26, 10), Transform3D.IDENTITY)
-			merge_points.append(Vector3(-2.2, -2.0, 0))
+				var rd := Vector3(0, p0.y, p0.z).normalized()
+				var q := Vector3(ring_x, 0, 0) + rd * ring_r
+				batch.add("header", MeshKit.sweep(MeshKit.bezier(p0, p0 + Vector3(-1.0, 0, 0), q + rd * 1.4, q), 0.26, 10), Transform3D.IDENTITY)
+			var ring := TorusMesh.new()
+			ring.inner_radius = ring_r - 0.25
+			ring.outer_radius = ring_r + 0.25
+			ring.rings = 36
+			batch.add("header", ring, _xf(Vector3(ring_x, 0, 0), Vector3(0, 0, 90)))
+			merge_points.append(Vector3(ring_x, -ring_r, 0))
 			continue
 		var side_z: float = list[0].port.z
 		var out := signf(side_z) if absf(side_z) > 0.01 else -1.0
@@ -838,7 +865,8 @@ func _build_turbo(batch: MeshKit.Batch, inlet: Vector3) -> Vector3:
 		var blade := _part(_turbine_wheel, MeshKit.box(Vector3(0.08, 0.5, 0.18)), "piston")
 		blade.basis = Basis(Vector3.RIGHT, a) * Basis(Vector3.UP, 0.5)
 		blade.position = Vector3(0, cos(a), sin(a)) * 0.3
-	_turbo_light.position = tp
+	_turbo_pos = tp
+	_has_turbo = true
 	_anchors["turbine"] = tp + Vector3(1.2, 0, 0)
 	var down := tp + Vector3(-0.2, -2.2, 0.8)
 	batch.add("header", MeshKit.sweep(MeshKit.bezier(tp + Vector3(0, -0.6, 0.6), tp + Vector3(0, -1.2, 1.0), down + Vector3(0, 0.6, 0), down, 8), 0.36, 12), Transform3D.IDENTITY)
@@ -923,6 +951,7 @@ func _build_rotary(batch: MeshKit.Batch) -> Vector3:
 	for i in 2:
 		var p := Vector3(-0.9 + i * 1.8, -1.0, R * 1.2)
 		batch.add("header", MeshKit.sweep(MeshKit.bezier(p, p + Vector3(0, 0, 1.0), col + Vector3(-1.0, 0.8, 0), col, 10), 0.3, 12), Transform3D.IDENTITY)
+	_anchors["turbine"] = col
 	if _built_key.split("|")[2] == "1":
 		return _build_turbo(batch, col)
 	return col
@@ -1061,7 +1090,8 @@ func _process(delta: float) -> void:
 
 	if drives_audio:
 		Sfx.rpm = rpm
-		Sfx.max_rpm = max_rpm
+		Sfx.idle_rpm = idle
+		Sfx.max_rpm = max_rpm * (1.0 if demo else G.d_max_rpm_mult)
 		Sfx.cylinders = spec.cyl
 		Sfx.pitch = spec.pitch
 		Sfx.diesel = spec.diesel
@@ -1096,7 +1126,7 @@ func _place_camera(jitter: Vector3) -> void:
 	var half_v := deg_to_rad(_cam.fov * 0.5)
 	var half_h := atan(tan(half_v) * aspect)
 	var zoom := clampf(float(G.settings.get("cam_zoom", 1.0)), 0.7, 1.4)
-	var r := ENGINE_SIZE * 0.86
+	var r := ENGINE_SIZE * 0.97
 	var fit_v := atan(tan(half_v) * band.size.y)
 	var fit_h := atan(tan(half_h) * band.size.x)
 	var dist := r / sin(minf(fit_v, fit_h)) / zoom
@@ -1245,7 +1275,9 @@ func _update_effects(delta: float, ratio: float, throttle: bool) -> void:
 	_tail_light.visible = (flame > 0.02 or _warm_frames > 0) and _q() >= 1
 	_steam.emitting = heat > 0.75 and int(G.settings.get("particles", 1)) > 0
 	_turbo_light.light_energy = 3.0 if turbo_on else 0.0
-	_turbo_light.visible = turbo_on or _warm_frames > 0
+	_turbo_light.visible = _has_turbo and (turbo_on or _warm_frames > 0)
+	if _turbo_light.visible:
+		_turbo_light.position = _root.to_local(_engine.to_global(_turbo_pos))
 	if _warm_frames > 0:
 		_warm_frames -= 1
 		_tail_flame.visible = true
