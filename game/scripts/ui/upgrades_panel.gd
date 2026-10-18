@@ -93,7 +93,7 @@ func _count(id: String) -> int:
 func _buy(id: String) -> void:
 	var n := G.buy_upgrade(id, _count(id))
 	if n > 0:
-		Sfx.play("buy", 1.0 + randf() * 0.1)
+		Sfx.play("upgrade", 1.0 + randf() * 0.06)
 		G.vibrate(10)
 	refresh()
 

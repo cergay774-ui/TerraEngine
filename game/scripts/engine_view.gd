@@ -288,7 +288,8 @@ func _mat(color: Color, metallic: float = 0.6, rough: float = 0.4, alpha: float 
 	m.metallic_specular = 0.6
 	if alpha < 1.0:
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	# все детали построены лицом наружу — задние грани можно отсекать (меньше нагрузка)
+	m.cull_mode = BaseMaterial3D.CULL_BACK
 	return m
 
 
@@ -335,9 +336,10 @@ func _make_mats() -> void:
 		_mats.block.albedo_texture = w
 		_mats.head.albedo_texture = w
 		_mats.cover.albedo_texture = w
-	for k in ["piston", "rod", "crank", "steel", "coil", "stand"]:
+	# вспышка и полупрозрачный картер видны с обеих сторон
+	for k in ["flash", "case"]:
 		var m: StandardMaterial3D = _mats[k]
-		m.cull_mode = BaseMaterial3D.CULL_BACK
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
 
 
 func _weave_tex() -> Texture2D:
@@ -1048,6 +1050,10 @@ func _process(delta: float) -> void:
 		Sfx.pitch = spec.pitch
 		Sfx.diesel = spec.diesel
 		Sfx.engine_type = engine_type
+		if demo:
+			Sfx.engine_load = clampf((rpm - idle) / maxf(1.0, max_rpm - idle), 0.0, 1.0)
+		else:
+			Sfx.engine_load = (1.0 if throttle else 0.0) * (1.0 if not G.is_exhausted else 0.0)
 		Sfx.turbo_level = 0.0 if demo else (1.0 if G.turbo_time > 0.0 else (0.35 * ratio if _turbine_wheel != null else 0.0))
 	_hud.queue_redraw()
 	_update_render_mode()

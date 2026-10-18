@@ -13,6 +13,39 @@ static func quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3
 	st.add_vertex(d)
 
 
+## Треугольник, гарантированно повёрнутый лицом в сторону out.
+## В Godot 4 лицевая сторона — обход по часовой стрелке, т.е. (b - a) × (c - a) смотрит ОТ зрителя.
+## Нормали: если na/nb/nc не заданы — плоская нормаль грани.
+static func tri(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, out: Vector3,
+		na: Vector3 = Vector3.ZERO, nb: Vector3 = Vector3.ZERO, nc: Vector3 = Vector3.ZERO) -> void:
+	var cr := (b - a).cross(c - a)
+	if cr.length_squared() < 1e-14:
+		return
+	if cr.dot(out) > 0.0:
+		var t := b
+		b = c
+		c = t
+		var tn := nb
+		nb = nc
+		nc = tn
+	var fn := -cr.normalized() if cr.dot(out) <= 0.0 else cr.normalized()
+	if fn.dot(out) < 0.0:
+		fn = -fn
+	st.set_normal(na if na != Vector3.ZERO else fn)
+	st.add_vertex(a)
+	st.set_normal(nb if nb != Vector3.ZERO else fn)
+	st.add_vertex(b)
+	st.set_normal(nc if nc != Vector3.ZERO else fn)
+	st.add_vertex(c)
+
+
+## Четырёхугольник a-b-c-d лицом в сторону out (нормали — плоские или по вершинам).
+static func oquad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3, out: Vector3,
+		na: Vector3 = Vector3.ZERO, nb: Vector3 = Vector3.ZERO, nc: Vector3 = Vector3.ZERO, nd: Vector3 = Vector3.ZERO) -> void:
+	tri(st, a, b, c, out, na, nb, nc)
+	tri(st, a, c, d, out, na, nc, nd)
+
+
 ## Коробка со скруглёнными рёбрами (как литая деталь).
 static func rounded_box(size: Vector3, radius: float, res: int = 6) -> ArrayMesh:
 	var half := size * 0.5
@@ -52,13 +85,8 @@ static func rounded_box(size: Vector3, radius: float, res: int = 6) -> ArrayMesh
 				var b: Array = grid[i + 1][j]
 				var c: Array = grid[i + 1][j + 1]
 				var d: Array = grid[i][j + 1]
-				for tri in [[a, b, c], [a, c, d]]:
-					for vtx in tri:
-						st.set_normal(vtx[1])
-						st.add_vertex(vtx[0])
-	# смотрим, чтобы треугольники были наружу
-	var mesh := st.commit()
-	return mesh
+				oquad(st, a[0], b[0], c[0], d[0], n, a[1], b[1], c[1], d[1])
+	return st.commit()
 
 
 ## Труба по ломаной с плавными рамками (выпускные коллекторы, патрубки).
@@ -85,7 +113,10 @@ static func sweep(points: PackedVector3Array, radius: float, sides: int = 12, ca
 				nrm = t.cross(Vector3.RIGHT)
 			nrm = nrm.normalized()
 		else:
-			nrm = (prev_normal - t * prev_normal.dot(t)).normalized()
+			nrm = (prev_normal - t * prev_normal.dot(t))
+			if nrm.length() < 0.0001:
+				nrm = prev_normal
+			nrm = nrm.normalized()
 		prev_normal = nrm
 		var bin := t.cross(nrm).normalized()
 		var ring := []
@@ -101,21 +132,15 @@ static func sweep(points: PackedVector3Array, radius: float, sides: int = 12, ca
 			var b: Array = rings[i + 1][k]
 			var c: Array = rings[i + 1][k2]
 			var d: Array = rings[i][k2]
-			for vtx in [a, b, c, a, c, d]:
-				st.set_normal(vtx[1])
-				st.add_vertex(vtx[0])
+			var out: Vector3 = a[1] + b[1] + c[1] + d[1]
+			oquad(st, a[0], b[0], c[0], d[0], out, a[1], b[1], c[1], d[1])
 	if caps:
 		for end in [0, n - 1]:
 			var ring: Array = rings[end]
 			var center := points[end]
-			var dirn := (points[1] - points[0]).normalized() * -1.0 if end == 0 else (points[n - 1] - points[n - 2]).normalized()
+			var dirn := -(points[1] - points[0]).normalized() if end == 0 else (points[n - 1] - points[n - 2]).normalized()
 			for k in sides:
-				st.set_normal(dirn)
-				st.add_vertex(center)
-				st.set_normal(dirn)
-				st.add_vertex(ring[k][0])
-				st.set_normal(dirn)
-				st.add_vertex(ring[(k + 1) % sides][0])
+				tri(st, center, ring[k][0], ring[(k + 1) % sides][0], dirn, dirn, dirn, dirn)
 	return st.commit()
 
 
@@ -144,12 +169,10 @@ static func gear(radius: float, width: float, teeth: int, tooth_h: float = 0.12)
 	for i in n:
 		var a := pts[i]
 		var b := pts[(i + 1) % n]
-		quad(st, Vector3(x0, a.x, a.y), Vector3(x1, a.x, a.y), Vector3(x1, b.x, b.y), Vector3(x0, b.x, b.y))
-		for x in [x0, x1]:
-			st.add_vertex(Vector3(x, 0, 0))
-			st.add_vertex(Vector3(x, a.x, a.y))
-			st.add_vertex(Vector3(x, b.x, b.y))
-	st.generate_normals()
+		var mid := (a + b) * 0.5
+		oquad(st, Vector3(x0, a.x, a.y), Vector3(x1, a.x, a.y), Vector3(x1, b.x, b.y), Vector3(x0, b.x, b.y), Vector3(0, mid.x, mid.y))
+		tri(st, Vector3(x0, 0, 0), Vector3(x0, a.x, a.y), Vector3(x0, b.x, b.y), Vector3(-1, 0, 0))
+		tri(st, Vector3(x1, 0, 0), Vector3(x1, a.x, a.y), Vector3(x1, b.x, b.y), Vector3(1, 0, 0))
 	return st.commit()
 
 
@@ -161,20 +184,32 @@ static func half_tube(r_in: float, r_out: float, h: float, segs: int = 20) -> Ar
 	var a1 := PI * 1.5
 	var y0 := -h * 0.5
 	var y1 := h * 0.5
+	var up := Vector3(0, 1, 0)
 	for i in segs:
 		var t0 := lerpf(a0, a1, float(i) / segs)
 		var t1 := lerpf(a0, a1, float(i + 1) / segs)
 		var c0 := Vector3(sin(t0), 0, cos(t0))
 		var c1 := Vector3(sin(t1), 0, cos(t1))
-		for r in [r_out, r_in]:
-			quad(st, c0 * r + Vector3(0, y0, 0), c1 * r + Vector3(0, y0, 0), c1 * r + Vector3(0, y1, 0), c0 * r + Vector3(0, y1, 0))
-		for y in [y0, y1]:
-			quad(st, c0 * r_in + Vector3(0, y, 0), c1 * r_in + Vector3(0, y, 0), c1 * r_out + Vector3(0, y, 0), c0 * r_out + Vector3(0, y, 0))
+		var mid := (c0 + c1) * 0.5
+		# внешняя стенка — наружу, внутренняя — к оси (гладкие нормали)
+		oquad(st, c0 * r_out + up * y0, c1 * r_out + up * y0, c1 * r_out + up * y1, c0 * r_out + up * y1, mid, c0, c1, c1, c0)
+		oquad(st, c0 * r_in + up * y0, c1 * r_in + up * y0, c1 * r_in + up * y1, c0 * r_in + up * y1, -mid, -c0, -c1, -c1, -c0)
+		oquad(st, c0 * r_in + up * y0, c1 * r_in + up * y0, c1 * r_out + up * y0, c0 * r_out + up * y0, -up)
+		oquad(st, c0 * r_in + up * y1, c1 * r_in + up * y1, c1 * r_out + up * y1, c0 * r_out + up * y1, up)
+	# торцы разреза смотрят в открытую сторону (+Z)
 	for t in [a0, a1]:
 		var c := Vector3(sin(t), 0, cos(t))
-		quad(st, c * r_in + Vector3(0, y0, 0), c * r_out + Vector3(0, y0, 0), c * r_out + Vector3(0, y1, 0), c * r_in + Vector3(0, y1, 0))
-	st.generate_normals()
+		oquad(st, c * r_in + up * y0, c * r_out + up * y0, c * r_out + up * y1, c * r_in + up * y1, Vector3(0, 0, 1))
 	return st.commit()
+
+
+static func _poly_area(poly: PackedVector2Array) -> float:
+	var a := 0.0
+	for i in poly.size():
+		var p := poly[i]
+		var q := poly[(i + 1) % poly.size()]
+		a += p.x * q.y - q.x * p.y
+	return a * 0.5
 
 
 ## Выдавливание многоугольника (в плоскости YZ) вдоль X.
@@ -183,17 +218,21 @@ static func extrude(poly: PackedVector2Array, depth: float) -> ArrayMesh:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var idx := Geometry2D.triangulate_polygon(poly)
 	for side in [-0.5, 0.5]:
+		var out := Vector3(signf(side), 0, 0)
 		for i in range(0, idx.size(), 3):
-			for k in 3:
-				var p := poly[idx[i + k]]
-				st.add_vertex(Vector3(side * depth, p.x, p.y))
+			var p0 := poly[idx[i]]
+			var p1 := poly[idx[i + 1]]
+			var p2 := poly[idx[i + 2]]
+			tri(st, Vector3(side * depth, p0.x, p0.y), Vector3(side * depth, p1.x, p1.y), Vector3(side * depth, p2.x, p2.y), out)
 	var n := poly.size()
+	var ccw := _poly_area(poly) > 0.0
 	for i in n:
 		var p0 := poly[i]
 		var p1 := poly[(i + 1) % n]
-		quad(st, Vector3(-depth * 0.5, p0.x, p0.y), Vector3(-depth * 0.5, p1.x, p1.y),
-			Vector3(depth * 0.5, p1.x, p1.y), Vector3(depth * 0.5, p0.x, p0.y))
-	st.generate_normals()
+		var e := p1 - p0
+		var o2 := Vector2(e.y, -e.x) if ccw else Vector2(-e.y, e.x)
+		oquad(st, Vector3(-depth * 0.5, p0.x, p0.y), Vector3(-depth * 0.5, p1.x, p1.y),
+			Vector3(depth * 0.5, p1.x, p1.y), Vector3(depth * 0.5, p0.x, p0.y), Vector3(0, o2.x, o2.y))
 	return st.commit()
 
 
@@ -211,10 +250,11 @@ static func extrude_ring(inner: PackedVector2Array, outer: PackedVector2Array, d
 		var c := outer[j]
 		var d := outer[i]
 		for x in [x0, x1]:
-			quad(st, Vector3(x, a.x, a.y), Vector3(x, b.x, b.y), Vector3(x, c.x, c.y), Vector3(x, d.x, d.y))
-		quad(st, Vector3(x0, a.x, a.y), Vector3(x0, b.x, b.y), Vector3(x1, b.x, b.y), Vector3(x1, a.x, a.y))
-		quad(st, Vector3(x0, d.x, d.y), Vector3(x0, c.x, c.y), Vector3(x1, c.x, c.y), Vector3(x1, d.x, d.y))
-	st.generate_normals()
+			oquad(st, Vector3(x, a.x, a.y), Vector3(x, b.x, b.y), Vector3(x, c.x, c.y), Vector3(x, d.x, d.y), Vector3(signf(x), 0, 0))
+		var mi := (a + b) * 0.5
+		var mo := (c + d) * 0.5
+		oquad(st, Vector3(x0, a.x, a.y), Vector3(x0, b.x, b.y), Vector3(x1, b.x, b.y), Vector3(x1, a.x, a.y), -Vector3(0, mi.x, mi.y))
+		oquad(st, Vector3(x0, d.x, d.y), Vector3(x0, c.x, c.y), Vector3(x1, c.x, c.y), Vector3(x1, d.x, d.y), Vector3(0, mo.x, mo.y))
 	return st.commit()
 
 

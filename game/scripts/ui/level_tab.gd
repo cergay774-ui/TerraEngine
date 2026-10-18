@@ -9,9 +9,18 @@ const FILL_RECT := Rect2(414, 144, 392, 75)   # где полоса лежит �
 var progress: float = 0.0
 var level: int = 1
 var _shown: float = 0.0
+var _last_level: int = -1
+var _pulse: float = 0.0
+var _time: float = 0.0
 
 
 func _process(delta: float) -> void:
+	_time += delta
+	if _last_level != -1 and level != _last_level:
+		_pulse = 1.0
+		_shown = 0.0
+	_last_level = level
+	_pulse = maxf(0.0, _pulse - delta * 1.6)
 	_shown = lerpf(_shown, progress, 1.0 - exp(-delta * 6.0))
 	if progress < _shown - 0.5:
 		_shown = progress
@@ -32,10 +41,17 @@ func _draw() -> void:
 		var fr := Rect2(origin + FILL_RECT.position * k, FILL_RECT.size * k)
 		var fs := FILL.get_size()
 		draw_texture_rect_region(FILL, Rect2(fr.position, Vector2(fr.size.x * p, fr.size.y)), Rect2(0, 0, fs.x * p, fs.y))
+		# блик пробегает по заполненной части раз в несколько секунд
+		var sweep := fmod(_time * 0.35, 1.4) - 0.2
+		if sweep > 0.0 and sweep < p:
+			var sx := fr.position.x + fr.size.x * sweep
+			draw_colored_polygon(PackedVector2Array([Vector2(sx - 6, fr.end.y - 4), Vector2(sx + 4, fr.end.y - 4), Vector2(sx + 14, fr.position.y + 4), Vector2(sx + 4, fr.position.y + 4)]), Color(1, 1, 1, 0.35))
 	# номер уровня на аватаре
 	var font := ThemeDB.fallback_font
 	var c := origin + Vector2(152, 286) * k
-	var r := 44.0 * k
+	var r := 44.0 * k * (1.0 + 0.35 * sin(_pulse * PI) * _pulse)
+	if _pulse > 0.0:
+		draw_circle(c, r * (1.0 + (1.0 - _pulse) * 1.2), Color(1.0, 0.8, 0.2, 0.5 * _pulse))
 	draw_circle(c, r + 3.0, Color("1b1d22"))
 	draw_circle(c, r, Color("ffc21a"))
 	draw_circle(c, r - 4.0, Color("23262e"))

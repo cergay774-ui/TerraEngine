@@ -7,6 +7,8 @@ var _list_panel: PanelContainer
 var _list: VBoxContainer
 var _rows: Dictionary = {}
 var _open: bool = false
+var _shown_cash: Big = null
+var _chip: PanelContainer
 
 
 func _ready() -> void:
@@ -18,6 +20,7 @@ func _ready() -> void:
 	chip.offset_top = 0
 	chip.offset_bottom = 64
 	add_child(chip)
+	_chip = chip
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 8)
 	chip.add_child(h)
@@ -96,8 +99,35 @@ func set_open(v: bool) -> void:
 		_list_panel.visible = false
 
 
+## Кэш «докручивается» до нового значения, а крупная прибавка подпрыгивает.
+func _process(delta: float) -> void:
+	var target: Big = G.cur.cash
+	if _shown_cash == null or target.lt(_shown_cash):
+		_shown_cash = target.copy()
+	else:
+		var diff := target.sub(_shown_cash)
+		if not target.is_zero() and diff.div(target).to_float() > 0.15:
+			_bump()
+		_shown_cash = _shown_cash.add(diff.mul(1.0 - exp(-delta * 9.0)))
+		if target.is_zero() or target.sub(_shown_cash).div(target).to_float() < 0.0005:
+			_shown_cash = target.copy()
+	_cash_label.text = G.fmt(_shown_cash)
+
+
+var _bumping: bool = false
+
+func _bump() -> void:
+	if _bumping:
+		return
+	_bumping = true
+	_chip.pivot_offset = _chip.size * 0.5
+	var tw := _chip.create_tween()
+	tw.tween_property(_chip, "scale", Vector2(1.08, 1.08), 0.08)
+	tw.tween_property(_chip, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func(): _bumping = false)
+
+
 func refresh() -> void:
-	_cash_label.text = G.fmt(G.cur.cash)
 	if not _open:
 		return
 	for id in _rows:

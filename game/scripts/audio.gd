@@ -6,7 +6,7 @@ extends Node
 const MIX_RATE := 22050.0
 const REF_RPM := 2400.0          # на каких оборотах записана петля мотора
 const SOUND_NAMES := ["starter", "knock", "crit", "coin", "turbo", "case_shake", "case_open",
-	"fanfare", "click", "buy", "garage_door", "rebirth", "pop"]
+	"fanfare", "click", "buy", "garage_door", "rebirth", "pop", "upgrade"]
 
 # параметры мотора, их выставляет EngineView каждый кадр
 var rpm: float = 0.0
@@ -17,8 +17,11 @@ var diesel: bool = false
 var engine_on: bool = false
 var turbo_level: float = 0.0
 var engine_type: String = ""
+var engine_load: float = 0.0      # 0 — холостые, 1 — газ зажат (звук «тяжелее»)
 
 var _engine_player: AudioStreamPlayer
+var _load_player: AudioStreamPlayer
+var _load_smooth: float = 0.0
 var _whistle_player: AudioStreamPlayer
 var _music: AudioStreamPlayer
 var _pool: Array[AudioStreamPlayer] = []
@@ -37,6 +40,10 @@ func _ready() -> void:
 	_engine_player.bus = "SFX"
 	_engine_player.volume_db = -80.0
 	add_child(_engine_player)
+	_load_player = AudioStreamPlayer.new()
+	_load_player.bus = "SFX"
+	_load_player.volume_db = -80.0
+	add_child(_load_player)
 	_whistle_player = AudioStreamPlayer.new()
 	_whistle_player.bus = "SFX"
 	_whistle_player.volume_db = -80.0
@@ -110,18 +117,32 @@ func _process(delta: float) -> void:
 		_switch_loop()
 	var target := 1.0 if engine_on else 0.0
 	_vol = move_toward(_vol, target, delta * 1.5)
+	_load_smooth = lerpf(_load_smooth, clampf(engine_load, 0.0, 1.0), 1.0 - exp(-delta * 6.0))
+	var has_load := _load_player.stream != null
 	if _vol <= 0.001:
 		if _engine_player.playing:
 			_engine_player.stop()
+		if _load_player.playing:
+			_load_player.stop()
 	else:
 		if not _engine_player.playing and _engine_player.stream != null:
+			# обе петли одинаковой длины и стартуют вместе — переход между ними без сдвига фазы
 			_engine_player.play()
+			if has_load:
+				_load_player.play()
 		var ratio := clampf(rpm / maxf(max_rpm, 1.0), 0.0, 1.3)
-		_engine_player.volume_db = linear_to_db(_vol * (0.55 + 0.45 * ratio))
+		var ps: float
 		if _uses_file:
-			_engine_player.pitch_scale = clampf(0.5 + 1.5 * ratio, 0.3, 3.0)
+			ps = clampf(pitch * (0.82 + 1.45 * ratio), 0.45, 2.8)
 		else:
-			_engine_player.pitch_scale = clampf(rpm / REF_RPM, 0.3, 4.0)
+			ps = clampf(rpm / REF_RPM, 0.3, 4.0)
+		_engine_player.pitch_scale = ps
+		var idle_v := _vol * (0.6 + 0.4 * ratio)
+		if has_load:
+			idle_v *= 1.0 - 0.65 * _load_smooth
+			_load_player.pitch_scale = ps
+			_load_player.volume_db = linear_to_db(maxf(0.0001, _vol * _load_smooth * (0.45 + 0.3 * ratio)))
+		_engine_player.volume_db = linear_to_db(maxf(0.0001, idle_v))
 	# свист турбины
 	if turbo_level > 0.02 and _vol > 0.01:
 		if not _whistle_player.playing:
@@ -149,10 +170,24 @@ func _switch_loop() -> void:
 		if not _loops.has(engine_type):
 			_loops[engine_type] = _synth_engine_loop()
 		st = _loops[engine_type]
+	# «нагруженный» слой той же длины: engine_<тип>_load.ogg или engine_load.ogg
+	var load_st: AudioStream = null
+	if _uses_file:
+		for path in ["res://assets/sounds/engine_%s_load.ogg" % engine_type, "res://assets/sounds/engine_load.ogg"]:
+			if ResourceLoader.exists(path):
+				load_st = load(path)
+				if load_st is AudioStreamOggVorbis:
+					load_st.loop = true
+				break
 	var was := _engine_player.playing
+	_engine_player.stop()
+	_load_player.stop()
 	_engine_player.stream = st
+	_load_player.stream = load_st
 	if was:
 		_engine_player.play()
+		if load_st != null:
+			_load_player.play()
 
 
 ## Бесшовная петля мотора на оборотах REF_RPM: число вспышек и периодов тона в петле целое.
@@ -247,6 +282,8 @@ func _load_or_synth(sound_name: String) -> AudioStream:
 			buf = _synth_sweep(200.0, 1600.0, 1.2, 0.4)
 		"pop":
 			buf = _synth_pop()
+		"upgrade":
+			buf = _tones([[880.0, 0.0, 0.08], [1320.0, 0.06, 0.12], [1760.0, 0.12, 0.2]], 0.35)
 	return _to_wav(buf)
 
 

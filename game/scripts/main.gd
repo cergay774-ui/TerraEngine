@@ -15,11 +15,14 @@ var top_margin: float = 0.0
 
 var _level_tab: Control
 var _resources: Control
-var _ips_label: Label
 var _rebirth_label: Label
 var _level_label: Label
-var _stamina_bar: ProgressBar
-var _stamina_label: Label
+var _stamina_gauge: Control
+var _float_gain: Big = Big.zero()
+var _float_next: float = 0.5
+var _last_float_angle: float = 0.0
+var _badges: Dictionary = {}      # кнопка нижней панели -> точка «есть что купить»
+var _badge_acc: float = 0.0
 var _status_label: Label
 var _xray_btn: Button
 var _float_layer: Control
@@ -165,12 +168,6 @@ func _build_top_bar() -> void:
 	_rebirth_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	add_child(_rebirth_label)
 
-	_ips_label = UI.label("+0/с", 38, UI.GOOD)
-	_ips_label.position = Vector2(20, top_margin + 150)
-	_ips_label.size = Vector2(420, 50)
-	_ips_label.add_theme_constant_override("outline_size", 8)
-	_ips_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
-	add_child(_ips_label)
 
 	_level_label = UI.label("", 19, Color("d8d2c4"), HORIZONTAL_ALIGNMENT_RIGHT)
 	_level_label.anchor_left = 1.0
@@ -185,23 +182,21 @@ func _build_top_bar() -> void:
 
 
 func _build_engine_hud() -> void:
-	_stamina_bar = UI.bar(Color("ffb02e"), 18)
-	_stamina_bar.anchor_left = 0.15
-	_stamina_bar.anchor_right = 0.85
-	_stamina_bar.offset_top = ENGINE_BOTTOM + 8
-	_stamina_bar.offset_bottom = ENGINE_BOTTOM + 26
-	_stamina_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_stamina_bar)
-	_stamina_label = UI.label("", 18, UI.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
-	_stamina_label.anchor_right = 1.0
-	_stamina_label.offset_top = ENGINE_BOTTOM + 30
-	_stamina_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_stamina_label)
+	# стамина — вертикальная капсула справа посередине полосы мотора
+	_stamina_gauge = preload("res://scripts/ui/stamina_gauge.gd").new()
+	var band_top := ENGINE_TOP + top_margin + 70.0
+	var band_mid := (band_top + ENGINE_BOTTOM) * 0.5
+	var gh := minf(430.0, ENGINE_BOTTOM - band_top)
+	_stamina_gauge.position = Vector2(W - 70.0, band_mid - gh * 0.5)
+	_stamina_gauge.size = Vector2(60.0, gh)
+	add_child(_stamina_gauge)
 	_status_label = UI.label("", 20, Color("8fc4ff"), HORIZONTAL_ALIGNMENT_CENTER)
 	_status_label.anchor_right = 1.0
 	_status_label.offset_left = 20
 	_status_label.offset_right = -20
-	_status_label.offset_top = ENGINE_BOTTOM + 60
+	_status_label.offset_top = ENGINE_BOTTOM + 20
+	_status_label.add_theme_constant_override("outline_size", 6)
+	_status_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_status_label)
@@ -264,6 +259,20 @@ func _build_bottom_bar() -> void:
 			_resources.set_open(false)
 			_toggle_panel(bid))
 		bar.add_child(b)
+		# точка «есть что купить/забрать»
+		var dot := Control.new()
+		dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		dot.size = Vector2(26, 26)
+		dot.position = Vector2(b.custom_minimum_size.x - 30, 4)
+		dot.visible = false
+		dot.draw.connect(func():
+			var t := Time.get_ticks_msec() / 1000.0
+			var r := 9.0 + 1.5 * sin(t * 6.0)
+			dot.draw_circle(Vector2(13, 13), r + 3.0, Color(0, 0, 0, 0.6))
+			dot.draw_circle(Vector2(13, 13), r, Color("8fe36b"))
+			dot.draw_circle(Vector2(11, 11), r * 0.35, Color(1, 1, 1, 0.7)))
+		b.add_child(dot)
+		_badges[id] = {"button": b, "dot": dot}
 
 
 # ---------------------------------------------------------------------
@@ -433,7 +442,7 @@ func _set_garage(on: bool) -> void:
 	var top := (ENGINE_TOP + top_margin + 90.0) / H
 	var bottom := (ENGINE_BOTTOM + 60.0) / H
 	engine_view.band = Rect2(0.16, top, 0.68, bottom - top) if on else _engine_band(false)
-	for n in [_stamina_bar, _stamina_label, _status_label, _xray_btn, get_node_or_null("Hint")]:
+	for n in [_stamina_gauge, _status_label, _xray_btn, get_node_or_null("Hint")]:
 		if n:
 			n.visible = not on
 	if on:
@@ -478,8 +487,6 @@ func _refresh_all() -> void:
 
 func _refresh_numbers() -> void:
 	_resources.refresh()
-	_ips_label.text = "+%s/с" % G.fmt(G.income_now.mul(G.d_time_mult))
-	_ips_label.add_theme_color_override("font_color", Color("6fb6ff") if G.turbo_time > 0.0 else (UI.GOOD if G.throttle else Color("b9d7a8")))
 	var mult := Big.power(1.25, G.rebirths).mul(Big.power(100.0, G.ultra))
 	var rtxt := "Перерождение %d (x%s)" % [G.rebirths, G.fmt(mult)]
 	if G.ultra > 0:
@@ -497,18 +504,9 @@ func _process(delta: float) -> void:
 		_fps_label.visible = G.settings.get("show_fps", false)
 		if _fps_label.visible:
 			_fps_label.text = "%d FPS" % Engine.get_frames_per_second()
-	_stamina_bar.value = G.stamina / maxf(G.d_stamina_max, 0.01)
-	var sb: StyleBoxFlat = _stamina_bar.get_theme_stylebox("fill")
-	sb.bg_color = Color("ff4a3a") if G.is_exhausted else (Color("6fb6ff") if G.has_boost("stamina") else Color("ffb02e"))
-	if G.has_boost("stamina"):
-		_stamina_label.text = "Стамина: бесконечная"
-	elif G.is_exhausted:
-		_stamina_label.text = "Перегрев! Мотор остывает…"
-	else:
-		_stamina_label.text = "Стамина %.1f / %.1f с" % [G.stamina, G.d_stamina_max]
 	var hint := get_node_or_null("Hint")
 	if hint:
-		hint.visible = G.stats.presses < 5 and _toast_box.get_child_count() == 0
+		hint.visible = G.stats.presses < 5 and _toast_box.get_child_count() == 0 and not _garage_mode
 
 	_ui_acc += delta
 	if _ui_acc >= 0.1:
@@ -518,15 +516,57 @@ func _process(delta: float) -> void:
 		if _open_panel != null and _open_panel.has_method("tick"):
 			_open_panel.tick()
 
-	if G.throttle:
-		_float_acc += delta
-		if _float_acc >= 0.5:
-			_float_acc = 0.0
-			var amt := G.income_now.mul(0.5 * G.d_time_mult)
-			var col := Color("8fc4ff") if G.turbo_time > 0.0 else UI.GOOD
-			float_text("+" + G.fmt(amt), col, 26)
-	else:
+	# доход всплывает «+X» вокруг мотора: при зажатии часто и ярко, на холостых реже и бледнее
+	_float_gain = _float_gain.add(G.income_now.mul(delta * G.d_time_mult))
+	_float_acc += delta
+	if _float_acc >= _float_next and not _garage_mode:
 		_float_acc = 0.0
+		_float_next = randf_range(0.35, 0.55) if G.throttle else randf_range(1.4, 1.9)
+		if not _float_gain.is_zero():
+			_income_popup(_float_gain)
+		_float_gain = Big.zero()
+
+	_badge_acc += delta
+	if _badge_acc >= 0.5:
+		_badge_acc = 0.0
+		_update_badges()
+	for id in _badges:
+		var dot: Control = _badges[id].dot
+		if dot.visible:
+			dot.queue_redraw()
+
+
+## Зелёные точки на кнопках: есть доступное улучшение, запчасть, награда или перерождение.
+func _update_badges() -> void:
+	if _badges.is_empty():
+		return
+	var any_upg := false
+	for u in D.UPGRADES:
+		if G.upgrade_unlocked(u.id) and G.upgrade_affordable(u.id) > 0:
+			any_upg = true
+			break
+	var any_part := false
+	for sl in D.SLOTS:
+		if not G.slot_visible(sl.id):
+			continue
+		var o := G.mark_offer(sl.id, G.best_mark(sl.id) + 1)
+		if o.ok and (o.free or G.can_pay(o.cur, o.price)):
+			any_part = true
+			break
+	var any_shop := false
+	for t in G.daily_tasks():
+		if not t.claimed and t.progress >= t.goal:
+			any_shop = true
+			break
+	var flags := {"settings": false, "upgrades": any_upg, "parts": any_part, "shop": any_shop, "rebirth": G.can_rebirth()}
+	for id in _badges:
+		var dot: Control = _badges[id].dot
+		var on: bool = flags.get(id, false)
+		if on and not dot.visible:
+			dot.scale = Vector2(0.2, 0.2)
+			dot.pivot_offset = dot.size * 0.5
+			dot.create_tween().tween_property(dot, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		dot.visible = on
 
 
 func _status_text() -> String:
@@ -560,6 +600,45 @@ func _on_hold(pressed: bool) -> void:
 		G.vibrate(15)
 
 
+## «+X» в случайной точке вокруг мотора: появляется с пружинкой, уплывает наружу и вверх, тает.
+func _income_popup(amount: Big) -> void:
+	var turbo := G.turbo_time > 0.0
+	var holding := G.throttle
+	var col := Color("8fc4ff") if turbo else (UI.GOOD if holding else Color(0.75, 0.9, 0.7, 0.85))
+	var fsize := 30 if holding else 22
+	var center := _engine_point(0.5, 0.5)
+	var b: Rect2 = engine_view.band
+	var rx := W * b.size.x * 0.36
+	var ry := H * b.size.y * 0.38
+	var ang := randf() * TAU
+	for _i in 6:
+		if absf(angle_difference(ang, _last_float_angle)) > 0.9:
+			break
+		ang = randf() * TAU
+	_last_float_angle = ang
+	var dir := Vector2(cos(ang), sin(ang))
+	var at := center + dir * Vector2(rx, ry) * randf_range(0.75, 1.0)
+	var l := UI.label("+" + G.fmt(amount), fsize, col, HORIZONTAL_ALIGNMENT_CENTER)
+	l.add_theme_constant_override("outline_size", 8)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.75))
+	l.size = Vector2(260, 44)
+	l.position = at - l.size * 0.5
+	l.pivot_offset = l.size * 0.5
+	l.scale = Vector2(0.35, 0.35)
+	l.modulate.a = 0.0
+	l.rotation = randf_range(-0.08, 0.08)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_float_layer.add_child(l)
+	var drift := dir * 26.0 + Vector2(0, -46.0)
+	var tw := l.create_tween().set_parallel(true)
+	tw.tween_property(l, "scale", Vector2.ONE, 0.32).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "modulate:a", 1.0, 0.16)
+	tw.tween_property(l, "position", l.position + drift, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "rotation", 0.0, 0.5)
+	tw.tween_property(l, "modulate:a", 0.0, 0.5).set_delay(0.8)
+	tw.chain().tween_callback(l.queue_free)
+
+
 func float_text(text: String, color: Color, size: int = 26, at: Vector2 = Vector2(-1, -1)) -> void:
 	var l := UI.label(text, size, color, HORIZONTAL_ALIGNMENT_CENTER)
 	l.add_theme_constant_override("outline_size", 6)
@@ -567,12 +646,16 @@ func float_text(text: String, color: Color, size: int = 26, at: Vector2 = Vector
 	var center := _engine_point(0.5, 0.3)
 	if at.x < 0.0:
 		at = center + Vector2(randf_range(-150, 150), randf_range(-60, 60))
-	l.size = Vector2(400, 40)
-	l.position = at - Vector2(200, 20)
+	l.size = Vector2(400, 40 + size)
+	l.position = at - l.size * 0.5
+	l.pivot_offset = l.size * 0.5
+	l.scale = Vector2(0.4, 0.4)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_float_layer.add_child(l)
 	var tw := l.create_tween().set_parallel(true)
-	tw.tween_property(l, "position:y", l.position.y - 90.0, 1.1).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "modulate:a", 0.0, 1.1).set_delay(0.3)
+	tw.tween_property(l, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "position:y", l.position.y - 90.0, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "modulate:a", 0.0, 0.5).set_delay(0.85)
 	tw.chain().tween_callback(l.queue_free)
 
 
@@ -590,11 +673,15 @@ func show_toast(text: String, color: Color = UI.TEXT) -> void:
 		_toast_box.get_child(0).queue_free()
 		_toast_box.remove_child(_toast_box.get_child(0))
 	p.modulate.a = 0.0
+	p.scale = Vector2(0.92, 0.92)
+	p.resized.connect(func(): p.pivot_offset = p.size * 0.5)
 	var tw := p.create_tween()
-	tw.tween_property(p, "modulate:a", 1.0, 0.2)
-	tw.tween_interval(2.6)
-	tw.tween_property(p, "modulate:a", 0.0, 0.4)
-	tw.tween_callback(p.queue_free)
+	tw.set_parallel(true)
+	tw.tween_property(p, "modulate:a", 1.0, 0.22)
+	tw.tween_property(p, "scale", Vector2.ONE, 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.chain().tween_interval(2.6)
+	tw.chain().tween_property(p, "modulate:a", 0.0, 0.4)
+	tw.chain().tween_callback(p.queue_free)
 
 
 func _on_level_up(lvl: int) -> void:

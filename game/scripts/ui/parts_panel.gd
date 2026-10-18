@@ -142,7 +142,7 @@ func _slot_card(s: Dictionary) -> Control:
 		var mk2: int = next_mk
 		bt.pressed.connect(func():
 			if G.buy_mark(sid2, mk2):
-				Sfx.play("buy")
+				Sfx.play("upgrade")
 				G.vibrate(20)
 				main._apply_engine()
 				main.show_toast("%s Mk %s установлена" % [D.slot(sid2).name, D.roman(mk2)], UI.GOOD)

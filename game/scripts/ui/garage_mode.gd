@@ -9,6 +9,7 @@ var _sides: Dictionary = {}       # слот -> -1 (слева) / 1 (справ�
 var _lines: Control
 var _time: float = 0.0
 var _layout_key: String = ""
+var _appear: float = 0.0      # 0..1 — линии «прорастают» от карточек к деталям
 
 const CARD_W := 196.0
 const CARD_H := 86.0
@@ -89,10 +90,16 @@ func rebuild() -> void:
 			var sid: String = list[i]
 			var card := _make_card(sid)
 			var x := 10.0 if col[1] < 0 else size.x - CARD_W - 10.0
-			card.position = Vector2(x, top + step * i + (step - CARD_H) * 0.5)
+			var target := Vector2(x, top + step * i + (step - CARD_H) * 0.5)
+			card.position = target + Vector2(-70.0 if col[1] < 0 else 70.0, 0)
+			card.modulate.a = 0.0
 			add_child(card)
+			var tw := card.create_tween().set_parallel(true)
+			tw.tween_property(card, "position", target, 0.38).set_delay(0.05 * i).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			tw.tween_property(card, "modulate:a", 1.0, 0.25).set_delay(0.05 * i)
 			_cards[sid] = card
 			_sides[sid] = col[1]
+	_appear = 0.0
 	_refresh_cards()
 
 
@@ -154,6 +161,7 @@ func _refresh_cards() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	_appear = minf(1.0, _appear + delta * 1.6)
 	var key := G.current_engine() + "|" + str(G.level) + "|" + str(G.equipped("turbine").is_empty())
 	if key != _layout_key and engine_view.part_screen_pos("block").x >= 0.0:
 		_layout_key = key
@@ -172,7 +180,25 @@ func _draw_lines() -> void:
 		col = col.lerp(Color("ffc21a"), 0.35)
 		var start := b.position + Vector2(CARD_W if side < 0 else 0.0, CARD_H * 0.5)
 		var elbow := Vector2(start.x + side * -1.0 * 26.0, start.y)
-		var pts := PackedVector2Array([start, elbow, p])
+		# линия растёт от карточки к детали
+		var k := clampf(_appear * 1.4 - 0.2, 0.0, 1.0)
+		k = k * k * (3.0 - 2.0 * k)
+		var l1 := start.distance_to(elbow)
+		var l2 := elbow.distance_to(p)
+		var want := (l1 + l2) * k
+		var end_p := p
+		var pts: PackedVector2Array
+		if want <= l1:
+			end_p = start.lerp(elbow, want / maxf(l1, 0.001))
+			pts = PackedVector2Array([start, end_p])
+		else:
+			end_p = elbow.lerp(p, (want - l1) / maxf(l2, 0.001))
+			pts = PackedVector2Array([start, elbow, end_p])
+		if k < 0.999:
+			_lines.draw_polyline(pts, Color(0, 0, 0, 0.6), 5.0, true)
+			_lines.draw_polyline(pts, col, 2.5, true)
+			_lines.draw_circle(end_p, 4.0, Color.WHITE)
+			continue
 		_lines.draw_polyline(pts, Color(0, 0, 0, 0.6), 5.0, true)
 		_lines.draw_polyline(pts, col, 2.5, true)
 		var pulse := 0.5 + 0.5 * sin(_time * 4.0 + p.x * 0.05)
