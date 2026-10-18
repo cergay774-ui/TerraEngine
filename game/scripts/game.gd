@@ -43,16 +43,16 @@ var engine_choice: String = ""
 var settings: Dictionary = {
 	"quality": 1, "fps": 60, "shake": true, "vibration": true,
 	"sfx": 0.8, "music": 0.6, "sci": false, "lang": "ru", "xray": false,
-	"shadows": 1, "msaa": 2, "glow": true, "particles": 1, "res_scale": 0.85,
+	"shadows": 1, "msaa": 0, "glow": false, "particles": 1, "res_scale": 0.75, "fps3d": 0,
 	"garage": true, "cam_sway": true, "cam_zoom": 1.0, "show_fps": false,
 }
 
 ## Пресеты графики: Низкое, Среднее, Высокое, Ультра.
 const PRESETS := [
-	{"shadows": 0, "msaa": 0, "glow": false, "particles": 0, "res_scale": 0.6, "garage": true},
-	{"shadows": 1, "msaa": 2, "glow": true, "particles": 1, "res_scale": 0.85, "garage": true},
-	{"shadows": 1, "msaa": 4, "glow": true, "particles": 2, "res_scale": 1.0, "garage": true},
-	{"shadows": 2, "msaa": 4, "glow": true, "particles": 2, "res_scale": 1.0, "garage": true},
+	{"shadows": 0, "msaa": 0, "glow": false, "particles": 0, "res_scale": 0.6, "fps3d": 0, "garage": true},
+	{"shadows": 1, "msaa": 0, "glow": false, "particles": 1, "res_scale": 0.75, "fps3d": 0, "garage": true},
+	{"shadows": 1, "msaa": 2, "glow": true, "particles": 2, "res_scale": 0.9, "fps3d": 1, "garage": true},
+	{"shadows": 2, "msaa": 4, "glow": true, "particles": 2, "res_scale": 1.0, "fps3d": 1, "garage": true},
 ]
 var last_time: float = 0.0
 
@@ -1235,7 +1235,13 @@ func from_dict(d: Dictionary) -> void:
 	var s: Dictionary = d.get("settings", {})
 	for k in s:
 		settings[k] = s[k]
-	for k in ["quality", "fps", "shadows", "msaa", "particles"]:
+	# старые сохранения: графика была тяжелее — переводим на новый пресет
+	if not s.has("fps3d"):
+		var q := clampi(int(settings.get("quality", 1)), 0, 3)
+		settings.quality = q
+		for k in PRESETS[q]:
+			settings[k] = PRESETS[q][k]
+	for k in ["quality", "fps", "shadows", "msaa", "particles", "fps3d"]:
 		settings[k] = int(settings[k])
 	last_time = float(d.get("last_time", 0.0))
 	mark_dirty()

@@ -26,6 +26,8 @@ var flash_white: float = 0.0
 var show_hud: bool = true
 var drives_audio: bool = true
 var band: Rect2 = Rect2(0, 0, 1, 1)   # где на экране стоит мотор (доли экрана)
+var render_paused: bool = false       # мотор закрыт меню — 3D не перерисовываем (меньше нагрев)
+var locked: bool = false              # режим гаража: мотор не крутится пальцем
 
 var _vp: SubViewport
 var _tex: TextureRect
@@ -63,6 +65,8 @@ var _fov_kick: float = 0.0
 var _tail_pos: Vector3 = Vector3.ZERO
 var _pop_glow: float = 0.0
 var _lift: float = 0.0
+var _frame_i: int = 0
+var _anchors: Dictionary = {}     # слот запчасти -> точка на моторе (локально в _engine)
 
 
 func _ready() -> void:
@@ -122,7 +126,7 @@ func _gui_input(event: InputEvent) -> void:
 		_pressed = event.pressed
 		hold_changed.emit(event.pressed)
 		accept_event()
-	elif event is InputEventMouseMotion and _pressed:
+	elif event is InputEventMouseMotion and _pressed and not locked:
 		_yaw_target = clampf(_yaw_target - event.relative.x * 0.006, -1.3, 1.3)
 		accept_event()
 
@@ -228,6 +232,7 @@ func _apply_graphics() -> void:
 		return
 	var sc := clampf(float(G.settings.get("res_scale", 1.0)), 0.4, 1.0)
 	_vp.size = Vector2i(maxi(16, int(size.x * sc)), maxi(16, int(size.y * sc)))
+	_vp.positional_shadow_atlas_size = 2048 if _q() >= 2 else 1024
 	var ms := int(G.settings.get("msaa", 2))
 	_vp.msaa_3d = Viewport.MSAA_4X if ms >= 4 else (Viewport.MSAA_2X if ms >= 2 else Viewport.MSAA_DISABLED)
 	if _env != null:
@@ -421,6 +426,7 @@ func _rebuild() -> void:
 	_cyls.clear()
 	_spinners.clear()
 	_rotors.clear()
+	_anchors.clear()
 	_turbine_wheel = null
 	_make_mats()
 	var batch := MeshKit.Batch.new()
@@ -536,6 +542,11 @@ func _build_piston_engine(batch: MeshKit.Batch) -> Vector3:
 		_part(fly, MeshKit.cyl(0.1, 0.36, 6), "crank", Vector3(0, cos(k * TAU / 6) * 0.7, sin(k * TAU / 6) * 0.7), Vector3(0, 0, 90))
 	_spinners.append({"node": fly, "ratio": 1.0})
 	var front_x := length * 0.5 + 0.2
+	_anchors["flywheel"] = fly.position
+	_anchors["crank"] = Vector3(length * 0.3, 0, 0.4)
+	_anchors["reactor"] = Vector3(0, -0.4, 1.75)
+	_anchors["stabilizer"] = Vector3(-length * 0.3, -2.05, 1.5)
+	_anchors["cooling"] = Vector3(front_x, deck * 0.5, 1.5)
 
 	# картер, поддон с рёбрами, масляный фильтр, щуп
 	var case_w := rows * SPACING + 0.5
@@ -613,6 +624,13 @@ func _build_piston_engine(batch: MeshKit.Batch) -> Vector3:
 			port = fx * Vector3(0, deck + HEAD * 0.45, out_z * 1.08)
 			out_dir = (fx.basis * Vector3(0, -0.25, signf(out_z))).normalized()
 		header_ends.append({"port": port, "dir": out_dir, "bank": c.bank})
+		if not _anchors.has("block") or frame.position.x >= float(_anchors.get("_x", -INF)):
+			_anchors["_x"] = frame.position.x
+			_anchors["block"] = fx * Vector3(0, 1.6, BORE + 0.3)
+			_anchors["pistons"] = fx * Vector3(0, 3.0, 0)
+			_anchors["head"] = fx * Vector3(0, deck + HEAD * 0.5, 1.3)
+			_anchors["ignition"] = fx * Vector3(0, deck + HEAD + 0.9, 0)
+			_anchors["fuel"] = fx * (Vector3(0, deck + HEAD * 1.4, -out_z * 1.1) if engine_type != "radial" else Vector3(0, deck + HEAD, 0))
 		# клапаны
 		var valves: Array = []
 		for side in [-1, 1]:
@@ -715,6 +733,7 @@ func _build_timing(batch: MeshKit.Batch, front_x: float, deck: float, banks: Arr
 		path.append(Vector3(front_x + 0.15, v.x, v.y))
 	batch.add("belt", MeshKit.sweep(path, 0.1, 4, false), Transform3D.IDENTITY)
 	# генератор с крыльчаткой
+	_anchors["cooling"] = Vector3(front_x - 0.4, 1.4, 2.3)
 	batch.add("steel", MeshKit.cyl(0.75, 1.1, 24), _xf(Vector3(front_x - 0.4, 1.4, 2.3), Vector3(0, 0, 90)))
 	for k in 8:
 		batch.add("crank", MeshKit.box(Vector3(1.12, 0.08, 0.3)), _xf(Vector3(front_x - 0.4, 1.4, 2.3), Vector3(k * 22.5, 0, 0)))
@@ -767,6 +786,7 @@ func _build_headers(batch: MeshKit.Batch, ends: Array, length: float, turbo: boo
 			var pp: Vector3 = p
 			batch.add("header", MeshKit.sweep(MeshKit.bezier(pp, pp + Vector3(0.8, 0, 0), target + Vector3(-0.6, 0.4, 0), target, 10), 0.38, 12), Transform3D.IDENTITY)
 		m = target
+	_anchors["turbine"] = m
 	if turbo:
 		m = _build_turbo(batch, m)
 	return m
@@ -801,6 +821,7 @@ func _build_turbo(batch: MeshKit.Batch, inlet: Vector3) -> Vector3:
 		blade.basis = Basis(Vector3.RIGHT, a) * Basis(Vector3.UP, 0.5)
 		blade.position = Vector3(0, cos(a), sin(a)) * 0.3
 	_turbo_light.position = tp
+	_anchors["turbine"] = tp + Vector3(1.2, 0, 0)
 	var down := tp + Vector3(-0.2, -2.2, 0.8)
 	batch.add("header", MeshKit.sweep(MeshKit.bezier(tp + Vector3(0, -0.6, 0.6), tp + Vector3(0, -1.2, 1.0), down + Vector3(0, 0.6, 0), down, 8), 0.36, 12), Transform3D.IDENTITY)
 	return down
@@ -811,6 +832,7 @@ func _build_exhaust_tail(batch: MeshKit.Batch, from: Vector3) -> void:
 	var muff_c := from + Vector3(0.6, -0.6, -2.4)
 	batch.add("header", MeshKit.sweep(MeshKit.bezier(from, from + Vector3(0.3, -0.4, -0.5), muff_c + Vector3(0, 0.3, 1.8), muff_c + Vector3(0, 0, 1.3), 8), 0.34, 12), Transform3D.IDENTITY)
 	batch.add("steel", MeshKit.rounded_box(Vector3(1.5, 1.2, 2.8), 0.5, 4), _xf(muff_c))
+	_anchors["exhaust"] = muff_c
 	var tail0 := muff_c + Vector3(0, 0, -1.3)
 	var tail1 := tail0 + Vector3(0, 0.2, -1.0)
 	batch.add("steel", MeshKit.sweep(PackedVector3Array([tail0, tail1]), 0.3, 16), Transform3D.IDENTITY)
@@ -869,6 +891,16 @@ func _build_rotary(batch: MeshKit.Batch) -> Vector3:
 		batch.add("steel", MeshKit.sweep(MeshKit.bezier(Vector3(x, R * 1.1, 1.2), Vector3(x, R * 1.6, 1.6), Vector3(x, R * 1.8, 2.4), Vector3(x, R * 1.8, 3.2), 8), 0.35, 14), Transform3D.IDENTITY)
 		batch.add("steel", MeshKit.cone(0.35, 0.6, 0.4, 16), _xf(Vector3(x, R * 1.8, 3.4), Vector3(90, 0, 0)))
 	batch.add("case", MeshKit.rounded_box(Vector3(4.2, 1.0, 3.0), 0.3, 3), _xf(Vector3(0, -R * 1.25 - 0.4, 0)))
+	_anchors["block"] = Vector3(0.9, R * 0.95, 0)
+	_anchors["pistons"] = Vector3(0.9, 0, 0)
+	_anchors["crank"] = Vector3(2.6, 0, 0)
+	_anchors["flywheel"] = Vector3(-2.9, 0, 0)
+	_anchors["head"] = Vector3(0.9, R * 1.5, 1.6)
+	_anchors["ignition"] = Vector3(0.9, 0, -R * 1.4)
+	_anchors["fuel"] = Vector3(0.9, R * 1.8, 3.2)
+	_anchors["cooling"] = Vector3(0.9, -R * 1.1, 0)
+	_anchors["reactor"] = Vector3(0, -R * 1.25 - 0.4, 1.5)
+	_anchors["stabilizer"] = Vector3(-0.9, -R * 1.1, 0)
 	var col := Vector3(2.4, -2.6, R * 1.6)
 	for i in 2:
 		var p := Vector3(-0.9 + i * 1.8, -1.0, R * 1.2)
@@ -905,6 +937,17 @@ func _build_stand(batch: MeshKit.Batch, box: AABB, k: float) -> float:
 		batch.add("rubber", MeshKit.cyl(0.24, 0.16, 16), Transform3D(Basis(Vector3.RIGHT, PI * 0.5).scaled(Vector3.ONE * inv), (p + Vector3(0, -0.36, 0)) * inv))
 	# низ колёс должен стоять на полу (y = 0)
 	return -(floor_y - 0.05)
+
+
+## Где на экране (в координатах этого Control) находится деталь слота. (-1, -1) — нет такой точки.
+func part_screen_pos(slot_id: String) -> Vector2:
+	if _engine == null or _cam == null or not _anchors.has(slot_id):
+		return Vector2(-1, -1)
+	var gp := _engine.to_global(_anchors[slot_id])
+	if _cam.is_position_behind(gp):
+		return Vector2(-1, -1)
+	var p := _cam.unproject_position(gp)
+	return p * (size / Vector2(maxi(1, _vp.size.x), maxi(1, _vp.size.y)))
 
 
 func _sc(inv: float, at: Vector3 = Vector3.ZERO) -> Transform3D:
@@ -982,7 +1025,9 @@ func _process(delta: float) -> void:
 	_engine.position = Vector3(n.x * amp * 0.5, _lift, n.z * amp * 0.5)
 	shake_offset = Vector2(n.x, n.y) * amp * 25.0
 
-	if not _pressed:
+	if locked:
+		_yaw_target = 0.0
+	elif not _pressed:
 		var sway := 0.18 * sin(_time * 0.25) if G.settings.get("cam_sway", true) else 0.0
 		_yaw_target = lerpf(_yaw_target, sway, 1.0 - exp(-delta * 0.6))
 	_yaw = lerpf(_yaw, _yaw_target, 1.0 - exp(-delta * 8.0))
@@ -1005,6 +1050,19 @@ func _process(delta: float) -> void:
 		Sfx.engine_type = engine_type
 		Sfx.turbo_level = 0.0 if demo else (1.0 if G.turbo_time > 0.0 else (0.35 * ratio if _turbine_wheel != null else 0.0))
 	_hud.queue_redraw()
+	_update_render_mode()
+
+
+## Экономия: 3D рисуется через кадр на слабых пресетах и не рисуется вовсе, когда мотор закрыт меню.
+func _update_render_mode() -> void:
+	_frame_i += 1
+	if render_paused:
+		_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	elif int(G.settings.get("fps3d", 1)) == 0:
+		if _frame_i % 2 == 0:
+			_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	else:
+		_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 
 
 func _place_camera(jitter: Vector3) -> void:
@@ -1082,6 +1140,7 @@ func _animate(delta: float) -> void:
 	if max_flash > 0.0:
 		_flash_light.position = _root.to_local(flash_pos)
 	_flash_light.light_energy = 4.0 * max_flash
+	_flash_light.visible = max_flash > 0.02 and _q() >= 1
 	if _turbine_wheel != null:
 		_turbine_deg = fmod(_turbine_deg + (200.0 + rpm * rpm / 25000.0) * delta * (2.0 if (not demo and G.turbo_time > 0.0) else 1.0), 360.0)
 		_turbine_wheel.rotation.x = deg_to_rad(_turbine_deg)
@@ -1158,8 +1217,10 @@ func _update_effects(delta: float, ratio: float, throttle: bool) -> void:
 	_tail_light.position = tail + Vector3(0, 0.5, -0.8)
 	_tail_light.light_color = flame_col
 	_tail_light.light_energy = flame * 6.0
+	_tail_light.visible = flame > 0.02
 	_steam.emitting = heat > 0.75 and int(G.settings.get("particles", 1)) > 0
 	_turbo_light.light_energy = 3.0 if turbo_on else 0.0
+	_turbo_light.visible = turbo_on
 
 
 func _update_tints() -> void:

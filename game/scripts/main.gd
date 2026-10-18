@@ -2,12 +2,15 @@ extends Control
 ## Главный экран: верхняя панель с валютами, мотор по центру, стамина, 5 кнопок внизу.
 
 const W := 720.0
-const H := 1280.0
+var H: float = 1280.0          # высота экрана в единицах интерфейса (на вытянутых телефонах больше)
 const ENGINE_TOP := 205.0
-const ENGINE_BOTTOM := 930.0
+var ENGINE_BOTTOM: float = 930.0  # низ полосы мотора — считается от низа экрана
 
 var engine_view: Control
 var _fps_label: Label
+var _garage_mode: bool = false
+var _garage_ui: Control = null
+var _door_busy: bool = false
 var top_margin: float = 0.0
 
 var _level_tab: Control
@@ -33,6 +36,8 @@ var _ui_acc: float = 0.0
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	theme = UI.make_theme()
+	H = maxf(1280.0, get_viewport_rect().size.y)
+	ENGINE_BOTTOM = H - 350.0
 	_compute_safe_area()
 
 	# 3D-гараж с мотором — на весь экран, интерфейс поверх
@@ -297,6 +302,9 @@ func _side_of(id: String) -> String:
 
 
 func _toggle_panel(id: String) -> void:
+	if id == "parts":
+		_toggle_garage()
+		return
 	var p := _panel_for(id)
 	if _open_panel == p:
 		close_panel()
@@ -309,6 +317,10 @@ func _toggle_panel(id: String) -> void:
 func open_panel(p: Control, side: String) -> void:
 	_open_panel = p
 	_open_side = side
+	if side != "left":
+		get_tree().create_timer(0.35).timeout.connect(func():
+			if _open_panel == p:
+				engine_view.render_paused = true)
 	p.visible = true
 	if p.has_method("refresh"):
 		p.refresh()
@@ -371,6 +383,7 @@ func close_panel(instant: bool = false) -> void:
 	var side := _open_side
 	_open_panel = null
 	_open_side = ""
+	engine_view.render_paused = false
 	if instant:
 		p.visible = false
 		engine_view.band = _engine_band(false)
@@ -394,6 +407,58 @@ func close_panel(instant: bool = false) -> void:
 			p.visible = false
 		if _open_panel == null:
 			_dim.visible = false)
+
+
+# ---------------------------------------------------------------------
+# Режим гаража
+# ---------------------------------------------------------------------
+
+func _toggle_garage() -> void:
+	if _door_busy:
+		return
+	_door_busy = true
+	var door := preload("res://scripts/ui/garage_door.gd").new()
+	add_child(door)
+	door.closed.connect(func(): _set_garage(not _garage_mode))
+	door.tree_exited.connect(func(): _door_busy = false)
+	door.play()
+
+
+func _set_garage(on: bool) -> void:
+	_garage_mode = on
+	close_panel(true)
+	engine_view.locked = on
+	engine_view.mouse_filter = Control.MOUSE_FILTER_IGNORE if on else Control.MOUSE_FILTER_STOP
+	G.set_holding(false)
+	var top := (ENGINE_TOP + top_margin + 90.0) / H
+	var bottom := (ENGINE_BOTTOM + 60.0) / H
+	engine_view.band = Rect2(0.16, top, 0.68, bottom - top) if on else _engine_band(false)
+	for n in [_stamina_bar, _stamina_label, _status_label, _xray_btn, get_node_or_null("Hint")]:
+		if n:
+			n.visible = not on
+	if on:
+		if _garage_ui == null:
+			_garage_ui = preload("res://scripts/ui/garage_mode.gd").new()
+			_garage_ui.main = self
+			_garage_ui.engine_view = engine_view
+			add_child(_garage_ui)
+			move_child(_garage_ui, engine_view.get_index() + 1)
+		_garage_ui.visible = true
+		_garage_ui.set("_layout_key", "")
+	elif _garage_ui != null:
+		_garage_ui.visible = false
+		_garage_ui.process_mode = Node.PROCESS_MODE_INHERIT
+	if _garage_ui != null:
+		_garage_ui.process_mode = Node.PROCESS_MODE_INHERIT if on else Node.PROCESS_MODE_DISABLED
+
+
+## Открыть выбор вариантов для одной детали (из режима гаража).
+func open_slot(slot_id: String) -> void:
+	var p := _panel_for("parts")
+	p.set("only_slot", slot_id)
+	if _open_panel != null:
+		close_panel(true)
+	open_panel(p, "bottom")
 
 
 # ---------------------------------------------------------------------

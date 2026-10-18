@@ -80,6 +80,7 @@ func _build_graphics() -> void:
 	_toggle("Свечение (bloom)", G.settings.glow, func(on): _put("glow", on))
 	_toggle("Гараж вокруг мотора", G.settings.garage, func(on): _put("garage", on))
 	_section("Экран")
+	_choice("Кадры 3D", ["Через кадр", "Каждый кадр"], int(G.settings.fps3d), func(i): _put("fps3d", i))
 	_choice("Частота кадров", ["30", "60", "90", "120"], [30, 60, 90, 120].find(int(G.settings.fps)), func(i): _put("fps", [30, 60, 90, 120][i]))
 	_toggle("Показывать FPS", G.settings.show_fps, func(on): _put("show_fps", on))
 	_hint("Если телефон греется или тормозит — выберите «Низкое» или «Среднее» и 30 FPS.")

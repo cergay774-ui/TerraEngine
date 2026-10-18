@@ -25,7 +25,7 @@ static func environment(quality: int, glow: bool) -> Environment:
 	env.glow_bloom = 0.08
 	env.glow_hdr_threshold = 1.1
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
-	env.fog_enabled = quality >= 1
+	env.fog_enabled = quality >= 2
 	env.fog_light_color = Color(0.09, 0.09, 0.11)
 	env.fog_density = 0.0028
 	return env
@@ -277,15 +277,10 @@ static func build(parent: Node3D, floor_y: float, quality: int) -> Dictionary:
 	var rim := OmniLight3D.new()
 	rim.light_color = Color(0.35, 0.55, 1.0)
 	rim.light_energy = 3.0
-	rim.omni_range = 26.0
+	rim.omni_range = 18.0
+	rim.visible = quality >= 1
 	rim.position = Vector3(-6.0, floor_y + 9.0, back_z + 3.0)
 	root.add_child(rim)
-	var warm := OmniLight3D.new()
-	warm.light_color = Color(1.0, 0.6, 0.3)
-	warm.light_energy = 1.2
-	warm.omni_range = 20.0
-	warm.position = Vector3(12.0, floor_y + 5.0, 6.0)
-	root.add_child(warm)
 	return {"root": root, "key": key}
 
 

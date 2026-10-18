@@ -1,10 +1,12 @@
 extends Node
 ## Звук. Если в res://assets/sounds/ лежит файл с таким же именем (.ogg) — берётся он,
-## иначе звук синтезируется кодом. Звук мотора — бесшовная петля, высота тона от оборотов.
+## иначе звук синтезируется кодом. Звук мотора — один заранее посчитанный бесшовный цикл,
+## высота тона меняется от оборотов (дёшево для телефона: никакого синтеза на каждом кадре).
 
 const MIX_RATE := 22050.0
+const REF_RPM := 2400.0          # на каких оборотах записана петля мотора
 const SOUND_NAMES := ["starter", "knock", "crit", "coin", "turbo", "case_shake", "case_open",
-	"fanfare", "click", "buy", "garage_door", "rebirth"]
+	"fanfare", "click", "buy", "garage_door", "rebirth", "pop"]
 
 # параметры мотора, их выставляет EngineView каждый кадр
 var rpm: float = 0.0
@@ -16,21 +18,14 @@ var engine_on: bool = false
 var turbo_level: float = 0.0
 var engine_type: String = ""
 
-var _gen_player: AudioStreamPlayer
-var _pb: AudioStreamGeneratorPlayback
-var _file_player: AudioStreamPlayer
-var _file_type: String = ""
+var _engine_player: AudioStreamPlayer
+var _whistle_player: AudioStreamPlayer
 var _music: AudioStreamPlayer
 var _pool: Array[AudioStreamPlayer] = []
 var _sounds: Dictionary = {}
-
-var _phase: float = 0.0
-var _t_since: float = 1.0
-var _amp: float = 1.0
-var _body: float = 0.0
-var _whistle: float = 0.0
-var _lp: float = 0.0
-var _pop_left: int = 0
+var _loops: Dictionary = {}       # тип мотора -> AudioStream
+var _loop_type: String = "-"
+var _uses_file: bool = false
 var _vol: float = 0.0
 
 
@@ -38,19 +33,15 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_make_bus("SFX")
 	_make_bus("Music")
-	_gen_player = AudioStreamPlayer.new()
-	var gen := AudioStreamGenerator.new()
-	gen.mix_rate = MIX_RATE
-	gen.buffer_length = 0.12
-	_gen_player.stream = gen
-	_gen_player.bus = "SFX"
-	add_child(_gen_player)
-	_gen_player.play()
-	_pb = _gen_player.get_stream_playback()
-
-	_file_player = AudioStreamPlayer.new()
-	_file_player.bus = "SFX"
-	add_child(_file_player)
+	_engine_player = AudioStreamPlayer.new()
+	_engine_player.bus = "SFX"
+	_engine_player.volume_db = -80.0
+	add_child(_engine_player)
+	_whistle_player = AudioStreamPlayer.new()
+	_whistle_player.bus = "SFX"
+	_whistle_player.volume_db = -80.0
+	_whistle_player.stream = _synth_whistle()
+	add_child(_whistle_player)
 
 	for i in 8:
 		var p := AudioStreamPlayer.new()
@@ -111,72 +102,112 @@ func play(sound_name: String, pitch_scale: float = 1.0, volume_db: float = 0.0) 
 
 ## Хлопок в выхлопе.
 func pop() -> void:
-	_pop_left = int(MIX_RATE * 0.05)
+	play("pop", randf_range(0.85, 1.2), -4.0)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if engine_type != _loop_type:
+		_switch_loop()
+	var target := 1.0 if engine_on else 0.0
+	_vol = move_toward(_vol, target, delta * 1.5)
+	if _vol <= 0.001:
+		if _engine_player.playing:
+			_engine_player.stop()
+	else:
+		if not _engine_player.playing and _engine_player.stream != null:
+			_engine_player.play()
+		var ratio := clampf(rpm / maxf(max_rpm, 1.0), 0.0, 1.3)
+		_engine_player.volume_db = linear_to_db(_vol * (0.55 + 0.45 * ratio))
+		if _uses_file:
+			_engine_player.pitch_scale = clampf(0.5 + 1.5 * ratio, 0.3, 3.0)
+		else:
+			_engine_player.pitch_scale = clampf(rpm / REF_RPM, 0.3, 4.0)
+	# свист турбины
+	if turbo_level > 0.02 and _vol > 0.01:
+		if not _whistle_player.playing:
+			_whistle_player.play()
+		_whistle_player.volume_db = linear_to_db(turbo_level * 0.5 * _vol)
+		_whistle_player.pitch_scale = clampf(0.7 + rpm / maxf(max_rpm, 1.0), 0.5, 2.5)
+	elif _whistle_player.playing:
+		_whistle_player.stop()
+
+
+func _switch_loop() -> void:
+	_loop_type = engine_type
 	var type_file := "res://assets/sounds/engine_%s.ogg" % engine_type
 	var generic := "res://assets/sounds/engine.ogg"
-	var want_file := ""
-	if ResourceLoader.exists(type_file):
-		want_file = type_file
-	elif ResourceLoader.exists(generic):
-		want_file = generic
-	if want_file != "":
-		if _file_type != want_file:
-			_file_type = want_file
-			var st = load(want_file)
+	var st: AudioStream = null
+	_uses_file = false
+	for path in [type_file, generic]:
+		if ResourceLoader.exists(path):
+			st = load(path)
 			if st is AudioStreamOggVorbis:
 				st.loop = true
-			_file_player.stream = st
-		if engine_on and not _file_player.playing:
-			_file_player.play()
-		elif not engine_on and _file_player.playing:
-			_file_player.stop()
-		_file_player.pitch_scale = clampf(0.5 + 1.5 * rpm / maxf(max_rpm, 1.0), 0.3, 3.0)
-		_fill(true)
-	else:
-		_fill(false)
+			_uses_file = true
+			break
+	if st == null:
+		if not _loops.has(engine_type):
+			_loops[engine_type] = _synth_engine_loop()
+		st = _loops[engine_type]
+	var was := _engine_player.playing
+	_engine_player.stream = st
+	if was:
+		_engine_player.play()
 
 
-func _fill(silent_engine: bool) -> void:
-	if _pb == null:
-		return
-	var frames := _pb.get_frames_available()
-	if frames <= 0:
-		return
-	var fire_freq := rpm / 60.0 * maxf(1.0, cylinders) / 2.0
+## Бесшовная петля мотора на оборотах REF_RPM: число вспышек и периодов тона в петле целое.
+func _synth_engine_loop() -> AudioStreamWAV:
+	var length := 1.0
+	var n := int(MIX_RATE * length)
+	var cyl := maxi(1, cylinders)
+	var fire_freq := REF_RPM / 60.0 * cyl / 2.0
 	if engine_type == "rotary":
-		fire_freq = rpm / 60.0 * 2.0
-	var body_freq := (70.0 + rpm / 45.0) * pitch
-	var decay := 30.0 + rpm / 60.0
-	var target_vol := 0.0 if (silent_engine or not engine_on) else 0.55
-	var whistle_freq := 1800.0 + rpm * 0.35
-	var dt := 1.0 / MIX_RATE
+		fire_freq = REF_RPM / 60.0 * 2.0
+	fire_freq = maxf(1.0, roundf(fire_freq * length)) / length
+	var body_freq: float = roundf((70.0 + REF_RPM / 45.0) * pitch * length) / length
+	var decay := 30.0 + REF_RPM / 60.0
 	var noise_amt := 0.9 if diesel else 0.55
-	for i in frames:
-		_vol += (target_vol - _vol) * 0.0005
-		_phase += fire_freq * dt
-		if _phase >= 1.0:
-			_phase -= 1.0
-			_t_since = 0.0
-			_amp = randf_range(0.75, 1.0)
-		_t_since += dt
-		_body = fmod(_body + body_freq * dt, 1.0)
-		var env := exp(-_t_since * decay) * _amp
-		var n := randf() * 2.0 - 1.0
-		var s := env * (noise_amt * n + 0.8 * sin(TAU * _body))
-		s += 0.18 * sin(TAU * _phase) # низкий гул
-		s *= _vol
-		if turbo_level > 0.01:
-			_whistle = fmod(_whistle + whistle_freq * dt, 1.0)
-			s += turbo_level * 0.06 * sin(TAU * _whistle)
-		if _pop_left > 0:
-			_pop_left -= 1
-			s += (randf() * 2.0 - 1.0) * 0.6 * (_pop_left / (MIX_RATE * 0.05))
-		_lp += (s - _lp) * 0.35
-		var v := clampf(_lp, -1.0, 1.0)
-		_pb.push_frame(Vector2(v, v))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(engine_type)
+	var buf := PackedFloat32Array()
+	buf.resize(n)
+	var amps := []
+	var fires := int(roundf(fire_freq * length))
+	for k in fires:
+		amps.append(rng.randf_range(0.75, 1.0))
+	var lp := 0.0
+	# два прохода, чтобы фильтр «прогрелся» и стык петли был гладким
+	for pass_i in 2:
+		for i in n:
+			var t := float(i) / MIX_RATE
+			var ph := t * fire_freq
+			var k := int(floor(ph)) % fires
+			var since: float = (ph - floorf(ph)) / fire_freq
+			var env := exp(-since * decay) * float(amps[k])
+			var s := env * (noise_amt * (rng.randf() * 2.0 - 1.0) + 0.8 * sin(TAU * body_freq * t))
+			s += 0.18 * sin(TAU * fire_freq * t)
+			lp += (s - lp) * 0.35
+			if pass_i == 1:
+				buf[i] = clampf(lp * 0.9, -1.0, 1.0)
+	var w := _to_wav(buf)
+	w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	w.loop_begin = 0
+	w.loop_end = n
+	return w
+
+
+func _synth_whistle() -> AudioStreamWAV:
+	var n := int(MIX_RATE * 0.5)
+	var buf := PackedFloat32Array()
+	buf.resize(n)
+	var f := 2000.0  # 1000 периодов за 0.5 с — стык бесшовный
+	for i in n:
+		var t := float(i) / MIX_RATE
+		buf[i] = 0.25 * sin(TAU * f * t) + 0.05 * sin(TAU * f * 2.0 * t)
+	var w := _to_wav(buf)
+	w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	w.loop_end = n
+	return w
 
 
 # ---------------------------------------------------------------------
@@ -214,6 +245,8 @@ func _load_or_synth(sound_name: String) -> AudioStream:
 			buf = _synth_rumble(1.1)
 		"rebirth":
 			buf = _synth_sweep(200.0, 1600.0, 1.2, 0.4)
+		"pop":
+			buf = _synth_pop()
 	return _to_wav(buf)
 
 
@@ -318,4 +351,16 @@ func _synth_rumble(length: float) -> PackedFloat32Array:
 		lp += ((randf() * 2.0 - 1.0) - lp) * 0.03
 		var env := minf(1.0, t * 8.0) * minf(1.0, (length - t) * 3.0)
 		buf[i] = env * (lp * 2.5 + 0.15 * sin(TAU * 55.0 * t))
+	return buf
+
+
+func _synth_pop() -> PackedFloat32Array:
+	var n := int(0.09 * MIX_RATE)
+	var buf := PackedFloat32Array()
+	buf.resize(n)
+	var lp := 0.0
+	for i in n:
+		var t := float(i) / MIX_RATE
+		lp += ((randf() * 2.0 - 1.0) - lp) * 0.5
+		buf[i] = lp * 0.9 * exp(-t * 45.0) + 0.4 * sin(TAU * 90.0 * t) * exp(-t * 30.0)
 	return buf

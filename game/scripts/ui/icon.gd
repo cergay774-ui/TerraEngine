@@ -33,6 +33,17 @@ func _draw() -> void:
 	if D.CURRENCIES.has(kind):
 		col = D.CURRENCIES[kind].color
 	var r := s * 0.42
+	if kind.begins_with("part_"):
+		# заглушка детали: шестерёнка с поршнем, пока нет своей иконки
+		draw_circle(c, r, Color("1b1d22"))
+		draw_arc(c, r, 0, TAU, 32, Color("ffc21a"), 2.5)
+		for k in 8:
+			var a := TAU * k / 8.0
+			draw_line(c + Vector2(cos(a), sin(a)) * r * 0.55, c + Vector2(cos(a), sin(a)) * r * 0.82, Color("8d939b"), r * 0.18)
+		draw_circle(c, r * 0.55, Color("8d939b"))
+		draw_rect(Rect2(c + Vector2(-r * 0.28, -r * 0.42), Vector2(r * 0.56, r * 0.5)), Color("d4d9df"))
+		draw_line(c + Vector2(0, 0.05 * r), c + Vector2(r * 0.15, r * 0.42), Color("d4d9df"), r * 0.14)
+		return
 	match kind:
 		"cash":
 			draw_circle(c, r, col.darkened(0.3))

@@ -3,6 +3,9 @@ extends PanelContainer
 ## силуэтом с замком и условием открытия. Новая запчасть сразу меняется на моторе.
 
 var main: Control
+var only_slot: String = ""     # режим гаража: показываем одну деталь
+var _title: Label
+var _engine_row: HBoxContainer
 var _list: VBoxContainer
 var _engines: HFlowContainer
 var _buy_tiles: Array = []
@@ -14,15 +17,16 @@ func _ready() -> void:
 	add_child(v)
 	var head := HBoxContainer.new()
 	v.add_child(head)
-	var t := UI.label("Запчасти", 30, UI.ACCENT)
-	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(t)
+	_title = UI.label("Запчасти", 30, UI.ACCENT)
+	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(_title)
 	var x := UI.button("×", 28, UI.PANEL_2, 48)
 	x.custom_minimum_size.x = 56
 	x.pressed.connect(func(): main.close_panel())
 	head.add_child(x)
 
 	var eh := HBoxContainer.new()
+	_engine_row = eh
 	v.add_child(eh)
 	eh.add_child(UI.label("Мотор:", 18, UI.MUTED))
 	_engines = HFlowContainer.new()
@@ -42,11 +46,16 @@ func _ready() -> void:
 
 
 func refresh() -> void:
-	_build_engines()
+	_engine_row.visible = only_slot == ""
+	_title.text = "Запчасти" if only_slot == "" else D.slot(only_slot).name
+	if only_slot == "":
+		_build_engines()
 	UI.clear(_list)
 	_buy_tiles.clear()
 	for s in D.SLOTS:
 		if not G.slot_visible(s.id):
+			continue
+		if only_slot != "" and s.id != only_slot:
 			continue
 		_list.add_child(_slot_card(s))
 	_list.add_child(UI.wrap_label("Марки бесконечны: каждая следующая даёт x3 к бонусу и стоит примерно в 10 раз дороже. Марки VI–X — за золото, XI–XV — за алмазы, дальше — за изумруды. Редкость (только из кейсов) множит бонус марки.", 15, UI.MUTED))
