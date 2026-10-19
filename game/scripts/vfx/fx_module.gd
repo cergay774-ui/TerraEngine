@@ -61,6 +61,11 @@ func pq() -> int:
 	return view.fx_particles()
 
 
+## Запасной режим OpenGL: часть эффектов (чтение экрана, следы частиц) там упрощаем.
+func compat() -> bool:
+	return RenderingServer.get_current_rendering_method() == "gl_compatibility"
+
+
 ## Мягкая круглая точка для частиц.
 static func soft_dot() -> Texture2D:
 	return GarageScene._soft_dot()
