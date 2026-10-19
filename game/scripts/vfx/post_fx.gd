@@ -175,7 +175,7 @@ func setup() -> void:
 
 func _grade() -> Vector4:
 	# контраст, насыщенность, виньетка, сплит-тон
-	return Vector4(0.32, 1.12, 0.42, 0.6)
+	return Vector4(0.5, 1.12, 0.55, 0.75)
 
 
 static func _shader_for(quality: int) -> Shader:
