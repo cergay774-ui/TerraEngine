@@ -162,3 +162,32 @@ static func price_text(cur_id: String, amount: Big) -> String:
 	if cur_id == "cash":
 		return "$" + G.fmt(amount)
 	return "%s %s" % [G.fmt(amount), name.to_lower()]
+
+
+# ---------------------------------------------------------------------
+# Круги без многоугольников. draw_circle/draw_arc/draw_polygon на каждой перерисовке
+# создают и удаляют буферы видеопамяти; если элемент обновляется каждый кадр, на
+# телефоне это десятки буферов в кадр. Кружок из готовой текстуры рисуется как
+# обычный прямоугольник и не создаёт ничего.
+# ---------------------------------------------------------------------
+
+static var _disc: ImageTexture
+
+
+static func disc_tex() -> ImageTexture:
+	if _disc == null:
+		var n := 128
+		var img := Image.create(n, n, false, Image.FORMAT_LA8)
+		var c := (n - 1) * 0.5
+		var r := n * 0.5 - 1.0
+		for y in n:
+			for x in n:
+				var d := Vector2(x - c, y - c).length()
+				img.set_pixel(x, y, Color(1, 1, 1, clampf(r - d + 0.5, 0.0, 1.0)))
+		img.generate_mipmaps()
+		_disc = ImageTexture.create_from_image(img)
+	return _disc
+
+
+static func draw_disc(ci: CanvasItem, center: Vector2, radius: float, color: Color) -> void:
+	ci.draw_texture_rect(disc_tex(), Rect2(center - Vector2(radius, radius), Vector2(radius, radius) * 2.0), false, color)

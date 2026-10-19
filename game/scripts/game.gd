@@ -52,8 +52,8 @@ var settings: Dictionary = {
 const PRESETS := [
 	{"shadows": 0, "msaa": 0, "glow": false, "particles": 0, "res_scale": 0.6, "fps3d": 0, "garage": true},
 	{"shadows": 1, "msaa": 0, "glow": false, "particles": 1, "res_scale": 0.75, "fps3d": 0, "garage": true},
-	{"shadows": 1, "msaa": 2, "glow": true, "particles": 2, "res_scale": 0.9, "fps3d": 1, "garage": true},
-	{"shadows": 2, "msaa": 4, "glow": true, "particles": 2, "res_scale": 1.0, "fps3d": 1, "garage": true},
+	{"shadows": 1, "msaa": 0, "glow": true, "particles": 2, "res_scale": 1.0, "fps3d": 1, "garage": true},
+	{"shadows": 2, "msaa": 0, "glow": true, "particles": 2, "res_scale": 1.0, "fps3d": 1, "garage": true},
 ]
 var last_time: float = 0.0
 var stall_downgraded: bool = false   # графику снизили из-за зависания в прошлый раз
@@ -73,6 +73,7 @@ var offline_report: Big = null
 var offline_seconds: float = 0.0
 var _paused_at: float = 0.0
 var _load_failed: bool = false
+var _from_dict_ok: bool = false      # from_dict дошла до конца (ошибка в данных прерывает её на полпути)
 
 var _roll_acc: float = 0.0
 var _save_acc: float = 0.0
@@ -1291,6 +1292,7 @@ static func valid_save(d) -> bool:
 
 
 func from_dict(d: Dictionary) -> void:
+	_from_dict_ok = false
 	_reset_all()
 	var c := _dict(d.get("cur"))
 	for id in c:
@@ -1298,7 +1300,7 @@ func from_dict(d: Dictionary) -> void:
 			cur[id] = _big(c[id])
 	var uc := _dict(d.get("unlocked_cur"))
 	for id in uc:
-		if uc[id] == true:
+		if uc[id] is bool and uc[id]:
 			unlocked_cur[id] = true
 	var u := _dict(d.get("upg"))
 	for id in u:
@@ -1347,7 +1349,8 @@ func from_dict(d: Dictionary) -> void:
 	if dl.get("day") is String and dl.get("tasks") is Array:
 		daily = dl
 	engine_choice = str(d.get("engine", ""))
-	guaranteed_turbo = d.get("guaranteed_turbo", false) == true
+	var gt = d.get("guaranteed_turbo", false)
+	guaranteed_turbo = gt is bool and gt
 	var s := _dict(d.get("settings"))
 	for k in s:
 		if settings.has(k) and typeof(s[k]) in [TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING]:
@@ -1360,6 +1363,9 @@ func from_dict(d: Dictionary) -> void:
 			settings[k] = PRESETS[q][k]
 	for k in ["quality", "fps", "shadows", "msaa", "particles", "fps3d"]:
 		settings[k] = int(_num(settings[k]))
+	# MSAA в упрощённом рендере на Android идёт отдельным путём, на который есть жалобы
+	# на утечку памяти, — выключаем у всех, вместо него на высоких пресетах полное разрешение
+	settings.msaa = 0
 	for k in ["sfx", "music", "res_scale", "cam_zoom"]:
 		settings[k] = _num(settings[k], 1.0)
 	last_time = _num(d.get("last_time"))
@@ -1369,6 +1375,7 @@ func from_dict(d: Dictionary) -> void:
 	recalc()
 	stamina = d_stamina_max
 	_compute_offline()
+	_from_dict_ok = true
 
 
 func _compute_offline() -> void:
@@ -1427,13 +1434,17 @@ func load_game() -> void:
 	if data == null:
 		data = _read_save(SAVE_PATH + ".bak")
 	if data == null and FileAccess.file_exists(SAVE_PATH):
-		# файл есть, но битый и копии нет — откладываем его в сторону, чтобы не затереть
+		# файл есть, но битый и копии нет — откладываем его в сторону (copy понимает только
+		# полные пути); если отложить не вышло, не сохраняем поверх него
 		var dir := DirAccess.open("user://")
+		var err := FAILED
 		if dir != null:
-			dir.copy("save.json", "save.corrupt.json")
-		_load_failed = false
+			err = dir.copy(SAVE_PATH, "user://save.corrupt.%d.json" % int(Time.get_unix_time_from_system()))
+		_load_failed = err != OK
 	if data is Dictionary:
 		from_dict(data)
+		if not _from_dict_ok:
+			_load_failed = true  # загрузилось не всё — не затираем файл автосохранением
 
 
 func export_save() -> String:
@@ -1452,7 +1463,11 @@ func import_save(text: String) -> bool:
 	var keep := {}
 	for k in ["quality", "shadows", "msaa", "glow", "particles", "res_scale", "fps3d", "fps", "garage"]:
 		keep[k] = settings[k]
+	var backup := to_dict()
 	from_dict(data)
+	if not _from_dict_ok:
+		from_dict(backup)  # данные оказались кривыми — возвращаем как было
+		return false
 	for k in keep:
 		settings[k] = keep[k]
 	apply_settings()

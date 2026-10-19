@@ -28,6 +28,7 @@ var _stall_logged: bool = false
 var _thread: Thread
 var _running: bool = true
 var _suspended: bool = false      # приложение свёрнуто — цикл стоит законно
+var _armed: bool = false          # до входа в игру не следим: первая компиляция шейдеров на загрузке — не зависание
 
 ## Прошлый запуск зависал (в его журнале есть STALL) — игра сама снизит графику.
 var prev_stalled: bool = false
@@ -87,6 +88,15 @@ func _set_phase(p: String) -> void:
 	_phase = p
 	_beat_us = Time.get_ticks_usec()
 	_mutex.unlock()
+
+
+## Начать следить за зависаниями (вызывается, когда игра загрузилась).
+func arm() -> void:
+	_mutex.lock()
+	_armed = true
+	_beat_us = Time.get_ticks_usec()
+	_mutex.unlock()
+	event("сторож включён")
 
 
 ## Отметить событие (уровень, сборка мотора, открытие меню…).
@@ -163,8 +173,9 @@ func _watchdog() -> void:
 		var ev := _last_event
 		var logged := _stall_logged
 		var suspended := _suspended
+		var armed := _armed
 		_mutex.unlock()
-		if since > 3.0 and not logged and not suspended:
+		if since > 3.0 and not logged and not suspended and armed:
 			_mutex.lock()
 			_stall_logged = true
 			_mutex.unlock()

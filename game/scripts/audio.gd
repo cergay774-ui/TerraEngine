@@ -154,7 +154,8 @@ func _process(delta: float) -> void:
 		var ratio := clampf((rpm - idle_rpm) / maxf(max_rpm - idle_rpm, 1.0), -0.3, 1.1)
 		var ps: float
 		if _uses_file:
-			ps = clampf(pitch * (0.85 + 1.2 * ratio), 0.5, 2.3)
+			# верх ниже потолка 2.3 — тон растёт до самой отсечки и на турбо у любого мотора
+			ps = clampf(lerpf(pitch * 0.85, minf(pitch * 2.05, 2.1), ratio), 0.5, 2.3)
 		else:
 			ps = clampf(rpm / REF_RPM, 0.3, 4.0)
 		ratio = clampf(ratio, 0.0, 1.0)

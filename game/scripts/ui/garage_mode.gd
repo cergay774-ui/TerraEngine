@@ -22,6 +22,7 @@ func _ready() -> void:
 	_lines = Control.new()
 	_lines.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_lines.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_lines.draw.connect(_draw_lines)
 	add_child(_lines)
 	G.changed.connect(_refresh_cards)
@@ -212,16 +213,24 @@ func _draw_lines() -> void:
 		else:
 			end_p = elbow.lerp(p, (want - l1) / maxf(l2, 0.001))
 			pts = PackedVector2Array([start, elbow, end_p])
+		# отрезки и кружки-текстуры: линии перерисовываются каждый кадр, а ломаные и круги
+		# создавали бы на каждой перерисовке новые буферы видеопамяти
+		_seg_line(pts, Color(0, 0, 0, 0.6), 5.0)
+		_seg_line(pts, col, 2.5)
 		if k < 0.999:
-			_lines.draw_polyline(pts, Color(0, 0, 0, 0.6), 5.0, true)
-			_lines.draw_polyline(pts, col, 2.5, true)
-			_lines.draw_circle(end_p, 4.0, Color.WHITE)
+			UI.draw_disc(_lines, end_p, 4.0, Color.WHITE)
 			continue
-		_lines.draw_polyline(pts, Color(0, 0, 0, 0.6), 5.0, true)
-		_lines.draw_polyline(pts, col, 2.5, true)
 		var pulse := 0.5 + 0.5 * sin(_time * 4.0 + p.x * 0.05)
-		_lines.draw_circle(p, 9.0 + pulse * 4.0, Color(col.r, col.g, col.b, 0.25))
-		_lines.draw_circle(p, 6.0, col)
-		_lines.draw_circle(p, 2.5, Color.WHITE)
+		UI.draw_disc(_lines, p, 9.0 + pulse * 4.0, Color(col.r, col.g, col.b, 0.25))
+		UI.draw_disc(_lines, p, 6.0, col)
+		UI.draw_disc(_lines, p, 2.5, Color.WHITE)
 		if b.get_meta("upgrade", false):
-			_lines.draw_circle(b.position + Vector2(CARD_W - 12, 12), 7.0 + pulse * 2.0, Color("8fe36b"))
+			UI.draw_disc(_lines, b.position + Vector2(CARD_W - 12, 12), 7.0 + pulse * 2.0, Color("8fe36b"))
+
+
+func _seg_line(pts: PackedVector2Array, col: Color, w: float) -> void:
+	for i in pts.size() - 1:
+		_lines.draw_line(pts[i], pts[i + 1], col, w, true)
+	# скруглённый стык на изломе
+	for i in range(1, pts.size() - 1):
+		UI.draw_disc(_lines, pts[i], w * 0.5, col)

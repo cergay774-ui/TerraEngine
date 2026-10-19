@@ -74,7 +74,6 @@ func _build_graphics() -> void:
 	_hint("Пресет выставляет все пункты ниже. Их можно поменять по одному.")
 	_section("Детали")
 	_choice("Тени", ["Выкл", "Чёткие", "Мягкие"], int(G.settings.shadows), func(i): _put("shadows", i))
-	_choice("Сглаживание", ["Выкл", "2x", "4x"], [0, 2, 4].find(int(G.settings.msaa)), func(i): _put("msaa", [0, 2, 4][i]))
 	_choice("Частицы", ["Мало", "Средне", "Много"], int(G.settings.particles), func(i): _put("particles", i))
 	_choice("Разрешение 3D", ["60%", "75%", "90%", "100%"], _res_index(), func(i): _put("res_scale", [0.6, 0.75, 0.9, 1.0][i]))
 	_toggle("Свечение (bloom)", G.settings.glow, func(on): _put("glow", on))

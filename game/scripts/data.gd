@@ -59,7 +59,7 @@ const SLOTS := [
 		"unlock": {"upg": "press", "lvl": 75}},
 	{"id": "exhaust", "name": "Выхлоп", "bonus": "Пассивный доход", "base": 0.4,
 		"unlock": {"cash": 2.0e5}},
-	{"id": "turbine", "name": "Турбина", "bonus": "Сила турбо-бонуса (x2 → x2.5 → x3…)", "base": 0.5,
+	{"id": "turbine", "name": "Турбина", "bonus": "Сила турбо-бонуса", "base": 0.5,
 		"unlock": {"level": 21, "cash": 1.0e6}},
 	{"id": "flywheel", "name": "Маховик", "bonus": "Шанс и сила критического газа", "base": 0.5,
 		"unlock": {"gold": 5.0}},

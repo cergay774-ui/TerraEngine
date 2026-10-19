@@ -12,6 +12,13 @@ var _shown: float = 0.0
 var _last_level: int = -1
 var _pulse: float = 0.0
 var _time: float = 0.0
+var _drawn_key: String = ""
+
+static var _shine: ImageTexture
+
+
+func _ready() -> void:
+	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 
 
 func _process(delta: float) -> void:
@@ -24,7 +31,32 @@ func _process(delta: float) -> void:
 	_shown = lerpf(_shown, progress, 1.0 - exp(-delta * 6.0))
 	if progress < _shown - 0.5:
 		_shown = progress
-	queue_redraw()
+	# перерисовка только когда картинка правда меняется (полоса едет, пульс, блик, цифры)
+	var sweep := _sweep()
+	var key := "%d|%d|%.3f|%.3f|%.3f" % [level, int(progress * 100.0), _shown, _pulse, sweep if sweep > 0.0 and sweep < _shown else -1.0]
+	if key != _drawn_key:
+		_drawn_key = key
+		queue_redraw()
+
+
+func _sweep() -> float:
+	return fmod(_time * 0.35, 1.4) - 0.2
+
+
+## Косой блик (параллелограмм) — текстурой, чтобы не строить многоугольник каждый кадр.
+static func _shine_tex() -> ImageTexture:
+	if _shine == null:
+		var w := 40
+		var h := 64
+		var img := Image.create(w, h, false, Image.FORMAT_LA8)
+		for y in h:
+			var v := float(y) / (h - 1)
+			var left := 0.5 * (1.0 - v) * w
+			for x in w:
+				var a := clampf(minf(x + 0.5 - left, left + w * 0.5 - (x + 0.5)) + 0.5, 0.0, 1.0)
+				img.set_pixel(x, y, Color(1, 1, 1, a))
+		_shine = ImageTexture.create_from_image(img)
+	return _shine
 
 
 func _draw() -> void:
@@ -42,19 +74,19 @@ func _draw() -> void:
 		var fs := FILL.get_size()
 		draw_texture_rect_region(FILL, Rect2(fr.position, Vector2(fr.size.x * p, fr.size.y)), Rect2(0, 0, fs.x * p, fs.y))
 		# блик пробегает по заполненной части раз в несколько секунд
-		var sweep := fmod(_time * 0.35, 1.4) - 0.2
+		var sweep := _sweep()
 		if sweep > 0.0 and sweep < p:
 			var sx := fr.position.x + fr.size.x * sweep
-			draw_colored_polygon(PackedVector2Array([Vector2(sx - 6, fr.end.y - 4), Vector2(sx + 4, fr.end.y - 4), Vector2(sx + 14, fr.position.y + 4), Vector2(sx + 4, fr.position.y + 4)]), Color(1, 1, 1, 0.35))
+			draw_texture_rect(_shine_tex(), Rect2(sx - 6, fr.position.y + 4, 20, fr.size.y - 8), false, Color(1, 1, 1, 0.35))
 	# номер уровня на аватаре
 	var font := ThemeDB.fallback_font
 	var c := origin + Vector2(152, 286) * k
 	var r := 44.0 * k * (1.0 + 0.35 * sin(_pulse * PI) * _pulse)
 	if _pulse > 0.0:
-		draw_circle(c, r * (1.0 + (1.0 - _pulse) * 1.2), Color(1.0, 0.8, 0.2, 0.5 * _pulse))
-	draw_circle(c, r + 3.0, Color("1b1d22"))
-	draw_circle(c, r, Color("ffc21a"))
-	draw_circle(c, r - 4.0, Color("23262e"))
+		UI.draw_disc(self, c, r * (1.0 + (1.0 - _pulse) * 1.2), Color(1.0, 0.8, 0.2, 0.5 * _pulse))
+	UI.draw_disc(self, c, r + 3.0, Color("1b1d22"))
+	UI.draw_disc(self, c, r, Color("ffc21a"))
+	UI.draw_disc(self, c, r - 4.0, Color("23262e"))
 	var txt := str(level)
 	var fsz := int(40.0 * k) if txt.length() < 3 else int(30.0 * k)
 	var w := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_CENTER, -1, fsz).x

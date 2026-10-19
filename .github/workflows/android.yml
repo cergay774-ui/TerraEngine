@@ -11,21 +11,46 @@ on:
   workflow_dispatch:
 
 env:
-  GODOT_VERSION: "4.3"
+  GODOT_VERSION: "4.7.2"
   PROJECT_PATH: game
   HAS_RELEASE_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
 
 jobs:
-  android:
-    name: Сборка APK
+  # Все прежние сборки подписаны ключом из образа godot-ci:4.3. Новая сборка подписывается
+  # тем же ключом — тогда она ставится поверх старой и сохранения игрока остаются.
+  signing-key:
+    name: Ключ подписи
     runs-on: ubuntu-22.04
     container:
       image: barichello/godot-ci:4.3
     steps:
+      - name: Достать ключ из образа 4.3
+        run: |
+          mkdir -p key
+          cp /root/debug.keystore key/debug.keystore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signing-key
+          path: key/debug.keystore
+          retention-days: 1
+
+  android:
+    name: Сборка APK
+    needs: signing-key
+    runs-on: ubuntu-22.04
+    container:
+      image: barichello/godot-ci:4.7.2
+    steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Настройка Godot (шаблоны экспорта, Android SDK, debug-ключ)
+      - name: Ключ подписи
+        uses: actions/download-artifact@v4
+        with:
+          name: signing-key
+          path: /tmp/key
+
+      - name: Настройка Godot (шаблоны экспорта, Android SDK)
         run: |
           mkdir -v -p ~/.local/share/godot/export_templates/ ~/.config/
           if [ "$HOME" != "/root" ]; then
@@ -41,32 +66,28 @@ jobs:
           godot --headless --path . --quit-after 5 2>&1 | tee ../run.log
           if grep -q "SCRIPT ERROR" ../run.log; then echo "Ошибки в скриптах"; exit 1; fi
 
-      - name: Сборка debug APK
+      - name: Сборка release APK
         env:
-          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /root/debug.keystore
-          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
-          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          RELEASE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          RELEASE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           mkdir -v -p build
           EXPORT_DIR="$(readlink -f build)"
+          if [ "$HAS_RELEASE_KEY" = "true" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > /tmp/release.keystore
+            export GODOT_ANDROID_KEYSTORE_RELEASE_PATH=/tmp/release.keystore
+            export GODOT_ANDROID_KEYSTORE_RELEASE_USER="$RELEASE_ALIAS"
+            export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD="$RELEASE_PASSWORD"
+          else
+            export GODOT_ANDROID_KEYSTORE_RELEASE_PATH=/tmp/key/debug.keystore
+            export GODOT_ANDROID_KEYSTORE_RELEASE_USER=androiddebugkey
+            export GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=android
+          fi
           cd $PROJECT_PATH
-          godot --headless --verbose --export-debug "Android" "$EXPORT_DIR/motor-garage-debug.apk" 2>&1 | tail -n 80
-          test -f "$EXPORT_DIR/motor-garage-debug.apk"
+          godot --headless --verbose --export-release "Android" "$EXPORT_DIR/motor-garage.apk" 2>&1 | tail -n 80
+          test -f "$EXPORT_DIR/motor-garage.apk"
           ls -la "$EXPORT_DIR"
-
-      - name: Сборка release APK (если в секретах есть ключ)
-        env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
-          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-        if: env.HAS_RELEASE_KEY == 'true'
-        run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > /tmp/release.keystore
-          export GODOT_ANDROID_KEYSTORE_RELEASE_PATH=/tmp/release.keystore
-          EXPORT_DIR="$(readlink -f build)"
-          cd $PROJECT_PATH
-          godot --headless --export-release "Android" "$EXPORT_DIR/motor-garage-release.apk" 2>&1 | tail -n 40
-          test -f "$EXPORT_DIR/motor-garage-release.apk"
 
       - name: Загрузить APK
         uses: actions/upload-artifact@v4

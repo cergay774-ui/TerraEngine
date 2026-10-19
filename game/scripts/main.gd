@@ -110,6 +110,8 @@ func _ready() -> void:
 	_refresh_all()
 	if G.offline_report != null:
 		call_deferred("_show_offline")
+	# сторож зависаний — после того как игра загрузилась и шейдеры первого кадра собраны
+	get_tree().create_timer(4.0).timeout.connect(Diag.arm)
 	if G.stall_downgraded:
 		G.stall_downgraded = false
 		get_tree().create_timer(1.5).timeout.connect(func():
@@ -283,12 +285,13 @@ func _build_bottom_bar() -> void:
 		dot.size = Vector2(26, 26)
 		dot.position = Vector2(b.custom_minimum_size.x - 30, 4)
 		dot.visible = false
+		dot.pivot_offset = Vector2(13, 13)
+		dot.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		# рисуется один раз; «дыхание» — масштабом в _process, без перерисовки
 		dot.draw.connect(func():
-			var t := Time.get_ticks_msec() / 1000.0
-			var r := 9.0 + 1.5 * sin(t * 6.0)
-			dot.draw_circle(Vector2(13, 13), r + 3.0, Color(0, 0, 0, 0.6))
-			dot.draw_circle(Vector2(13, 13), r, Color("8fe36b"))
-			dot.draw_circle(Vector2(11, 11), r * 0.35, Color(1, 1, 1, 0.7)))
+			UI.draw_disc(dot, Vector2(13, 13), 12.0, Color(0, 0, 0, 0.6))
+			UI.draw_disc(dot, Vector2(13, 13), 9.0, Color("8fe36b"))
+			UI.draw_disc(dot, Vector2(11, 11), 3.2, Color(1, 1, 1, 0.7)))
 		b.add_child(dot)
 		_badges[id] = {"button": b, "dot": dot}
 
@@ -409,6 +412,7 @@ func open_panel(p: Control, side: String) -> void:
 
 func _kill_panel_tween() -> void:
 	if _panel_tween != null and _panel_tween.is_valid():
+		_panel_tween.custom_step(10.0)  # довести прежнюю анимацию до конца (полоса мотора, скрытие панели)
 		_panel_tween.kill()
 	_panel_tween = null
 
@@ -574,10 +578,15 @@ func _process(delta: float) -> void:
 	if _badge_acc >= 0.5:
 		_badge_acc = 0.0
 		_update_badges()
+	var breathe := 1.0 + 0.15 * sin(Time.get_ticks_msec() / 1000.0 * 6.0)
 	for id in _badges:
 		var dot: Control = _badges[id].dot
-		if dot.visible:
-			dot.queue_redraw()
+		if dot.visible and not _badge_tweening(dot):
+			dot.scale = Vector2(breathe, breathe)
+
+
+func _badge_tweening(dot: Control) -> bool:
+	return Time.get_ticks_msec() < int(dot.get_meta("pop_until", 0))
 
 
 ## Если телефон не тянет (FPS долго ниже 22), графика сама снижается на ступень.
@@ -633,6 +642,7 @@ func _update_badges() -> void:
 		if on and not dot.visible:
 			dot.scale = Vector2(0.2, 0.2)
 			dot.pivot_offset = dot.size * 0.5
+			dot.set_meta("pop_until", Time.get_ticks_msec() + 360)
 			dot.create_tween().tween_property(dot, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		dot.visible = on
 

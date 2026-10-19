@@ -38,6 +38,10 @@ var _root: Node3D
 var _engine: Node3D
 var _garage: Dictionary = {}
 var _hud: Control
+var _hud_flash_drawn: float = 0.0
+var _ring: ColorRect
+var _ring_mat: ShaderMaterial
+var _ring_sent := Vector3(-1, -1, -1)   # прогресс, режим, видимость — что уже отправлено шейдеру
 var _flash_light: OmniLight3D
 var _turbo_light: OmniLight3D
 var _turbo_pos: Vector3 = Vector3.ZERO
@@ -68,6 +72,7 @@ var _tail_pos: Vector3 = Vector3.ZERO
 var _pop_glow: float = 0.0
 var _lift: float = 0.0
 var _frame_i: int = 0
+var _xray_warmers: Array = []
 var _warm_frames: int = 0   # первые кадры после сборки: все эффекты включены — шейдеры компилируются сразу, а не посреди игры
 var _anchors: Dictionary = {}     # слот запчасти -> точка на моторе (локально в _engine)
 
@@ -93,6 +98,7 @@ func _ready() -> void:
 	_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hud.draw.connect(_draw_hud)
 	add_child(_hud)
+	_make_turbo_ring()
 	resized.connect(_apply_graphics)
 	G.settings_changed.connect(_on_settings)
 	_setup_world()
@@ -244,8 +250,7 @@ func _apply_graphics() -> void:
 	var sc := clampf(float(G.settings.get("res_scale", 1.0)), 0.4, 1.0)
 	_vp.size = Vector2i(maxi(16, int(size.x * sc)), maxi(16, int(size.y * sc)))
 	_vp.positional_shadow_atlas_size = 2048 if _q() >= 2 else 1024
-	var ms := int(G.settings.get("msaa", 2))
-	_vp.msaa_3d = Viewport.MSAA_4X if ms >= 4 else (Viewport.MSAA_2X if ms >= 2 else Viewport.MSAA_DISABLED)
+	_vp.msaa_3d = Viewport.MSAA_DISABLED  # см. game.gd: MSAA на Android не используем
 	if _env != null:
 		_env.glow_enabled = G.settings.get("glow", true)
 	_tex.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
@@ -482,6 +487,34 @@ func _rebuild_inner() -> void:
 	_apply_xray()
 	_update_tints()
 	_warm_frames = 3
+	_add_xray_warmers()
+
+
+## Рентген меняет прозрачность материалов, а это другие шейдеры. Чтобы первое нажатие
+## «Рентген» не подвешивало картинку на компиляцию, пока идёт прогрев, внутри мотора
+## рисуются крошечные кубики с материалами во втором состоянии.
+func _add_xray_warmers() -> void:
+	for w in _xray_warmers:
+		if is_instance_valid(w):
+			w.queue_free()
+	_xray_warmers.clear()
+	if demo:
+		return
+	var cube := BoxMesh.new()
+	cube.size = Vector3.ONE * 0.05
+	for key in ["block", "head", "cover", "coil"]:
+		var src: StandardMaterial3D = _mats[key]
+		var m: StandardMaterial3D = src.duplicate()
+		var xr := src.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED if xr else BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.albedo_color.a = 1.0 if xr else 0.22
+		var mi := MeshInstance3D.new()
+		mi.mesh = cube
+		mi.material_override = m
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		mi.position = _center
+		_root.add_child(mi)
+		_xray_warmers.append(mi)
 
 
 func _engine_aabb() -> AABB:
@@ -1101,7 +1134,11 @@ func _process(delta: float) -> void:
 		else:
 			Sfx.engine_load = (1.0 if throttle else 0.0) * (1.0 if not G.is_exhausted else 0.0)
 		Sfx.turbo_level = 0.0 if demo else (1.0 if G.turbo_time > 0.0 else (0.35 * ratio if _turbine_wheel != null else 0.0))
-	_hud.queue_redraw()
+	# белая вспышка — перерисовка только пока она есть; кольцо турбо — параметрами шейдера
+	if flash_white > 0.0 or _hud_flash_drawn > 0.0:
+		_hud_flash_drawn = flash_white
+		_hud.queue_redraw()
+	_update_turbo_ring()
 	_update_render_mode()
 
 
@@ -1280,6 +1317,11 @@ func _update_effects(delta: float, ratio: float, throttle: bool) -> void:
 		_turbo_light.position = _root.to_local(_engine.to_global(_turbo_pos))
 	if _warm_frames > 0:
 		_warm_frames -= 1
+		if _warm_frames == 0:
+			for w in _xray_warmers:
+				if is_instance_valid(w):
+					w.queue_free()
+			_xray_warmers.clear()
 		_tail_flame.visible = true
 		for cy in _cyls:
 			cy.flash.visible = true
@@ -1355,18 +1397,63 @@ func _ultra_color() -> Color:
 # 2D поверх: кружок турбо, белая вспышка
 # ---------------------------------------------------------------------
 
+const RING_SHADER := """
+shader_type canvas_item;
+render_mode blend_premul_alpha;
+uniform float progress = 1.0;
+uniform vec4 arc_col : source_color = vec4(0.5, 1.0, 0.5, 0.8);
+void fragment() {
+	vec2 p = (UV - 0.5) * 60.0;
+	float ring = clamp(3.5 - abs(length(p) - 22.0), 0.0, 1.0);
+	float a01 = fract(atan(p.x, -p.y) / 6.2831853 + 1.0);
+	float on = step(a01, progress) * ring;
+	vec4 col = vec4(vec3(0.15), 0.15) * ring;
+	float a = arc_col.a * on;
+	COLOR = vec4(arc_col.rgb * a + col.rgb * (1.0 - a), a + col.a * (1.0 - a));
+}
+"""
+
+static var _ring_shader: Shader
+
+
+## Кольцо турбо над мотором: шейдер на квадрате 60×60, каждый кадр меняются только параметры.
+func _make_turbo_ring() -> void:
+	if _ring_shader == null:
+		_ring_shader = Shader.new()
+		_ring_shader.code = RING_SHADER
+	_ring_mat = ShaderMaterial.new()
+	_ring_mat.shader = _ring_shader
+	_ring = ColorRect.new()
+	_ring.material = _ring_mat
+	_ring.size = Vector2(60, 60)
+	_ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ring.visible = false
+	add_child(_ring)
+
+
+func _update_turbo_ring() -> void:
+	var on := show_hud and not demo and not locked and G.d_turbo_on
+	if on != _ring.visible:
+		_ring.visible = on
+	if not on:
+		return
+	_ring.position = Vector2(size.x * (band.position.x + band.size.x * 0.5), size.y * band.position.y + 34.0) - Vector2(30, 30)
+	var prog := 1.0
+	var mode := 0.0
+	if G.turbo_time > 0.0:
+		prog = G.turbo_time / G.TURBO_TIME
+		mode = 1.0
+	elif G.turbo_cd > 0.0:
+		prog = 1.0 - G.turbo_cd / G.d_turbo_cd
+		mode = 2.0
+	prog = snappedf(clampf(prog, 0.0, 1.0), 0.004)
+	if mode != _ring_sent.y:
+		_ring_mat.set_shader_parameter("arc_col", [Color(0.5, 1.0, 0.5, 0.8), Color(0.35, 0.65, 1.0), Color(1.0, 0.55, 0.15)][int(mode)])
+	if prog != _ring_sent.x:
+		_ring_mat.set_shader_parameter("progress", prog)
+	_ring_sent = Vector3(prog, mode, 1.0)
+
+
 func _draw_hud() -> void:
-	if show_hud and not demo and G.d_turbo_on:
-		var c := Vector2(size.x * (band.position.x + band.size.x * 0.5), size.y * band.position.y + 34.0)
-		var rad := 22.0
-		_hud.draw_arc(c, rad, 0, TAU, 40, Color(1, 1, 1, 0.15), 6.0)
-		if G.turbo_time > 0.0:
-			var f := G.turbo_time / G.TURBO_TIME
-			_hud.draw_arc(c, rad, -PI * 0.5, -PI * 0.5 + TAU * f, 40, Color(0.35, 0.65, 1.0), 6.0)
-		elif G.turbo_cd > 0.0:
-			var f2 := 1.0 - G.turbo_cd / G.d_turbo_cd
-			_hud.draw_arc(c, rad, -PI * 0.5, -PI * 0.5 + TAU * f2, 40, Color(1.0, 0.55, 0.15), 6.0)
-		else:
-			_hud.draw_arc(c, rad, 0, TAU, 40, Color(0.5, 1.0, 0.5, 0.8), 6.0)
 	if flash_white > 0.0:
 		_hud.draw_rect(Rect2(Vector2.ZERO, size), Color(1, 1, 1, flash_white))
