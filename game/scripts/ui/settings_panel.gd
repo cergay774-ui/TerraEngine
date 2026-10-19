@@ -78,6 +78,12 @@ func _build_graphics() -> void:
 	_choice("Разрешение 3D", ["60%", "75%", "90%", "100%"], _res_index(), func(i): _put("res_scale", [0.6, 0.75, 0.9, 1.0][i]))
 	_toggle("Свечение (bloom)", G.settings.glow, func(on): _put("glow", on))
 	_toggle("Гараж вокруг мотора", G.settings.garage, func(on): _put("garage", on))
+	_section("Режим графики")
+	var pending := 1 if G.compat_renderer_pending() else 0
+	_choice("Отрисовка", ["Vulkan (красивее)", "OpenGL (совместимость)"], pending, func(i):
+		G.set_compat_renderer(i == 1)
+		main.show_toast("Применится после перезапуска игры", Color("ffc21a")))
+	_hint("Сейчас: %s. Если на вашем телефоне графика глючит или игра подвисает — выберите OpenGL и перезапустите игру." % ("OpenGL" if G.uses_compat_renderer() else "Vulkan"))
 	_section("Экран")
 	_choice("Кадры 3D", ["Через кадр", "Каждый кадр"], int(G.settings.fps3d), func(i): _put("fps3d", i))
 	_choice("Частота кадров", ["30", "60", "90", "120"], [30, 60, 90, 120].find(int(G.settings.fps)), func(i): _put("fps", [30, 60, 90, 120][i]))

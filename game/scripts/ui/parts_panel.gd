@@ -145,6 +145,7 @@ func _slot_card(s: Dictionary) -> Control:
 				Sfx.play("upgrade")
 				G.vibrate(20)
 				main._apply_engine()
+				main.engine_view.fx_event("upgrade", {"slot": sid2})
 				main.show_toast("%s Mk %s установлена" % [D.slot(sid2).name, D.roman(mk2)], UI.GOOD)
 				refresh())
 		row.add_child(bt)

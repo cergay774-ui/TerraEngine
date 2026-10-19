@@ -48,10 +48,10 @@ func _ready() -> void:
 		dir.rename("diag.log", "diag_prev.log")
 	_file = FileAccess.open(LOG_PATH, FileAccess.WRITE)
 	var dt := Time.get_datetime_dict_from_system()
-	_header = "=== сессия %04d-%02d-%02d %02d:%02d:%02d | %s | %s | %s | Godot %s" % [
+	_header = "=== сессия %04d-%02d-%02d %02d:%02d:%02d | %s | %s | %s | %s | Godot %s" % [
 		dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, OS.get_model_name(), OS.get_name(),
 		RenderingServer.get_video_adapter_name() + " / " + RenderingServer.get_video_adapter_vendor(),
-		Engine.get_version_info().string]
+		RenderingServer.get_current_rendering_method(), Engine.get_version_info().string]
 	_write(_header)
 	RenderingServer.frame_pre_draw.connect(func(): _set_phase("draw"))
 	RenderingServer.frame_post_draw.connect(func(): _set_phase("idle"))

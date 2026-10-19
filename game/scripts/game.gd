@@ -57,6 +57,9 @@ const PRESETS := [
 ]
 var last_time: float = 0.0
 var stall_downgraded: bool = false   # графику снизили из-за зависания в прошлый раз
+var stall_renderer_switched: bool = false
+
+const GRAPHICS_OVERRIDE := "user://graphics_override.cfg"
 
 # --- рантайм ---
 var holding: bool = false
@@ -117,6 +120,11 @@ func _ready() -> void:
 			settings[k] = PRESETS[0][k]
 		settings.quality = 0
 		Diag.event("прошлая сессия зависала — графика снижена до «Низкой»")
+	elif Diag.prev_stalled and not uses_compat_renderer():
+		# зависало и на «Низкой» в режиме Vulkan — со следующего запуска пробуем OpenGL
+		set_compat_renderer(true)
+		stall_renderer_switched = true
+		Diag.event("прошлая сессия зависала на «Низкой» — со следующего запуска OpenGL")
 	apply_settings()
 
 
@@ -1206,6 +1214,26 @@ func claim_daily(i: int) -> String:
 # =====================================================================
 # Настройки
 # =====================================================================
+
+## Режим отрисовки: Vulkan («mobile») красивее, OpenGL («gl_compatibility») — запасной.
+## Переключается файлом настроек пользователя и действует со следующего запуска.
+func uses_compat_renderer() -> bool:
+	return RenderingServer.get_current_rendering_method() == "gl_compatibility"
+
+
+func compat_renderer_pending() -> bool:
+	return FileAccess.file_exists(GRAPHICS_OVERRIDE)
+
+
+func set_compat_renderer(on: bool) -> void:
+	if on:
+		var f := FileAccess.open(GRAPHICS_OVERRIDE, FileAccess.WRITE)
+		if f != null:
+			f.store_string("[rendering]\n\nrenderer/rendering_method=\"gl_compatibility\"\nrenderer/rendering_method.mobile=\"gl_compatibility\"\n")
+			f.close()
+	elif FileAccess.file_exists(GRAPHICS_OVERRIDE):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(GRAPHICS_OVERRIDE))
+
 
 func apply_preset(q: int) -> void:
 	settings.quality = clampi(q, 0, 3)

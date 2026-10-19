@@ -12,6 +12,12 @@ const BORE := 1.12
 const HEAD := 1.15
 const SPACING := 2.9
 const ENGINE_SIZE := 7.0      # мотор любого типа приводится к одному размеру
+const FX_MODULES := [
+	preload("res://scripts/vfx/post_fx.gd"),
+	preload("res://scripts/vfx/exhaust_fx.gd"),
+	preload("res://scripts/vfx/sparks_fx.gd"),
+	preload("res://scripts/vfx/heat_fx.gd"),
+]
 
 var engine_type: String = "inline4"
 var material_index: int = 0
@@ -43,15 +49,12 @@ var _ring: ColorRect
 var _ring_mat: ShaderMaterial
 var _ring_sent := Vector3(-1, -1, -1)   # прогресс, режим, видимость — что уже отправлено шейдеру
 var _flash_light: OmniLight3D
-var _turbo_light: OmniLight3D
 var _turbo_pos: Vector3 = Vector3.ZERO
 var _has_turbo: bool = false
-var _tail_light: OmniLight3D
-var _smoke: CPUParticles3D
-var _flames: CPUParticles3D
-var _sparks: CPUParticles3D
-var _steam: CPUParticles3D
-var _tail_flame: MeshInstance3D
+var _fx: Array = []             # модули эффектов (scripts/vfx), см. FxModule
+var _limiter_t: float = 0.0
+var _was_turbo: bool = false
+var _was_exhausted: bool = false
 var _cyls: Array = []
 var _spinners: Array = []      # [{node, ratio}] — вращаются вместе с коленвалом
 var _rotors: Array = []
@@ -60,6 +63,7 @@ var _mats: Dictionary = {}
 var _built_key: String = ""
 var _gfx_key: String = ""
 var _center: Vector3 = Vector3.ZERO
+var _bounds: AABB = AABB()
 var _yaw: float = 0.0
 var _yaw_target: float = 0.0
 var _pressed: bool = false
@@ -69,7 +73,6 @@ var _turbine_deg: float = 0.0
 var _tint_acc: float = 1.0
 var _fov_kick: float = 0.0
 var _tail_pos: Vector3 = Vector3.ZERO
-var _pop_glow: float = 0.0
 var _lift: float = 0.0
 var _frame_i: int = 0
 var _xray_warmers: Array = []
@@ -185,52 +188,13 @@ func _setup_world() -> void:
 	_world.add_child(_root)
 
 	_flash_light = _omni(Color(1.0, 0.55, 0.15), 6.0)
-	_turbo_light = _omni(Color(0.3, 0.55, 1.0), 16.0)
-	_tail_light = _omni(Color(1.0, 0.5, 0.15), 10.0)
-
-	var pq := clampi(int(G.settings.get("particles", 1)), 0, 2)
-	_smoke = _make_particles(Color(0.8, 0.8, 0.85, 0.3), 0.7, 2.2, [16, 40, 70][pq])
-	_smoke.direction = Vector3(0, 1, -0.3)
-	_smoke.gravity = Vector3(0, 0.5, 0)
-	_flames = _make_particles(Color(1.0, 0.6, 0.15, 1.0), 0.55, 0.28, [10, 24, 40][pq], true)
-	_flames.direction = Vector3(0, 0.3, -1)
-	_flames.spread = 12.0
-	_flames.initial_velocity_min = 5.0
-	_flames.initial_velocity_max = 9.0
-	_flames.gravity = Vector3.ZERO
-	_flames.emitting = false
-	_flames.one_shot = true
-	_flames.explosiveness = 0.9
-	_sparks = _make_particles(Color(1.0, 0.8, 0.35, 1.0), 0.14, 0.8, [1, 30, 60][pq], true)
-	_sparks.direction = Vector3(0, 1, 0)
-	_sparks.spread = 70.0
-	_sparks.initial_velocity_min = 5.0
-	_sparks.initial_velocity_max = 11.0
-	_sparks.gravity = Vector3(0, -22, 0)
-	_sparks.emitting = false
-	_sparks.one_shot = true
-	_sparks.explosiveness = 1.0
-	_sparks.scale_amount_curve = null
-	_steam = _make_particles(Color(0.95, 0.95, 1.0, 0.25), 1.0, 1.6, [1, 24, 40][pq])
-	_steam.direction = Vector3(0, 1, 0)
-	_steam.initial_velocity_min = 1.0
-	_steam.initial_velocity_max = 2.5
-	_steam.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	_steam.emission_box_extents = Vector3(3, 0.2, 1)
-	_steam.emitting = false
-
-	# языки пламени из выхлопа (светящийся конус)
-	var fm := StandardMaterial3D.new()
-	fm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	fm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	fm.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	fm.albedo_color = Color(1.0, 0.55, 0.15, 0.0)
-	fm.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_tail_flame = MeshInstance3D.new()
-	_tail_flame.mesh = MeshKit.cone(0.35, 0.0, 2.2, 12)
-	_tail_flame.material_override = fm
-	_tail_flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_root.add_child(_tail_flame)
+	_fx.clear()
+	for scr in FX_MODULES:
+		var m: FxModule = scr.new()
+		m.view = self
+		_root.add_child(m)
+		m.setup()
+		_fx.append(m)
 	_apply_graphics()
 
 
@@ -254,42 +218,6 @@ func _apply_graphics() -> void:
 	if _env != null:
 		_env.glow_enabled = G.settings.get("glow", true)
 	_tex.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-
-
-func _make_particles(color: Color, psize: float, life: float, amount: int, glow: bool = false) -> CPUParticles3D:
-	var p := CPUParticles3D.new()
-	var quad := QuadMesh.new()
-	quad.size = Vector2(psize, psize)
-	var m := StandardMaterial3D.new()
-	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.vertex_color_use_as_albedo = true
-	m.albedo_texture = GarageScene._soft_dot()
-	m.disable_receive_shadows = true
-	if glow:
-		m.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	quad.material = m
-	p.mesh = quad
-	p.amount = maxi(1, amount)
-	p.lifetime = life
-	p.spread = 18.0
-	p.initial_velocity_min = 0.8
-	p.initial_velocity_max = 2.0
-	p.scale_amount_min = 0.6
-	p.scale_amount_max = 1.4
-	var curve := Curve.new()
-	curve.add_point(Vector2(0, 0.5))
-	curve.add_point(Vector2(1, 2.2 if not glow else 0.2))
-	p.scale_amount_curve = curve
-	var grad := Gradient.new()
-	grad.set_color(0, color)
-	grad.set_color(1, Color(color.r, color.g, color.b, 0.0))
-	p.color_ramp = grad
-	p.local_coords = false
-	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_root.add_child(p)
-	return p
 
 
 # ---------------------------------------------------------------------
@@ -483,11 +411,14 @@ func _rebuild_inner() -> void:
 	_engine.position = Vector3(0, _lift, 0)
 	box = _engine_aabb()
 	_center = box.get_center()
-	_steam.position = Vector3(_center.x, box.end.y - 1.0, _center.z)
+	_bounds = box
 	_apply_xray()
 	_update_tints()
 	_warm_frames = 3
 	_add_xray_warmers()
+	for m in _fx:
+		m.on_rebuild()
+		m.warmup(true)
 
 
 ## Рентген меняет прозрачность материалов, а это другие шейдеры. Чтобы первое нажатие
@@ -1073,8 +1004,16 @@ func _process(delta: float) -> void:
 			# отсечка: на максимуме обороты «бьются» об ограничитель
 			if rpm > target * 0.97:
 				target *= 0.94 + (0.06 if fmod(_time, 0.12) < 0.06 else 0.0)
+				_limiter_t -= delta
+				if _limiter_t <= 0.0:
+					_limiter_t = 0.12
+					fx_event("limiter")
+			else:
+				_limiter_t = 0.0
 		elif G.is_exhausted:
 			target = idle * (0.75 + 0.2 * sin(_time * 9.0))
+		if not throttle:
+			_limiter_t = 0.0
 		var kk := 3.2 if target > rpm else 1.6
 		rpm = lerpf(rpm, target, 1.0 - exp(-delta * kk))
 		if _prev_throttle and not throttle and rpm > max_rpm * 0.55:
@@ -1253,68 +1192,141 @@ func _tail_world() -> Vector3:
 
 func _pop_flame() -> void:
 	Sfx.pop()
-	_pop_glow = 1.0
-	_flames.position = _tail_world()
-	_flames.restart()
-	_flames.emitting = true
-	if int(G.settings.get("particles", 1)) > 0:
-		_sparks.position = _tail_world()
-		_sparks.direction = Vector3(0, 0.6, -1)
-		_sparks.restart()
-		_sparks.emitting = true
+	fx_event("pop")
 
 
 ## Сноп искр из мотора (для крита).
 func burst_sparks() -> void:
-	if int(G.settings.get("particles", 1)) == 0:
-		return
-	_sparks.position = _center + Vector3(0, 2.0, 0)
-	_sparks.direction = Vector3(0, 1, 0)
-	_sparks.restart()
-	_sparks.emitting = true
+	fx_event("crit")
 	_fov_kick = 0.6
 
 
 ## Рывок камеры и выстрел пламени при включении турбо.
 func turbo_kick() -> void:
 	_fov_kick = 1.0
+	fx_event("turbo_start")
 	_pop_flame()
 
 
+## Сообщить модулям эффектов о событии.
+func fx_event(event_name: String, data: Dictionary = {}) -> void:
+	for m in _fx:
+		m.on_event(event_name, data)
+
+
+# ---------------------------------------------------------------------
+# Что видят модули эффектов (координаты — в пространстве _root, пол на y = 0)
+# ---------------------------------------------------------------------
+
+func fx_quality() -> int:
+	return _q()
+
+
+func fx_particles() -> int:
+	return clampi(int(G.settings.get("particles", 1)), 0, 2)
+
+
+func fx_root() -> Node3D:
+	return _root
+
+
+func fx_camera() -> Camera3D:
+	return _cam
+
+
+func fx_viewport() -> SubViewport:
+	return _vp
+
+
+## TextureRect, на котором показан 3D-кадр (для постобработки).
+func fx_display() -> TextureRect:
+	return _tex
+
+
+func fx_environment() -> Environment:
+	return _env
+
+
+func fx_point(engine_local: Vector3) -> Vector3:
+	return _root.to_local(_engine.to_global(engine_local))
+
+
+func fx_dir(engine_local_dir: Vector3) -> Vector3:
+	var b := _root.global_transform.basis.inverse() * _engine.global_transform.basis
+	return (b * engine_local_dir).normalized()
+
+
+func fx_tail() -> Vector3:
+	return _tail_world()
+
+
+## Направление струи из выхлопной трубы.
+func fx_tail_dir() -> Vector3:
+	return fx_dir(Vector3(0, 0.2, -1.0))
+
+
+## Центр улитки турбины или Vector3.INF, если турбины нет.
+func fx_turbine() -> Vector3:
+	return fx_point(_turbo_pos) if _has_turbo else Vector3.INF
+
+
+func fx_center() -> Vector3:
+	return _center
+
+
+func fx_bounds() -> AABB:
+	return _bounds
+
+
+func fx_floor_y() -> float:
+	return 0.0
+
+
+## Точка детали ("block", "head", "pistons", "exhaust", "turbine", "fuel"…) или Vector3.INF.
+func fx_anchor(slot_id: String) -> Vector3:
+	if _engine == null or not _anchors.has(slot_id):
+		return Vector3.INF
+	return fx_point(_anchors[slot_id])
+
+
+## Где точка 3D-мира на картинке: (0..1, 0..1), или (-1, -1), если за камерой.
+func fx_screen_uv(root_pos: Vector3) -> Vector2:
+	if _cam == null:
+		return Vector2(-1, -1)
+	var gp := _root.to_global(root_pos)
+	if _cam.is_position_behind(gp):
+		return Vector2(-1, -1)
+	return _cam.unproject_position(gp) / Vector2(maxi(1, _vp.size.x), maxi(1, _vp.size.y))
+
+
 func _update_effects(delta: float, ratio: float, throttle: bool) -> void:
-	var black: bool = (not demo and G.is_exhausted) or (_spec().diesel and throttle)
-	var tail := _tail_world()
-	_smoke.position = tail
-	_smoke.emitting = int(G.settings.get("particles", 1)) > 0 or ratio > 0.2
-	_smoke.initial_velocity_min = 0.6 + 2.0 * ratio
-	_smoke.initial_velocity_max = 1.4 + 3.5 * ratio
-	_smoke.color_ramp.set_color(0, Color(0.06, 0.06, 0.07, 0.6) if black else Color(0.8, 0.8, 0.85, 0.22))
-	if throttle and ratio > 0.8 and randf() < (0.5 + (2.5 if G.turbo_time > 0.0 else 0.0)) * delta:
+	var exhausted: bool = (not demo) and G.is_exhausted
+	var black: bool = exhausted or (_spec().diesel and throttle)
+	var turbo_on := not demo and G.turbo_time > 0.0
+	if throttle and ratio > 0.8 and randf() < (0.5 + (2.5 if turbo_on else 0.0)) * delta:
 		_pop_flame()
 	var flame_col := Color(1.0, 0.55, 0.15)
-	var turbo_on := not demo and G.turbo_time > 0.0
 	if turbo_on:
 		flame_col = Color(0.35, 0.65, 1.0)
 	if not demo and G.ultra > 0:
 		flame_col = _ultra_color()
-	_flames.color_ramp.set_color(0, flame_col)
-	_pop_glow = maxf(0.0, _pop_glow - delta * 5.0)
-	var flame := maxf(_pop_glow, 0.55 if turbo_on and throttle else 0.0)
-	var tfm: StandardMaterial3D = _tail_flame.material_override
-	tfm.albedo_color = Color(flame_col.r, flame_col.g, flame_col.b, flame * (0.7 + 0.3 * randf()))
-	_tail_flame.visible = flame > 0.02
-	_tail_flame.position = tail + Vector3(0, 0.1, -1.0)
-	_tail_flame.rotation_degrees = Vector3(-90, 0, 0)
-	_tail_flame.scale = Vector3(1, 0.6 + flame * (0.8 + 0.4 * randf()), 1)
-	_tail_light.position = tail + Vector3(0, 0.5, -0.8)
-	_tail_light.light_color = flame_col
-	_tail_light.light_energy = flame * 6.0
-	_tail_light.visible = (flame > 0.02 or _warm_frames > 0) and _q() >= 1
-	_steam.emitting = heat > 0.75 and int(G.settings.get("particles", 1)) > 0
-	_turbo_light.light_energy = 3.0 if turbo_on else 0.0
-	_turbo_light.visible = _has_turbo and (turbo_on or _warm_frames > 0)
-	if _turbo_light.visible:
-		_turbo_light.position = _root.to_local(_engine.to_global(_turbo_pos))
+	# события по смене состояния
+	if turbo_on != _was_turbo:
+		_was_turbo = turbo_on
+		if not turbo_on:
+			fx_event("turbo_end")
+	if exhausted != _was_exhausted:
+		_was_exhausted = exhausted
+		fx_event("exhausted" if exhausted else "recovered")
+	var st := {
+		"ratio": ratio, "rpm": rpm, "throttle": throttle, "turbo": turbo_on,
+		"turbo_t": clampf(G.turbo_time / G.TURBO_TIME, 0.0, 1.0) if turbo_on else 0.0,
+		"heat": heat, "exhausted": exhausted, "black": black, "flame_col": flame_col,
+		"ultra": (not demo) and G.ultra > 0, "diesel": bool(_spec().diesel), "demo": demo,
+		"time": _time, "xray": _xray(), "garage": locked, "limiter": _limiter_t > 0.0,
+	}
+	for m in _fx:
+		m.update(delta, st)
 	if _warm_frames > 0:
 		_warm_frames -= 1
 		if _warm_frames == 0:
@@ -1322,14 +1334,10 @@ func _update_effects(delta: float, ratio: float, throttle: bool) -> void:
 				if is_instance_valid(w):
 					w.queue_free()
 			_xray_warmers.clear()
-		_tail_flame.visible = true
+			for m in _fx:
+				m.warmup(false)
 		for cy in _cyls:
 			cy.flash.visible = true
-		if _warm_frames == 2:
-			_flames.restart()
-			_flames.emitting = true
-			_sparks.restart()
-			_sparks.emitting = int(G.settings.get("particles", 1)) > 0
 
 
 func _update_tints() -> void:

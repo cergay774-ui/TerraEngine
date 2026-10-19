@@ -95,6 +95,7 @@ func _buy(id: String) -> void:
 	if n > 0:
 		Sfx.play("upgrade", 1.0 + randf() * 0.06)
 		G.vibrate(10)
+		main.engine_view.fx_event("upgrade", {"id": id})
 	refresh()
 
 

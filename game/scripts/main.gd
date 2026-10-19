@@ -112,6 +112,10 @@ func _ready() -> void:
 		call_deferred("_show_offline")
 	# сторож зависаний — после того как игра загрузилась и шейдеры первого кадра собраны
 	get_tree().create_timer(4.0).timeout.connect(Diag.arm)
+	if G.stall_renderer_switched:
+		G.stall_renderer_switched = false
+		get_tree().create_timer(1.5).timeout.connect(func():
+			show_toast("Прошлый запуск подвисал — со следующего запуска игра включит режим OpenGL. Вернуть можно в настройках.", Color("ffc21a")))
 	if G.stall_downgraded:
 		G.stall_downgraded = false
 		get_tree().create_timer(1.5).timeout.connect(func():
@@ -773,6 +777,7 @@ func _flush_level_up() -> void:
 	Diag.event("уровень %d" % lvl)
 	_pending_level = 0
 	_apply_engine()
+	engine_view.fx_event("level_up")
 	if (lvl - 1) % 10 != 0:
 		show_toast("Уровень %d! Доход x1.05" % lvl, Color("8fc4ff"))
 		Sfx.play("buy", 1.2)
@@ -813,6 +818,7 @@ func _on_crit(amount: Big) -> void:
 
 func _on_gold(n: int) -> void:
 	Sfx.play("coin")
+	engine_view.fx_event("gold")
 	float_text("+%d золото" % n, D.CURRENCIES.gold.color, 30)
 
 

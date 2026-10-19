@@ -15,10 +15,11 @@ config/description="Кликер-тайкун про сборку моторов
 config/version="0.1.0"
 run/main_scene="res://scenes/boot.tscn"
 config/quit_on_go_back=false
-config/features=PackedStringArray("4.7", "GL Compatibility")
+config/features=PackedStringArray("4.7", "Mobile")
 boot_splash/bg_color=Color(0.05, 0.05, 0.06, 1)
 boot_splash/show_image=false
 config/icon="res://icon.png"
+config/project_settings_override="user://graphics_override.cfg"
 
 [autoload]
 
@@ -43,7 +44,8 @@ pointing/emulate_mouse_from_touch=true
 
 [rendering]
 
-renderer/rendering_method="gl_compatibility"
-renderer/rendering_method.mobile="gl_compatibility"
+renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="mobile"
+rendering_device/fallback_to_opengl3=true
 textures/vram_compression/import_etc2_astc=true
 environment/defaults/default_clear_color=Color(0.05, 0.05, 0.06, 1)
