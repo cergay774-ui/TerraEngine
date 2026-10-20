@@ -102,7 +102,9 @@ void fragment() {
 #else
 	bl *= 0.5;
 #endif
-	c = max(c + (c - bl) * vig.z, vec3(0.0));
+	// прибавка ограничена: возле очень ярких бликов (вспышки, раскалённый металл) иначе
+	// соседние пиксели проваливаются в чёрные ореолы
+	c = max(c + clamp((c - bl) * vig.z, vec3(-0.06), vec3(0.06)), vec3(0.0));
 	// турбо-рывок: радиальное размытие к мотору
 	if (punch.x > 0.01) {
 		// выборки сдвинуты на случайную долю шага — вместо «двоения» мягкий след
@@ -214,12 +216,7 @@ func setup() -> void:
 	# контраст, насыщенность, виньетка, сплит-тон; в OpenGL картинка темнее — грейдинг мягче
 	_set4("grade", Vector4(0.3, 1.1, 0.42, 0.7) if compat() else Vector4(0.5, 1.12, 0.55, 0.75))
 	view.fx_display().material = _mat
-	# FXAA в 3D-вьюпорте (в проходе тонмаппинга, при меньшем разрешении 3D — дёшево): лесенки
-	# на гранях мотора и линии пола сглаживаются, а шарп в нашем шейдере возвращает чёткость.
-	# Только High/Ultra на Vulkan: там свечение и так даёт отдельный проход тонмаппинга.
-	var vp: SubViewport = view.fx_viewport()
-	if vp != null:
-		vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if _q >= 2 and not compat() else Viewport.SCREEN_SPACE_AA_DISABLED
+	# сглаживание 3D (MSAA) настраивает EngineView._apply_graphics
 
 
 static func _shader_for(quality: int) -> Shader:

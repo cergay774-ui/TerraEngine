@@ -64,6 +64,16 @@ var _built_key: String = ""
 var _gfx_key: String = ""
 var _center: Vector3 = Vector3.ZERO
 var _bounds: AABB = AABB()
+var _cam_attr: CameraAttributesPractical = null
+const INTRO_TIME := 2.2
+var _intro_t: float = 0.0
+var _intro_lift: float = 0.0
+var _intro_yaw: float = 0.0
+
+
+## Кинематографичный облёт мотора (после экрана загрузки).
+func play_intro() -> void:
+	_intro_t = INTRO_TIME
 var _yaw: float = 0.0
 var _yaw_target: float = 0.0
 var _pressed: bool = false
@@ -183,6 +193,14 @@ func _setup_world() -> void:
 	_cam = Camera3D.new()
 	_cam.fov = 30.0
 	_cam.far = 300.0
+	_cam_attr = null
+	if q >= 2 and RenderingServer.get_current_rendering_method() != "gl_compatibility":
+		_cam_attr = CameraAttributesPractical.new()
+		_cam_attr.dof_blur_far_enabled = true
+		_cam_attr.dof_blur_far_distance = 40.0
+		_cam_attr.dof_blur_far_transition = 14.0
+		_cam_attr.dof_blur_amount = 0.05 if q == 2 else 0.07
+		_cam.attributes = _cam_attr
 	_world.add_child(_cam)
 	_root = Node3D.new()
 	_world.add_child(_root)
@@ -211,10 +229,24 @@ func _omni(color: Color, rng: float) -> OmniLight3D:
 func _apply_graphics() -> void:
 	if _vp == null or size.x < 2.0:
 		return
-	var sc := clampf(float(G.settings.get("res_scale", 1.0)), 0.4, 1.0)
+	# res_scale считается от логического размера экрана (720 по ширине); больше 1 — значит
+	# рисовать чётче, вплоть до настоящего разрешения экрана (на флагманах оно в 2 раза выше)
+	var sc := clampf(float(G.settings.get("res_scale", 1.0)), 0.4, 2.0)
+	if sc > 1.0:
+		var phys := float(get_window().size.y) / maxf(get_viewport_rect().size.y, 1.0)
+		sc = minf(sc, maxf(1.0, phys))
 	_vp.size = Vector2i(maxi(16, int(size.x * sc)), maxi(16, int(size.y * sc)))
 	_vp.positional_shadow_atlas_size = 2048 if _q() >= 2 else 1024
-	_vp.msaa_3d = Viewport.MSAA_DISABLED  # см. game.gd: MSAA на Android не используем
+	# сглаживание: в Vulkan на телефонах MSAA почти бесплатно (тайловые видеокарты); в
+	# запасном OpenGL на Android у MSAA отдельный путь с утечкой памяти — там выключено
+	var compat := RenderingServer.get_current_rendering_method() == "gl_compatibility"
+	var q := _q()
+	if compat:
+		_vp.msaa_3d = Viewport.MSAA_DISABLED
+		_vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
+	else:
+		_vp.msaa_3d = [Viewport.MSAA_DISABLED, Viewport.MSAA_2X, Viewport.MSAA_4X, Viewport.MSAA_4X][q]
+		_vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
 	if _env != null:
 		_env.glow_enabled = G.settings.get("glow", true)
 	_tex.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
@@ -294,6 +326,87 @@ func _make_mats() -> void:
 	for k in ["flash", "case"]:
 		var m: StandardMaterial3D = _mats[k]
 		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_dress_mats(md)
+
+
+## Фактура поверх базовых цветов: литьё (мелкая шероховатая рябь на блоке и головке),
+## разброс шероховатости, лак на крышке и стенде, контровой блик по краям металла.
+## Включается с «Среднего»; на «Низком» материалы остаются простыми.
+func _dress_mats(md: Dictionary) -> void:
+	var q := _q()
+	if q < 1:
+		return
+	var cast_n := _cast_normal()
+	var rough_n := _rough_noise()
+	var weave: bool = md.get("weave", false)
+	for k in ["block", "head", "case"]:
+		var m: StandardMaterial3D = _mats[k]
+		if not weave:
+			m.normal_enabled = true
+			m.normal_texture = cast_n
+			m.normal_scale = 0.55
+			m.uv1_triplanar = true
+			m.uv1_scale = Vector3(0.9, 0.9, 0.9)
+		if q >= 2:
+			m.roughness_texture = rough_n
+			m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_RED
+	# окрашенное и лакированное: крышка клапанов, катушки, стенд, фильтр
+	for k in ["cover", "coil", "stand", "filter"]:
+		var m: StandardMaterial3D = _mats[k]
+		m.clearcoat_enabled = true
+		m.clearcoat = 0.75
+		m.clearcoat_roughness = 0.12
+	# полированный и точёный металл: контровой блик по краям
+	for k in ["piston", "rod", "crank", "steel", "brass", "header"]:
+		var m: StandardMaterial3D = _mats[k]
+		m.rim_enabled = true
+		m.rim = 0.25
+		m.rim_tint = 0.7
+		if q >= 2:
+			m.roughness_texture = rough_n
+			m.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_GREEN
+
+
+static var _cast_n_tex: NoiseTexture2D
+static var _rough_tex: NoiseTexture2D
+
+
+static func _cast_normal() -> NoiseTexture2D:
+	if _cast_n_tex == null:
+		var n := FastNoiseLite.new()
+		n.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+		n.frequency = 0.09
+		n.fractal_octaves = 4
+		n.seed = 7
+		_cast_n_tex = NoiseTexture2D.new()
+		_cast_n_tex.noise = n
+		_cast_n_tex.width = 256
+		_cast_n_tex.height = 256
+		_cast_n_tex.seamless = true
+		_cast_n_tex.as_normal_map = true
+		_cast_n_tex.bump_strength = 6.0
+		_cast_n_tex.generate_mipmaps = true
+	return _cast_n_tex
+
+
+static func _rough_noise() -> NoiseTexture2D:
+	if _rough_tex == null:
+		var n := FastNoiseLite.new()
+		n.noise_type = FastNoiseLite.TYPE_PERLIN
+		n.frequency = 0.02
+		n.fractal_octaves = 3
+		n.seed = 3
+		_rough_tex = NoiseTexture2D.new()
+		_rough_tex.noise = n
+		_rough_tex.width = 256
+		_rough_tex.height = 256
+		_rough_tex.seamless = true
+		_rough_tex.generate_mipmaps = true
+		var ramp := Gradient.new()
+		ramp.set_color(0, Color(0.55, 0.65, 0.6))
+		ramp.set_color(1, Color(1.0, 1.0, 1.0))
+		_rough_tex.color_ramp = ramp
+	return _rough_tex
 
 
 func _weave_tex() -> Texture2D:
@@ -1050,6 +1163,16 @@ func _process(delta: float) -> void:
 		var sway := 0.18 * sin(_time * 0.25) if G.settings.get("cam_sway", true) else 0.0
 		_yaw_target = lerpf(_yaw_target, sway, 1.0 - exp(-delta * 0.6))
 	_yaw = lerpf(_yaw, _yaw_target, 1.0 - exp(-delta * 8.0))
+	if _intro_t > 0.0:
+		# облёт после загрузки: камера заходит сбоку и сверху и плавно встаёт на место
+		_intro_t = maxf(0.0, _intro_t - delta)
+		var k := _intro_t / INTRO_TIME
+		var e := k * k * (3.0 - 2.0 * k)
+		_intro_yaw = 1.1 * e
+		_intro_lift = 4.0 * e
+	else:
+		_intro_yaw = 0.0
+		_intro_lift = 0.0
 	_fov_kick = maxf(0.0, _fov_kick - delta * 4.0)
 	_place_camera(n * amp * 0.15)
 
@@ -1096,7 +1219,7 @@ func _update_render_mode() -> void:
 
 
 func _place_camera(jitter: Vector3) -> void:
-	var dir := _view_dir().rotated(Vector3.UP, _yaw)
+	var dir := _view_dir().rotated(Vector3.UP, _yaw + _intro_yaw)
 	var aspect := maxf(0.3, size.x / maxf(size.y, 1.0))
 	_cam.fov = 30.0 + _fov_kick * 4.0
 	var half_v := deg_to_rad(_cam.fov * 0.5)
@@ -1106,8 +1229,11 @@ func _place_camera(jitter: Vector3) -> void:
 	var fit_v := atan(tan(half_v) * band.size.y)
 	var fit_h := atan(tan(half_h) * band.size.x)
 	var dist := r / sin(minf(fit_v, fit_h)) / zoom
-	_cam.position = _center + dir * dist + jitter
+	_cam.position = _center + dir * dist + jitter + Vector3(0, _intro_lift, 0)
 	_cam.look_at(_center, Vector3.UP)
+	# дальний план гаража мягко размыт (как у камеры с открытой диафрагмой) — мотор выделяется
+	if _cam_attr != null and absf(_cam_attr.dof_blur_far_distance - (dist + ENGINE_SIZE * 0.9)) > 0.5:
+		_cam_attr.dof_blur_far_distance = dist + ENGINE_SIZE * 0.9
 	# сдвиг кадра, чтобы мотор стоял в своей полосе экрана
 	var ndc_y := 1.0 - 2.0 * (band.position.y + band.size.y * 0.5)
 	var ndc_x := 2.0 * (band.position.x + band.size.x * 0.5) - 1.0
@@ -1362,7 +1488,7 @@ func _update_tints() -> void:
 		glow_amt = clampf(ratio - 0.4, 0.0, 0.6)
 	var hc := _part_color("exhaust", Color("8a8a8f"))
 	hm.albedo_color = hc.lerp(Color("6a5a7a"), clampf(heat + ratio * 0.3, 0.0, 1.0) * 0.5)
-	hm.emission = Color(1.0, 0.28, 0.05) * glow_amt * glow_amt * 2.2
+	hm.emission = Color(1.0, 0.24, 0.04) * glow_amt * glow_amt * 1.25
 	if _xray() != (_mats.block.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA):
 		_apply_xray()
 

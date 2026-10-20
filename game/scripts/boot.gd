@@ -178,3 +178,4 @@ func _show_main() -> void:
 	var ev = main.get("engine_view")
 	if ev != null:
 		ev.rpm = _engine.rpm
+		ev.play_intro()

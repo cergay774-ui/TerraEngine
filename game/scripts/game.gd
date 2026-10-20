@@ -53,7 +53,7 @@ const PRESETS := [
 	{"shadows": 0, "msaa": 0, "glow": false, "particles": 0, "res_scale": 0.6, "fps3d": 0, "garage": true},
 	{"shadows": 1, "msaa": 0, "glow": false, "particles": 1, "res_scale": 0.75, "fps3d": 0, "garage": true},
 	{"shadows": 1, "msaa": 0, "glow": true, "particles": 2, "res_scale": 1.0, "fps3d": 1, "garage": true},
-	{"shadows": 2, "msaa": 0, "glow": true, "particles": 2, "res_scale": 1.0, "fps3d": 1, "garage": true},
+	{"shadows": 2, "msaa": 0, "glow": true, "particles": 2, "res_scale": 1.5, "fps3d": 1, "garage": true},
 ]
 var last_time: float = 0.0
 var stall_downgraded: bool = false   # графику снизили из-за зависания в прошлый раз

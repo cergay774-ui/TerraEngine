@@ -75,7 +75,7 @@ func _build_graphics() -> void:
 	_section("Детали")
 	_choice("Тени", ["Выкл", "Чёткие", "Мягкие"], int(G.settings.shadows), func(i): _put("shadows", i))
 	_choice("Частицы", ["Мало", "Средне", "Много"], int(G.settings.particles), func(i): _put("particles", i))
-	_choice("Разрешение 3D", ["60%", "75%", "90%", "100%"], _res_index(), func(i): _put("res_scale", [0.6, 0.75, 0.9, 1.0][i]))
+	_choice("Разрешение 3D", ["60%", "75%", "90%", "100%", "150%"], _res_index(), func(i): _put("res_scale", [0.6, 0.75, 0.9, 1.0, 1.5][i]))
 	_toggle("Свечение (bloom)", G.settings.glow, func(on): _put("glow", on))
 	_toggle("Гараж вокруг мотора", G.settings.garage, func(on): _put("garage", on))
 	_section("Режим графики")
@@ -94,7 +94,7 @@ func _build_graphics() -> void:
 func _res_index() -> int:
 	var r := float(G.settings.res_scale)
 	var best := 0
-	var vals := [0.6, 0.75, 0.9, 1.0]
+	var vals := [0.6, 0.75, 0.9, 1.0, 1.5]
 	for i in vals.size():
 		if absf(vals[i] - r) < absf(vals[best] - r):
 			best = i
