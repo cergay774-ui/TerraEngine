@@ -1,81 +1,353 @@
+  rendered docs/preview_noon_realistic.png {"d16_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d16_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}}
+  rendered docs/preview_afternoon_cumulus.png {"d16_mat": {"max": 0.395, "px_over_0.04": 26, "px_over_0.10": 20}, "d16_raw": {"max": 0.253, "px_over_0.04": 12, "px_over_0.10": 6}, "d24_mat": {"max": 0.395, "px_over_0.04": 26, "px_over_0.10": 20}, "d24_raw": {"max": 0.253, "px_over_0.04": 12, "px_over_0.10": 6}}
+  rendered docs/preview_sunset_realistic.png {"d16_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d16_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}}
+  rendered docs/preview_dusk_cirrus.png {"d16_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d16_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}}
+  rendered docs/preview_night_moon.png {"d16_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d16_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}}
+  rendered docs/preview_overcast.png {"d16_mat": {"max": 0.173, "px_over_0.04": 1622, "px_over_0.10": 416}, "d16_raw": {"max": 0.116, "px_over_0.04": 1189, "px_over_0.10": 23}, "d24_mat": {"max": 0.182, "px_over_0.04": 1790, "px_over_0.10": 470}, "d24_raw": {"max": 0.123, "px_over_0.04": 1316, "px_over_0.10": 31}}
+  rendered docs/preview_storm.png {"d16_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d16_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}}
+  rendered docs/preview_fantasy.png {"d16_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d16_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}}
+  rendered docs/preview_minimal.png {"d16_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d16_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}}
+  rendered docs/preview_crisp_dense.png {"d16_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d16_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}}
+  rendered docs/preview_zenith_dense.png {"d16_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d16_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}}
+  rendered docs/preview_above_clouds.png {"d16_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d16_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_mat": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}, "d24_raw": {"max": 0.0, "px_over_0.04": 0, "px_over_0.10": 0}}
 {
-  "static": {
-    "order_violations": 0,
-    "max_screen_err_px": 0.1583196557326846,
-    "max_size_err": 0.010536356936272865,
-    "behind": 0,
-    "truth_behind": 0,
-    "max_facing_err": 0.0,
-    "visible": 120,
-    "depth_range": [
-      46.85493230174077,
-      79.35009671179887
-    ]
+ "static": {
+  "depth_order_violations": 0,
+  "depth_out_of_range": 0,
+  "back_facing": 0,
+  "cirrus_not_behind": 0,
+  "cirrus_slot_order": 0,
+  "ceiling_behind_true_depth": 0,
+  "ceiling_slot_order": 0,
+  "max_screen_err_px": 0.15831965573092469,
+  "max_size_err": 0.00017620067866758356,
+  "behind": 0,
+  "truth_behind": 0,
+  "max_facing_err": 0.0,
+  "visible": 114
+ },
+ "above_clouds": {
+  "above": 1.0,
+  "depth_order_violations": 0,
+  "depth_out_of_range": 0,
+  "back_facing": 0,
+  "cirrus_not_behind": 0,
+  "cirrus_slot_order": 0,
+  "ceiling_behind_true_depth": 0,
+  "ceiling_slot_order": 0,
+  "max_screen_err_px": 0.15831965573092469,
+  "max_size_err": 0.00017620067866758356,
+  "behind": 0,
+  "truth_behind": 0,
+  "max_facing_err": 0.0,
+  "visible": 114
+ },
+ "rig_lag": {
+  "convention_aim_at_camera": {
+   "vote": 1.0,
+   "max_shift_px": 0.0,
+   "sprites": 56
+  },
+  "convention_opposite": {
+   "vote": -1.0,
+   "max_shift_px": 0.0,
+   "sprites": 56
+  }
+ },
+ "motion": {
+  "frames": 1400,
+  "distance_blocks": 2970,
+  "max_frame_to_frame_px": 17.08,
+  "jumps_over_40px": 0
+ },
+ "cost": {
+  "Performance": {
+   "molang_nodes_per_frame": 16885,
+   "animated_bones": 91,
+   "draw_calls_estimate": 25
+  },
+  "Balanced": {
+   "molang_nodes_per_frame": 28469,
+   "animated_bones": 188,
+   "draw_calls_estimate": 50
+  },
+  "High": {
+   "molang_nodes_per_frame": 45389,
+   "animated_bones": 353,
+   "draw_calls_estimate": 92
+  },
+  "Ultra": {
+   "molang_nodes_per_frame": 61351,
+   "animated_bones": 511,
+   "draw_calls_estimate": 130
+  }
+ },
+ "previews_artefacts": {
+  "noon_realistic": {
+   "d16_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d16_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   }
+  },
+  "afternoon_cumulus": {
+   "d16_mat": {
+    "max": 0.395,
+    "px_over_0.04": 26,
+    "px_over_0.10": 20
+   },
+   "d16_raw": {
+    "max": 0.253,
+    "px_over_0.04": 12,
+    "px_over_0.10": 6
+   },
+   "d24_mat": {
+    "max": 0.395,
+    "px_over_0.04": 26,
+    "px_over_0.10": 20
+   },
+   "d24_raw": {
+    "max": 0.253,
+    "px_over_0.04": 12,
+    "px_over_0.10": 6
+   }
+  },
+  "sunset_realistic": {
+   "d16_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d16_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   }
+  },
+  "dusk_cirrus": {
+   "d16_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d16_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   }
+  },
+  "night_moon": {
+   "d16_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d16_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   }
+  },
+  "overcast": {
+   "d16_mat": {
+    "max": 0.173,
+    "px_over_0.04": 1622,
+    "px_over_0.10": 416
+   },
+   "d16_raw": {
+    "max": 0.116,
+    "px_over_0.04": 1189,
+    "px_over_0.10": 23
+   },
+   "d24_mat": {
+    "max": 0.182,
+    "px_over_0.04": 1790,
+    "px_over_0.10": 470
+   },
+   "d24_raw": {
+    "max": 0.123,
+    "px_over_0.04": 1316,
+    "px_over_0.10": 31
+   }
+  },
+  "storm": {
+   "d16_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d16_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   }
+  },
+  "fantasy": {
+   "d16_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d16_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   }
+  },
+  "minimal": {
+   "d16_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d16_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   }
+  },
+  "crisp_dense": {
+   "d16_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d16_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   }
+  },
+  "zenith_dense": {
+   "d16_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d16_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   }
   },
   "above_clouds": {
-    "above": 1.0,
-    "order_violations": 0,
-    "max_screen_err_px": 0.1583196557326846,
-    "max_size_err": 0.010536356936272865,
-    "behind": 0,
-    "truth_behind": 0,
-    "max_facing_err": 0.0,
-    "visible": 120,
-    "depth_range": [
-      46.464990328820114,
-      73.17601547388782
-    ]
-  },
-  "rig_lag": {
-    "convention_aim_at_camera": {
-      "vote": 1.0,
-      "max_shift_px": 0.0,
-      "sprites": 61
-    },
-    "convention_opposite": {
-      "vote": -1.0,
-      "max_shift_px": 0.0,
-      "sprites": 61
-    }
-  },
-  "motion": {
-    "frames": 1400,
-    "distance_blocks": 2970,
-    "max_frame_to_frame_px": 17.08,
-    "jumps_over_40px": 0
-  },
-  "cost": {
-    "Performance": {
-      "molang_nodes_per_frame": 10600,
-      "animated_bones": 72,
-      "draw_calls_estimate": 11
-    },
-    "Balanced": {
-      "molang_nodes_per_frame": 21874,
-      "animated_bones": 185,
-      "draw_calls_estimate": 25
-    },
-    "High": {
-      "molang_nodes_per_frame": 36637,
-      "animated_bones": 355,
-      "draw_calls_estimate": 46
-    },
-    "Ultra": {
-      "molang_nodes_per_frame": 51009,
-      "animated_bones": 518,
-      "draw_calls_estimate": 66
-    }
+   "d16_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d16_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_mat": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   },
+   "d24_raw": {
+    "max": 0.0,
+    "px_over_0.04": 0,
+    "px_over_0.10": 0
+   }
   }
+ }
 }
-  rendered docs/preview_noon_realistic.png
-  rendered docs/preview_afternoon_cumulus.png
-  rendered docs/preview_sunset_realistic.png
-  rendered docs/preview_dusk_cirrus.png
-  rendered docs/preview_night_moon.png
-  rendered docs/preview_overcast.png
-  rendered docs/preview_storm.png
-  rendered docs/preview_fantasy.png
-  rendered docs/preview_minimal.png
-  rendered docs/preview_above_clouds.png
-PASS (194s)
-exit 0
+robustness worst: {'px_over_0.04': 302, 'px_over_0.10': 196, 'max': 0.546}
+PASS (688s)

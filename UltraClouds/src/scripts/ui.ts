@@ -28,7 +28,7 @@ export interface MenuHost {
 }
 
 type BoolKey = "enabled" | "perfMode" | "autoQuality";
-type PageId = "main" | "quality" | "shape" | "light";
+type PageId = "main" | "layers" | "quality" | "shape" | "light";
 
 type Control =
   | { kind: "toggle"; key: BoolKey; text: string }
@@ -44,6 +44,13 @@ const PAGES: Record<PageId, Control[]> = {
     { kind: "choice", key: "profile", text: "uc.profile", items: PROFILE_IDS.map((p) => `uc.profile.${p}`) },
     { kind: "choice", key: "type", text: "uc.type", items: TYPE_IDS.map((t) => `uc.type.${t}`) },
     { kind: "slider", key: "density", text: "uc.density" },
+  ],
+  layers: [
+    { kind: "slider", key: "density", text: "uc.density" },
+    { kind: "slider", key: "cumulusAmount", text: "uc.amount.cu" },
+    { kind: "slider", key: "stratusAmount", text: "uc.amount.st" },
+    { kind: "slider", key: "altoAmount", text: "uc.amount.ac" },
+    { kind: "slider", key: "cirrusAmount", text: "uc.amount.ci" },
   ],
   quality: [
     { kind: "choiceNum", key: "quality", text: "uc.quality", items: ["uc.q.0", "uc.q.1", "uc.q.2", "uc.q.3"] },
@@ -76,6 +83,7 @@ const PAGES: Record<PageId, Control[]> = {
 };
 
 const SUB_PAGES: { page: Exclude<PageId, "main">; button: string; title: string }[] = [
+  { page: "layers", button: "uc.btn.layers", title: "uc.page.layers" },
   { page: "quality", button: "uc.btn.quality", title: "uc.page.quality" },
   { page: "shape", button: "uc.btn.shape", title: "uc.page.shape" },
   { page: "light", button: "uc.btn.light", title: "uc.page.light" },

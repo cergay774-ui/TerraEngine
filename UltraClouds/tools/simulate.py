@@ -8,8 +8,9 @@ independent ground-truth projection of the virtual cloud field:
 
   1. projection: every visible sprite lands where the true 3D cloud would be
      on screen, with the same size
-  2. draw order: view depth strictly decreases along the draw order (painter's
-     algorithm works whether or not the material writes depth)
+  2. depth: the projected depth grows with the true distance of the cloud, so
+     the depth buffer sorts clusters (checked pairwise); pieces of a cluster
+     share its depth
   3. rig lag: the picture does not change when the rig lags behind the camera
      (both possible conventions of query.rotation_to_camera are tested; the
      self-calibrating sign must converge)
@@ -18,8 +19,15 @@ independent ground-truth projection of the virtual cloud field:
   5. cost: Molang nodes evaluated per frame for every quality tier
 
 It also renders preview images (docs/preview_*.png) with a software
-compositor that mimics the actor shader (MatColor * texture, overlay lerp,
-light factor, fog).
+rasteriser that mimics the GPU state of the two passes: a quantised depth
+buffer (16 or 24 bit, LESS test), the alpha-tested core pass (discard,
+opaque, depth write only for kept pixels), and the blended halo pass (no
+discard, depth written for the whole quad), plus the actor shader colour
+math (MatColor * texture, overlay lerp, light factor, light multiplier, fog).
+Every frame is also rendered with an ideal far-to-near halo order; the
+difference measures the artefacts the real draw order can cause (cut halos,
+invisible rectangles).  Two alpha-test semantics are tested (texture alpha
+times material alpha, and raw texture alpha).
 
 Bedrock conventions used (derived in README "Coordinate conventions"):
   model (geometry/animation) units are 1/16 block, world = (x, y, -z) / 16
@@ -127,11 +135,15 @@ class Pack:
         self.rc_order = [(list(e.keys())[0], molang.parse(list(e.values())[0])) for e in self.desc["render_controllers"]]
         self.rc_expr = {}
         for name, rc in self.rcs.items():
+            tex = rc["textures"][0]
+            mat = rc["materials"][0]["*"].split(".", 1)[1]
             self.rc_expr[name] = {
                 "color": {k: molang.parse(v) for k, v in rc["color"].items()},
                 "overlay": {k: molang.parse(v) for k, v in rc["overlay_color"].items()},
+                "light": molang.parse(rc.get("light_color_multiplier", "1")),
                 "vis": [(list(e.keys())[0], e[list(e.keys())[0]] if isinstance(list(e.values())[0], bool) else molang.parse(list(e.values())[0])) for e in rc["part_visibility"]],
-                "tex": molang.parse(rc["textures"][0].split("[", 1)[1][:-1]),
+                "tex": molang.parse(tex.split("[", 1)[1][:-1]) if "[" in tex else tex.split(".", 1)[1],
+                "material": self.desc["materials"][mat],
             }
         self.atlas = {k: np.asarray(Image.open(os.path.join(RP, v + ".png")).convert("RGBA")).astype(np.float32) / 255.0
                       for k, v in self.desc["textures"].items()}
@@ -199,8 +211,9 @@ class Sim:
                 vis_rules.append((pat, v))
             color = [env.run(rce["color"][k]) for k in "rgba"]
             overlay = [env.run(rce["overlay"][k]) for k in "rgba"]
-            tex = ["natural", "soft"][int(env.run(rce["tex"]))]
-            rcs.append((rc_name, vis_rules, color, overlay, tex))
+            tex = rce["tex"] if isinstance(rce["tex"], str) else ["natural", "soft"][int(env.run(rce["tex"]))]
+            light = env.run(rce["light"])
+            rcs.append((rc_name, vis_rules, color, overlay, tex, rce["material"], light))
         self.last_ops = env.ops
         return transforms, rcs
 
@@ -265,8 +278,8 @@ def ground_truth(sim, clusters, cam, sprite_names):
                 hd = y / math.tan(math.radians(sp.el))
                 a = math.radians(sp.az + v("v.ov_phi"))
                 centre = cam.pos + np.array([hd * math.sin(a), y, hd * math.cos(a)])
-                q = min(1.0, max(0.06, 1.6 * math.sin(math.radians(sp.el))))
-                h = min(y * sp.height * v("v.ov_vis") * q, 1.8 * abs(y))
+                q = min(1.0, max(0.3, 1.6 * math.sin(math.radians(sp.el))))
+                h = min(y * sp.height * v("v.ov_vis") * q, 1.8 * abs(y) / max(math.cos(math.radians(cam.pitch)), 0.05))
                 out[sp.name] = (centre, h)
             continue
         P = G.LAYERS[L]["P"]
@@ -286,18 +299,31 @@ def ground_truth(sim, clusters, cam, sprite_names):
                 h *= v(f"{cl.var}_e")
             if L != "cu":
                 d = math.sqrt(dx * dx + dz * dz + (alt - cam.pos[1]) ** 2)
-                h = min(h * min(1.0, max(0.06, 1.6 * abs(alt - cam.pos[1]) / d)), 1.8 * abs(alt - cam.pos[1]))
+                se = abs(alt - cam.pos[1]) / d
+                fade = min(1.0, max(0.0, (se - 0.05) * 12))
+                h = min(h * fade * min(1.0, max(0.3, 1.6 * se)),
+                        1.8 * abs(alt - cam.pos[1]) / max(math.cos(math.radians(cam.pitch)), 0.05))
             out[sp.name] = (centre, h)
     return out
 
 
 def draw_order(pack, rcs):
     order = []
-    for rc_name, vis_rules, color, overlay, tex in rcs:
+    for rc_name, vis_rules, color, overlay, tex, material, light in rcs:
         for b in pack.bones[1:]:
             if visible(vis_rules, b["name"]):
-                order.append((b["name"], rc_name, color, overlay, tex))
+                order.append((b["name"], rc_name, color, overlay, tex, material, light))
     return order
+
+
+def true_distance(sim, clusters_by_name, cam, bone):
+    """True camera distance of the cluster (or ceiling sprite) of a bone."""
+    v = sim.var
+    sp = clusters_by_name[bone]
+    if "ceiling" in sp.flags:
+        sv = f"v.s{bone}"
+        return math.sqrt(v(sv + "_vx") ** 2 + v(sv + "_vy") ** 2 + v(sv + "_vz") ** 2)
+    return v(f"{sp.cluster.var}_m") / 0.12
 
 
 # ---------------------------------------------------------------------------
@@ -308,14 +334,19 @@ def check_frame(pack, sim, clusters, cam, rig_pos, transforms, rcs, report, tag)
     order = draw_order(pack, rcs)
     names = {o[0] for o in order}
     truth = ground_truth(sim, clusters, cam, names)
+    by_name = {sp.name: sp for cl in clusters for sp in cl.sprites}
     max_err = 0.0
     max_size_err = 0.0
-    depths = []
+    seen = {}
+    done = set()
+    ceiling = []
     n_vis = 0
+    zmin, zfar = sim.var("v.zmin"), sim.var("v.zfar")
     for bone, rc_name, *_ in order:
         tr = transforms.get(bone)
-        if tr is None or tr["scale"][0] <= 1e-6:
+        if tr is None or tr["scale"][0] <= 1e-6 or bone in done:
             continue
+        done.add(bone)
         corners, normal = quad_world(pack, bone, tr, rig_pos, transforms)
         centre = sum(corners) / 4
         pc = cam.project(centre)
@@ -339,14 +370,51 @@ def check_frame(pack, sim, clusters, cam, rig_pos, transforms, rcs, report, tag)
         # sprite must face the camera (plane parallel to the view plane)
         n = normal / np.linalg.norm(normal)
         report["max_facing_err"] = max(report["max_facing_err"], 1 - abs(n @ cam.f))
-        depths.append(pc[2])
-    viol = sum(1 for a, b in zip(depths, depths[1:]) if b >= a - 1e-6)
-    report["order_violations"] += viol
+        # winding: for an unrotated model these corners give +z while the
+        # south face's outside is world -z, so the face is front facing when
+        # the camera is on the -geo_n side (matters if a material culls)
+        geo_n = np.cross(corners[1] - corners[0], corners[3] - corners[0])
+        if geo_n @ (cam.pos - centre) > 0:
+            report["back_facing"] += 1
+        # compare clusters by their shared depth (pieces carry a tiny bias,
+        # ceiling sprites a slot step)
+        sp = by_name[bone]
+        if "ceiling" in sp.flags:
+            # the deck is the lowest layer: at or in front of its true depth
+            true_z = zmin * math.exp(-math.log(G.ZMIN_FRAC) * min(1, max(0, math.log(
+                max(true_distance(sim, by_name, cam, bone), 80) / 80) / math.log(50))))
+            if pc[2] > true_z * 1.001:
+                report["ceiling_behind_true_depth"] += 1
+            ceiling.append((sp.bias, pc[2]))
+            continue
+        z_cluster = pc[2] / (1 - G.PIECE_BIAS * sp.bias)
+        seen[bone] = (true_distance(sim, by_name, cam, bone), z_cluster, sp)
+        if not (zmin * 0.97 <= pc[2] <= zfar * (G.CI_BAND[1] + 0.001 if sp.layer == "ci" else 1.001)):
+            report["depth_out_of_range"] += 1
+    ceiling.sort()
+    report["ceiling_slot_order"] += sum(1 for a, b in zip(ceiling, ceiling[1:]) if b[1] >= a[1])
+    # cirrus: fixed slots behind every other cloud, decreasing in draw order
+    ci = [(z, sp) for d, z, sp in seen.values() if sp.layer == "ci"]
+    other = [z for d, z, sp in seen.values() if sp.layer != "ci"]
+    if ci and other and min(z for z, sp in ci) <= max(other):
+        report["cirrus_not_behind"] += 1
+    ci_order = [z for b in [o[0] for o in order] for z, sp in ci if sp.name == b]
+    report["cirrus_slot_order"] += sum(1 for a, b in zip(ci_order, ci_order[1:]) if b >= a)
+    # depth must grow with the true distance (clusters 5% apart or more)
+    items = [v for v in seen.values() if v[2].layer != "ci"]
+    bad = 0
+    for i in range(len(items)):
+        di, zi, si = items[i]
+        for j in range(len(items)):
+            dj, zj, sj = items[j]
+            if dj > di * 1.05 and zj <= zi:
+                bad += 1
+    report["depth_order_violations"] += bad
     report["max_screen_err_px"] = max(report["max_screen_err_px"], max_err)
     report["max_size_err"] = max(report["max_size_err"], max_size_err)
     report["visible"] = max(report["visible"], n_vis)
-    report["depth_range"] = (min(depths), max(depths)) if depths else (0, 0)
     return order
+
 
 
 def screen_positions(pack, cam, rig_pos, transforms, rcs):
@@ -380,11 +448,27 @@ def sky_colors(tod, rain):
     return zen * (1 - rain * 0.8) + grey * rain * 0.8, hor * (1 - rain * 0.8) + grey * rain * 0.8
 
 
-def render(pack, sim, cam, rig_pos, transforms, rcs, path, tod, rain=0.0, render_distance=8, ground=True):
+class Raster:
+    """Software model of the two GPU passes.
+
+    depth_bits: 16 or 24 (unorm, perspective depth with the near plane below)
+    alpha_mode: "mat" - alpha test on texture alpha * material alpha,
+                "raw" - alpha test on texture alpha only
+    halo_order: "pack" - the real draw order, "ideal" - far to near
+    """
+    NEAR = 0.05
+
+    def __init__(self, depth_bits=16, alpha_mode="mat", halo_order="pack"):
+        self.depth_bits, self.alpha_mode, self.halo_order = depth_bits, alpha_mode, halo_order
+
+    def quantise(self, z):
+        d = 1.0 - self.NEAR / max(z, self.NEAR)
+        return math.floor(d * (2 ** self.depth_bits - 1) + 0.5)
+
+
+def sky_image(cam, sim, tod, rain, ground):
     zen, hor = sky_colors(tod, rain)
-    ys = np.arange(HEIGHT)[:, None]
     img = np.zeros((HEIGHT, WIDTH, 3))
-    # sky by view elevation
     for y in range(HEIGHT):
         ray = cam.f * cam.focal + cam.u * (HEIGHT / 2 - y)
         el = ray[1] / np.linalg.norm(ray)
@@ -392,54 +476,115 @@ def render(pack, sim, cam, rig_pos, transforms, rcs, path, tod, rain=0.0, render
         img[y, :] = hor * (1 - t) + zen * t
         if ground and el < 0:
             img[y, :] = np.array([0.22, 0.32, 0.18]) * (0.35 + 0.65 * sim.var("v.day_lo")) * 0.9 + hor * 0.1
-    fog_col = hor
+    return img, hor
+
+
+def quad_pixels(pack, cam, bone, tr, rig_pos, transforms, atlas):
+    """Screen rectangle, point-sampled texture and view depth of a sprite."""
+    corners, _ = quad_world(pack, bone, tr, rig_pos, transforms)
+    pts = [cam.project(c) for c in corners]
+    if any(p is None for p in pts):
+        return None
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    x0f, x1f, y0f, y1f = min(xs), max(xs), min(ys), max(ys)
+    x0, x1 = max(0, int(math.ceil(x0f - 0.5))), min(WIDTH, int(math.ceil(x1f - 0.5)))
+    y0, y1 = max(0, int(math.ceil(y0f - 0.5))), min(HEIGHT, int(math.ceil(y1f - 0.5)))
+    if x1 <= x0 or y1 <= y0 or x1f - x0f > 20000:
+        return None
+    cube = pack.bone_by_name[bone]["cubes"][0]
+    u0, v0 = cube["uv"]["south"]["uv"]
+    n = atlas.shape[0] // 4
+    cell = atlas[v0 * n // 256:(v0 + 256) * n // 256, u0 * n // 256:(u0 + 256) * n // 256]
+    # pixel centres -> texel (point sampling, like the entity textures)
+    fx = (np.arange(x0, x1) + 0.5 - x0f) / (x1f - x0f)
+    fy = (np.arange(y0, y1) + 0.5 - y0f) / (y1f - y0f)
+    if pts[0][0] > pts[1][0]:
+        fx = 1 - fx
+    if pts[0][1] < pts[3][1]:
+        fy = 1 - fy
+    tx = np.clip((fx * n).astype(int), 0, n - 1)
+    ty = np.clip((fy * n).astype(int), 0, n - 1)
+    tex = cell[ty[:, None], tx[None, :]]
+    return (x0, x1, y0, y1), tex, pts[0][2]
+
+
+def compose(pack, sim, cam, rig_pos, transforms, rcs, tod, rain=0.0, render_distance=8,
+            ground=True, raster=None):
+    """Renders one frame; returns the image (HxWx3, linear 0..1)."""
+    raster = raster or Raster()
+    img, fog_col = sky_image(cam, sim, tod, rain, ground)
+    depth = np.full((HEIGHT, WIDTH), 2 ** 62, dtype=np.int64)
     rd = render_distance * 16.0
     fog_start, fog_end = (0.92, 1.0) if rain < 0.5 else (0.23 + 0.69 * (1 - rain), 0.7 + 0.3 * (1 - rain))
-    for bone, rc_name, color, overlay, tex in draw_order(pack, rcs):
+    lf = sim.var("v.lf")
+    draws = []
+    for seq, (bone, rc_name, color, overlay, tex, material, light) in enumerate(draw_order(pack, rcs)):
         tr = transforms.get(bone)
         if tr is None or tr["scale"][0] <= 1e-6:
             continue
-        corners, _ = quad_world(pack, bone, tr, rig_pos, transforms)
-        pts = [cam.project(c) for c in corners]
-        if any(p is None for p in pts):
+        q = quad_pixels(pack, cam, bone, tr, rig_pos, transforms, pack.atlas[tex])
+        if q is None:
             continue
-        xs = [p[0] for p in pts]
-        ysq = [p[1] for p in pts]
-        x0, x1, y0, y1 = int(min(xs)), int(max(xs)), int(min(ysq)), int(max(ysq))
-        if x1 < 0 or y1 < 0 or x0 >= WIDTH or y0 >= HEIGHT or x1 - x0 < 1 or y1 - y0 < 1:
-            continue
-        cube = pack.bone_by_name[bone]["cubes"][0]
-        u, v = cube["uv"]["south"]["uv"]
-        cell = pack.atlas[tex][v:v + 256, u:u + 256]
-        w, h = x1 - x0, y1 - y0
-        if w > 4000 or h > 4000:
-            continue
-        cell_img = Image.fromarray((cell * 255).astype(np.uint8), "RGBA").resize((w, h), Image.BILINEAR)
-        c = np.asarray(cell_img).astype(np.float32) / 255.0
-        # quad orientation: our image row 0 is the top of the cell
-        if pts[0][1] < pts[3][1]:
-            c = c[::-1]
-        if pts[0][0] > pts[1][0]:
-            c = c[:, ::-1]
-        cx0, cy0 = max(0, x0), max(0, y0)
-        cx1, cy1 = min(WIDTH, x1), min(HEIGHT, y1)
-        sub = c[cy0 - y0:cy1 - y0, cx0 - x0:cx1 - x0]
-        rgb = sub[..., :3] * np.array(color[:3])
+        draws.append((seq, material, q, color, overlay, light))
+    cores = [d for d in draws if d[1] == "entity_alphatest"]
+    halos = [d for d in draws if d[1] != "entity_alphatest"]
+    if raster.halo_order == "ideal":
+        halos.sort(key=lambda d: (-d[2][2], d[0]))
+    for seq, material, ((x0, x1, y0, y1), tex, z), color, overlay, light in cores + halos:
+        rgb = tex[..., :3] * np.array(color[:3])
         rgb = rgb * (1 - overlay[3]) + np.array(overlay[:3]) * overlay[3]
-        light = sim.var("v.lf") + 0.35 * overlay[3]
-        rgb = rgb * light
-        depth = pts[0][2]
-        fog = min(1, max(0, (depth / rd - fog_start) / (fog_end - fog_start)))
+        rgb = np.clip(rgb * (lf + 0.35 * overlay[3]) * light, 0, 1)
+        fog = min(1, max(0, (z / rd - fog_start) / (fog_end - fog_start)))
         rgb = rgb * (1 - fog) + fog_col * fog
-        a = sub[..., 3:4] * color[3]
-        img[cy0:cy1, cx0:cx1] = img[cy0:cy1, cx0:cx1] * (1 - a) + np.clip(rgb, 0, 1) * a
-    Image.fromarray((np.clip(img, 0, 1) ** (1 / 1.0) * 255).astype(np.uint8), "RGB").save(path)
+        zq = raster.quantise(z)
+        dbuf = depth[y0:y1, x0:x1]
+        passed = zq < dbuf
+        if material == "entity_alphatest":
+            a = tex[..., 3] * (color[3] if raster.alpha_mode == "mat" else 1.0)
+            keep = passed & (a >= 0.5)
+            img[y0:y1, x0:x1][keep] = rgb[keep]
+            dbuf[keep] = zq
+        else:
+            a = np.clip(tex[..., 3] * color[3], 0, 1)[..., None]
+            blended = img[y0:y1, x0:x1] * (1 - a) + rgb * a
+            img[y0:y1, x0:x1][passed] = blended[passed]
+            dbuf[passed] = zq
+    return img
+
+
+def save_image(img, path):
+    Image.fromarray((np.clip(img, 0, 1) * 255 + 0.5).astype(np.uint8), "RGB").save(path)
+
+
+def artefacts(pack, sim, cam, rig_pos, transforms, rcs, tod, rain=0.0, ground=True):
+    """Differences between the real draw order and an ideal far-to-near halo
+    order, for both depth precisions and both alpha-test semantics."""
+    out = {}
+    worst = None
+    for bits in (16, 24):
+        for mode in ("mat", "raw"):
+            real = compose(pack, sim, cam, rig_pos, transforms, rcs, tod, rain, ground=ground,
+                           raster=Raster(bits, mode, "pack"))
+            ideal = compose(pack, sim, cam, rig_pos, transforms, rcs, tod, rain, ground=ground,
+                            raster=Raster(bits, mode, "ideal"))
+            diff = np.abs(real - ideal).max(-1)
+            key = f"d{bits}_{mode}"
+            out[key] = {"max": round(float(diff.max()), 3),
+                        "px_over_0.04": int((diff > 0.04).sum()),
+                        "px_over_0.10": int((diff > 0.10).sum())}
+            if worst is None or out[key]["px_over_0.04"] > worst[0]:
+                worst = (out[key]["px_over_0.04"], key, real, ideal, diff)
+    return out, worst
 
 
 # ---------------------------------------------------------------------------
 
 def run_checks(pack, clusters):
-    report = {"order_violations": 0, "max_screen_err_px": 0.0, "max_size_err": 0.0, "behind": 0,
+    report = {"depth_order_violations": 0, "depth_out_of_range": 0, "back_facing": 0,
+              "cirrus_not_behind": 0, "cirrus_slot_order": 0, "ceiling_behind_true_depth": 0,
+              "ceiling_slot_order": 0,
+              "max_screen_err_px": 0.0, "max_size_err": 0.0, "behind": 0,
               "truth_behind": 0, "max_facing_err": 0.0, "visible": 0}
     results = {}
     props = default_props(tier=3, detail=3, cu=0.6, st=0.3, ac=0.45, ci=0.6, autoq=0)
@@ -536,38 +681,76 @@ def run_checks(pack, clusters):
     return results
 
 
+PREVIEW_SHOTS = [
+    ("noon_realistic", 0.5, dict(cu=0.45, st=0.08, ac=0.25, ci=0.35), 0.0, (-24, 20)),
+    ("afternoon_cumulus", 0.6, dict(cu=0.7, st=0.0, ac=0.06, ci=0.1, size=1.25), 0.0, (-18, 200)),
+    ("sunset_realistic", 0.735, dict(cu=0.45, st=0.08, ac=0.3, ci=0.45, warm=0.8, atmo=0.85), 0.0, (-14, 90)),
+    ("dusk_cirrus", 0.765, dict(cu=0.08, st=0.0, ac=0.2, ci=0.9, warm=0.85, atmo=0.9), 0.0, (-20, 90)),
+    ("night_moon", 0.02, dict(cu=0.4, st=0.05, ac=0.25, ci=0.3), 0.0, (-30, 0)),
+    ("overcast", 0.45, dict(cu=0.35, st=0.95, ac=0.3, ci=0.0, storm=0.15), 0.0, (-20, 300)),
+    ("storm", 0.55, dict(cu=0.72, st=0.8, ac=0.15, ci=0.1, storm=1, rain=1, thunder=1), 1.0, (-12, 150)),
+    ("fantasy", 0.7, dict(cu=0.5, st=0.0, ac=0.45, ci=0.55, fantasy=1, soft=2, size=1.35, warm=0.8), 0.0, (-22, 60)),
+    ("minimal", 0.42, dict(cu=0.3, st=0.0, ac=0.0, ci=0.22, tier=0, detail=0, lightq=0), 0.0, (-25, 0)),
+    ("crisp_dense", 0.55, dict(cu=1.0, st=0.3, ac=0.6, ci=0.6, soft=0), 0.0, (-35, 240)),
+    ("zenith_dense", 0.5, dict(cu=1.0, st=0.4, ac=0.8, ci=0.9), 0.0, (-80, 30)),
+    ("above_clouds", 0.66, dict(cu=0.65, st=0.4, ac=0.3, ci=0.4), 0.0, (16, 120)),
+]
+
+
+def settle(pack, props, tod, pos, pitch, yaw, frames=160):
+    sim = Sim(pack, props)
+    sim.time_of_day = tod
+    cam = Camera(pos + [0, 1.62, 0], pitch, yaw)
+    for i in range(frames):
+        tr, rcs = sim.frame(cam, pos - [0, 16, 0], dt=1 / 20)
+    return sim, cam, tr, rcs
+
+
 def previews(pack, clusters, only=None):
+    """Preview images (16-bit depth, real draw order) + artefact statistics."""
     os.makedirs(DOCS, exist_ok=True)
     base = np.array([512.0, 70.0, 300.0])
-    shots = [
-        ("noon_realistic", 0.5, dict(cu=0.45, st=0.08, ac=0.25, ci=0.35), 0.0, (-24, 20)),
-        ("afternoon_cumulus", 0.6, dict(cu=0.7, st=0.0, ac=0.06, ci=0.1, size=1.25), 0.0, (-18, 200)),
-        ("sunset_realistic", 0.735, dict(cu=0.45, st=0.08, ac=0.3, ci=0.45, warm=0.8, atmo=0.85), 0.0, (-14, 90)),
-        ("dusk_cirrus", 0.765, dict(cu=0.08, st=0.0, ac=0.2, ci=0.9, warm=0.85, atmo=0.9), 0.0, (-20, 90)),
-        ("night_moon", 0.02, dict(cu=0.4, st=0.05, ac=0.25, ci=0.3), 0.0, (-30, 0)),
-        ("overcast", 0.45, dict(cu=0.35, st=0.95, ac=0.3, ci=0.0, storm=0.15), 0.0, (-20, 300)),
-        ("storm", 0.55, dict(cu=0.72, st=0.8, ac=0.15, ci=0.1, storm=1, rain=1, thunder=1), 1.0, (-12, 150)),
-        ("fantasy", 0.7, dict(cu=0.5, st=0.0, ac=0.45, ci=0.55, fantasy=1, soft=2, size=1.35, warm=0.8), 0.0, (-22, 60)),
-        ("minimal", 0.42, dict(cu=0.3, st=0.0, ac=0.0, ci=0.22, tier=0, detail=0, lightq=0), 0.0, (-25, 0)),
-        ("above_clouds", 0.66, dict(cu=0.65, st=0.4, ac=0.3, ci=0.4), 0.0, (16, 120)),
-    ]
-    out = []
-    for name, tod, over, rain, (pitch, yaw) in shots:
+    stats = {}
+    for name, tod, over, rain, (pitch, yaw) in PREVIEW_SHOTS:
         if only and name not in only:
             continue
         props = default_props(**{**dict(tier=3, detail=3, lightq=2, autoq=0), **over})
-        sim = Sim(pack, props)
-        sim.time_of_day = tod
         y = 70.0 if name != "above_clouds" else 330.0
         pos = base + [0, y - base[1], 0]
-        cam = Camera(pos + [0, 1.62, 0], pitch, yaw)
-        for i in range(160):
-            tr, rcs = sim.frame(cam, pos - [0, 16, 0], dt=1 / 20)
+        sim, cam, tr, rcs = settle(pack, props, tod, pos, pitch, yaw)
+        ground = name != "above_clouds"
+        img = compose(pack, sim, cam, pos - [0, 16, 0], tr, rcs, tod, rain, ground=ground,
+                      raster=Raster(16, "mat", "pack"))
         path = os.path.join(DOCS, f"preview_{name}.png")
-        render(pack, sim, cam, pos - [0, 16, 0], tr, rcs, path, tod, rain=rain, ground=(name != "above_clouds"))
-        out.append(path)
-        print("  rendered", os.path.relpath(path, ROOT))
-    return out
+        save_image(img, path)
+        stats[name], worst = artefacts(pack, sim, cam, pos - [0, 16, 0], tr, rcs, tod, rain, ground)
+        if "--diff" in sys.argv and worst and worst[0]:
+            save_image(np.concatenate([worst[2], worst[3], np.repeat(worst[4][..., None] * 4, 3, -1)], 0),
+                       os.path.join(DOCS, f"artefacts_{name}.png"))
+        print("  rendered", os.path.relpath(path, ROOT), json.dumps(stats[name]))
+    return stats
+
+
+def robustness(pack, n=16, seed=5):
+    """Random views and random settings: real vs ideal halo order."""
+    rng = np.random.default_rng(seed)
+    worst = {"px_over_0.04": 0, "px_over_0.10": 0, "max": 0.0}
+    rows = []
+    for i in range(n):
+        over = dict(tier=3, detail=int(rng.integers(1, 4)), lightq=2, autoq=0,
+                    cu=float(rng.uniform(0.2, 1.0)), st=float(rng.uniform(0.0, 0.7)),
+                    ac=float(rng.uniform(0.0, 0.9)), ci=float(rng.uniform(0.0, 1.0)),
+                    size=float(rng.uniform(0.6, 2.0)), soft=int(rng.integers(0, 3)),
+                    height=int(rng.integers(140, 320)))
+        pos = np.array([rng.uniform(-5000, 5000), rng.uniform(64, 120), rng.uniform(-5000, 5000)])
+        pitch, yaw = float(rng.uniform(-88, 5)), float(rng.uniform(0, 360))
+        sim, cam, tr, rcs = settle(pack, default_props(**over), float(rng.uniform(0.3, 0.7)), pos, pitch, yaw, 40)
+        st, _ = artefacts(pack, sim, cam, pos - [0, 16, 0], tr, rcs, 0.5)
+        rows.append({"view": i, "pitch": round(pitch), **{k: v["px_over_0.04"] for k, v in st.items()}})
+        for v in st.values():
+            for k in worst:
+                worst[k] = max(worst[k], v[k])
+    return {"views": n, "worst": worst, "per_view_px_over_0.04": rows}
 
 
 def main():
@@ -576,12 +759,14 @@ def main():
     clusters = G.build_field()
     G.order_sprites(clusters)          # assigns the same names as the pack
     results = run_checks(pack, clusters)
-    print(json.dumps(results, indent=2))
     ok = True
     st = results["static"]
-    if st["order_violations"] or results["above_clouds"]["order_violations"]:
-        print("FAIL: draw order is not depth ordered"); ok = False
-    if st["max_screen_err_px"] > 1.0 or results["above_clouds"]["max_screen_err_px"] > 1.0:
+    ab = results["above_clouds"]
+    for key in ("depth_order_violations", "depth_out_of_range", "back_facing", "cirrus_not_behind",
+                "cirrus_slot_order", "ceiling_behind_true_depth", "ceiling_slot_order"):
+        if st[key] or ab[key]:
+            print(f"FAIL: {key}"); ok = False
+    if st["max_screen_err_px"] > 1.0 or ab["max_screen_err_px"] > 1.0:
         print("FAIL: projection error"); ok = False
     if st["max_size_err"] > 0.02:
         print("FAIL: projected size error"); ok = False
@@ -593,7 +778,12 @@ def main():
     if results["motion"]["jumps_over_40px"]:
         print("FAIL: clouds jump while moving"); ok = False
     if "--no-preview" not in sys.argv:
-        previews(pack, clusters)
+        results["previews_artefacts"] = previews(pack, clusters)
+    if "--no-robust" not in sys.argv:
+        results["robustness"] = robustness(pack)
+    print(json.dumps({k: v for k, v in results.items() if k != "robustness"}, indent=1))
+    if "robustness" in results:
+        print("robustness worst:", results["robustness"]["worst"])
     with open(os.path.join(DOCS, "simulation_results.json"), "w") as f:
         json.dump(results, f, indent=2)
     print(f"{'PASS' if ok else 'FAIL'} ({time.time() - t0:.0f}s)")

@@ -13,7 +13,11 @@ export interface Settings {
   enabled: boolean;
   profile: ProfileId;
   type: CloudType;
-  density: number; // %
+  density: number; // % overall cloud amount (50 = natural for the type)
+  cumulusAmount: number; // % per layer (100 = natural)
+  stratusAmount: number;
+  altoAmount: number;
+  cirrusAmount: number;
   quality: number; // 0 Low .. 3 Ultra
   detail: number; // 0..3
   lightQuality: number; // 0..2
@@ -45,6 +49,10 @@ export type NumericKey = {
 /** UI ranges of the numeric settings (also used to sanitise saved data). */
 export const RANGES: Record<Exclude<NumericKey, "v">, [number, number, number]> = {
   density: [0, 100, 5],
+  cumulusAmount: [0, 200, 10],
+  stratusAmount: [0, 200, 10],
+  altoAmount: [0, 200, 10],
+  cirrusAmount: [0, 200, 10],
   quality: [0, 3, 1],
   detail: [0, 3, 1],
   lightQuality: [0, 2, 1],
@@ -75,6 +83,10 @@ const BASE: Settings = {
   profile: "balanced",
   type: "realistic",
   density: 50,
+  cumulusAmount: 100,
+  stratusAmount: 100,
+  altoAmount: 100,
+  cirrusAmount: 100,
   quality: 1,
   detail: 1,
   lightQuality: 1,
@@ -253,10 +265,10 @@ export function toProperties(s: Settings, ws: WorldState): Record<string, number
     detail: perf ? 0 : s.detail,
     lightq: perf ? 0 : s.lightQuality,
     autoq: perf || s.autoQuality,
-    cu: c(mix.cu * f),
-    st: c(mix.st * f),
-    ac: c(mix.ac * f),
-    ci: c(mix.ci * f),
+    cu: c(mix.cu * f * (s.cumulusAmount / 100)),
+    st: c(mix.st * f * (s.stratusAmount / 100)),
+    ac: c(mix.ac * f * (s.altoAmount / 100)),
+    ci: c(mix.ci * f * (s.cirrusAmount / 100)),
     storm: c(mix.storm),
     fantasy: c(mix.fantasy),
     size: s.size / 100,

@@ -351,6 +351,7 @@ MATH = {
     "math.lerp": lambda a, b, t: a + (b - a) * t,
     "math.lerprotate": _lerprotate,
     "math.exp": lambda x: math.exp(min(x, 80.0)),
+    "math.ln": lambda x: math.log(x) if x > 0 else -1e30,
     "math.pow": lambda a, b: math.pow(a, b) if a >= 0 or float(b).is_integer() else 0.0,
     "math.sign": lambda x: 1.0 if x > 0 else (-1.0 if x < 0 else 0.0),
 }

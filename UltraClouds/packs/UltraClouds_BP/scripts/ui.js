@@ -9,6 +9,13 @@ const PAGES = {
         { kind: "choice", key: "type", text: "uc.type", items: TYPE_IDS.map((t) => `uc.type.${t}`) },
         { kind: "slider", key: "density", text: "uc.density" },
     ],
+    layers: [
+        { kind: "slider", key: "density", text: "uc.density" },
+        { kind: "slider", key: "cumulusAmount", text: "uc.amount.cu" },
+        { kind: "slider", key: "stratusAmount", text: "uc.amount.st" },
+        { kind: "slider", key: "altoAmount", text: "uc.amount.ac" },
+        { kind: "slider", key: "cirrusAmount", text: "uc.amount.ci" },
+    ],
     quality: [
         { kind: "choiceNum", key: "quality", text: "uc.quality", items: ["uc.q.0", "uc.q.1", "uc.q.2", "uc.q.3"] },
         { kind: "choiceNum", key: "detail", text: "uc.detail", items: ["uc.det.0", "uc.det.1", "uc.det.2", "uc.det.3"] },
@@ -39,6 +46,7 @@ const PAGES = {
     ],
 };
 const SUB_PAGES = [
+    { page: "layers", button: "uc.btn.layers", title: "uc.page.layers" },
     { page: "quality", button: "uc.btn.quality", title: "uc.page.quality" },
     { page: "shape", button: "uc.btn.shape", title: "uc.page.shape" },
     { page: "light", button: "uc.btn.light", title: "uc.page.light" },

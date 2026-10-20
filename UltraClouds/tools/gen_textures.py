@@ -16,7 +16,8 @@ used to hide the vanilla clouds.
 
 Cell layout (row-major, must match tools/gen_pack.py: CELLS):
   0-5  cumulus puffs         6-7  cumulus bases (seen slightly from below)
-  8-9  stratus sheets        10-11 cirrus streaks
+  8    stratus sheet          9    overcast slab (dense stratus)
+  10-11 cirrus streaks
   12-13 altocumulus patches  14 cumulonimbus tower   15 wisp / scud
 """
 import os
@@ -330,8 +331,10 @@ def cumulus_density(noise, rng, kind="puff", res=176):
             top = smoothstep(0.42, 0.55, Y)
             dens *= 1.0 - top * 0.45 * (1.0 - fib)
         # flat-ish base (condensation level) with a slightly ragged edge
-        ragged = 0.035 * (noise.fbm3(X * 7 + 3.1, Z * 7 + 1.7, Y * 0 + 0.5, octaves=3) - 0.5)
+        ragged = 0.05 * (noise.fbm3(X * 7 + 3.1, Z * 7 + 1.7, Y * 0 + 0.5, octaves=3) - 0.5)
         dens *= smoothstep(base_y - 0.03 + ragged, base_y + 0.05 + ragged, Y)
+    # rounded sides: the cloud must never touch the volume bounds (flat cuts)
+    dens *= 1.0 - smoothstep(0.84, 0.98, np.abs(X) + 0.1 * (billow - 0.5))
     return dens.astype(np.float32)
 
 
@@ -353,17 +356,20 @@ def cloud_base_density(noise, rng, res=CONTENT):
     Ys = Y + shear * Z          # oblique view: reveals the flat underside
     balls = []
     for i in range(rng.integers(6, 10)):
-        cx = rng.uniform(-0.75, 0.75)
-        cz = rng.uniform(-0.5, 0.5)
-        r = rng.uniform(0.22, 0.36)
-        balls.append((cx, -0.05 + rng.uniform(0, 0.25), cz, r * 1.4, r, r * 1.3))
-    balls.append((0.0, -0.1, 0.0, 0.9, 0.18, 0.7))
+        cx = rng.uniform(-0.5, 0.5)
+        cz = rng.uniform(-0.45, 0.45)
+        r = rng.uniform(0.2, 0.3)
+        balls.append((cx, -0.05 + rng.uniform(0, 0.25), cz, r * 1.35, r, r * 1.25))
+    balls.append((0.0, -0.1, 0.0, 0.72, 0.18, 0.62))
     shape = metaballs(Ys, X, Z, balls, k=8.0)
     off = rng.uniform(0, 100, 3)
     billow = noise.fbm3(X * 2.8 + off[0], Ys * 2.8 + off[1], Z * 2.8 + off[2], octaves=5, billow=True)
     dens = shape + 0.3 * (billow - 0.62)
     dens = smoothstep(-0.04, 0.2, dens)
     dens *= smoothstep(-0.28, -0.18, Ys)
+    # rounded sides: the cloud must never touch the volume bounds (flat cuts)
+    edge = np.abs(X) + 0.12 * (billow - 0.5)
+    dens *= 1.0 - smoothstep(0.78, 0.95, edge)
     return dens.astype(np.float32)
 
 
@@ -416,6 +422,32 @@ def stratus_sprite(noise, rng):
     tone -= 0.12 * smoothstep(-0.3, 0.7, Y)            # darker underside
     rgb = np.stack([tone * 0.975, tone * 0.99, tone * 1.03], -1)
     return np.clip(rgb, 0, 1), np.clip(alpha * 0.97, 0, 1)
+
+
+def slab_sprite(noise, rng):
+    """Dense overcast slab: an almost fully opaque, roughly rectangular piece
+    of a stratus deck with lumpy rolls and a soft, irregular border.  Used by
+    the overcast ceiling, where neighbouring pieces must close the sky with
+    little overlap (fewer, smaller quads = less overdraw on phones)."""
+    Y, X = coords2()
+    off = rng.uniform(0, 100, 4)
+    w1 = noise.fbm2(X * 1.6 + off[0], Y * 1.6 + off[1], octaves=5) - 0.5
+    w2 = noise.fbm2(X * 4.0 + off[1], Y * 4.0 + off[2], octaves=4) - 0.5
+    r = (np.abs(X / 0.9) ** 3 + np.abs(Y / 0.86) ** 3) ** (1 / 3) + 0.3 * w1 + 0.1 * w2
+    mask = 1.0 - smoothstep(0.78, 0.99, r)
+    rolls = noise.fbm2(X * 2.4 + w1 * 0.9 + off[2], Y * 3.8 + off[3], octaves=5, billow=True)
+    big = noise.fbm2(X * 1.2 + off[1], Y * 1.5 + off[0], octaves=3)
+    thick = mask * (0.6 + 0.4 * rolls) * (0.8 + 0.4 * big)
+    thick = gaussian_blur(thick, 1.2)
+    alpha = np.clip(1.0 - np.exp(-thick * 7.0), 0, 1)
+    shade = _relief_shade(gaussian_blur(thick, 2.5), 1.4)
+    tone = 0.8 + 0.2 * (shade - 0.5) + 0.06 * (big - 0.5)
+    # towards the border the tone settles on the mean, so the seams between
+    # overlapping slabs of the ceiling do not show
+    edge = smoothstep(0.45, 0.85, r)
+    tone = tone * (1 - edge) + 0.8 * edge
+    rgb = np.stack([tone * 0.975, tone * 0.99, tone * 1.03], -1)
+    return np.clip(rgb, 0, 1), alpha
 
 
 def cirrus_sprite(noise, rng, hooked=False):
@@ -494,8 +526,10 @@ def finish_cell(rgb, alpha, content=CONTENT, cell=CELL, normalize=True):
     crop_rgb, crop_a = rgb[y0:y1, x0:x1], alpha[y0:y1, x0:x1]
     pm = Image.fromarray((np.clip(crop_rgb * crop_a[..., None], 0, 1) * 255 + 0.5).astype(np.uint8), "RGB")
     am = Image.fromarray((np.clip(crop_a, 0, 1) * 255 + 0.5).astype(np.uint8), "L")
-    pm = np.asarray(pm.resize((content, content), Image.LANCZOS)).astype(np.float32) / 255.0
-    am = np.asarray(am.resize((content, content), Image.LANCZOS)).astype(np.float32) / 255.0
+    # bilinear, not Lanczos: Lanczos rings at the steep core edges, which
+    # makes edge texels brighter than the inside (light seams in the sky)
+    pm = np.asarray(pm.resize((content, content), Image.BILINEAR)).astype(np.float32) / 255.0
+    am = np.asarray(am.resize((content, content), Image.BILINEAR)).astype(np.float32) / 255.0
     rgb = pm / np.maximum(am[..., None], 1e-3)
     pad = (cell - content) // 2
     full_rgb = np.zeros((cell, cell, 3), np.float32)
@@ -519,6 +553,22 @@ def soften(rgb, alpha, sigma=3.2, gamma=1.25, contrast=0.8):
     return rgb2, a2
 
 
+def core_profile(alpha, q_core, halo_max, width=0.12):
+    """Give a layer cloud an opaque core with a faint halo.
+
+    The pack draws every cloud twice: an alpha-tested core pass (robust depth,
+    no invisible rectangles) and a blended halo pass.  The texture therefore
+    needs a dense inside (alpha ~1) that turns steeply into a soft halo whose
+    alpha stays below 0.5 (the alpha-test threshold, whatever the material
+    colour does to it)."""
+    nz = alpha[alpha > 0.02]
+    hi = float(np.quantile(nz, 1.0 - q_core))
+    lo = max(hi - width, 0.05)
+    out = np.where(alpha <= lo, alpha / lo * halo_max,
+                   halo_max + (1.0 - halo_max) * smoothstep(lo, hi, alpha))
+    return np.clip(out, 0, 1).astype(np.float32)
+
+
 def to_image(rgb, alpha):
     arr = np.concatenate([np.clip(rgb, 0, 1), np.clip(alpha, 0, 1)[..., None]], -1)
     return Image.fromarray((arr * 255.0 + 0.5).astype(np.uint8), "RGBA")
@@ -526,7 +576,7 @@ def to_image(rgb, alpha):
 
 # (kind, seed offset) for every cell, in atlas order
 CELL_JOBS = [("puff", i) for i in range(6)] + [("base", 0), ("base", 1),
-             ("stratus", 0), ("stratus", 1), ("cirrus", 0), ("cirrus_hook", 0),
+             ("stratus", 0), ("slab", 0), ("cirrus", 0), ("cirrus_hook", 0),
              ("alto", 0), ("alto", 1), ("tower", 0), ("wisp", 0)]
 
 
@@ -548,12 +598,22 @@ def render_cell(job, seed=20261020):
                                sigma_light=5.0, ambient=0.7)
     elif kind == "stratus":
         rgb, a = stratus_sprite(noise, rng)
+        a = core_profile(a, 0.55, 0.42)
+    elif kind == "slab":
+        rgb, a = slab_sprite(noise, rng)
+        a = core_profile(a, 0.85, 0.42)
+        c_rgb, c_a, aspect = finish_cell(rgb, a)
+        # edge texels take the colour of the dense inside: no light seams
+        # where the slabs of the overcast ceiling overlap
+        c_rgb = bleed_colors(c_rgb, (c_a >= 0.985).astype(np.float32))
+        return c_rgb, c_a, aspect
     elif kind == "cirrus":
         return finish_cell(*cirrus_sprite(noise, rng, hooked=False), normalize=False)
     elif kind == "cirrus_hook":
         return finish_cell(*cirrus_sprite(noise, rng, hooked=True), normalize=False)
     elif kind == "alto":
         rgb, a = alto_sprite(noise, rng)
+        a = core_profile(a, 0.5, 0.42)
     else:
         raise ValueError(kind)
     return finish_cell(rgb, a)

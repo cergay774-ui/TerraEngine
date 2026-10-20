@@ -13,7 +13,7 @@
   {
    "index": 2,
    "kind": "puff",
-   "aspect": 1.6471
+   "aspect": 1.6311
   },
   {
    "index": 3,
@@ -33,22 +33,22 @@
   {
    "index": 6,
    "kind": "base",
-   "aspect": 1.5238
+   "aspect": 1.4297
   },
   {
    "index": 7,
    "kind": "base",
-   "aspect": 1.5664
+   "aspect": 1.4803
   },
   {
    "index": 8,
    "kind": "stratus",
-   "aspect": 1.5245
+   "aspect": 1.5282
   },
   {
    "index": 9,
-   "kind": "stratus",
-   "aspect": 1.5725
+   "kind": "slab",
+   "aspect": 1.0547
   },
   {
    "index": 10,
@@ -63,17 +63,17 @@
   {
    "index": 12,
    "kind": "alto",
-   "aspect": 1.1908
+   "aspect": 1.1883
   },
   {
    "index": 13,
    "kind": "alto",
-   "aspect": 1.4737
+   "aspect": 1.4812
   },
   {
    "index": 14,
    "kind": "tower",
-   "aspect": 1.1397
+   "aspect": 1.1285
   },
   {
    "index": 15,

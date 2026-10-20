@@ -197,10 +197,20 @@ def check_rp():
             if name not in rcs["render_controllers"]:
                 err(f"client entity references unknown render controller {name}")
             analyse(cond, f"render controller condition {name}")
+    vanilla_materials = {"entity_alphablend", "entity_alphatest"}
+    for key, mat in desc.get("materials", {}).items():
+        if mat not in vanilla_materials:
+            err(f"material {key}: {mat} is not one of the vanilla materials used by this pack")
     for name, rc in rcs["render_controllers"].items():
         for field in ("color", "overlay_color"):
             for ch, v in rc.get(field, {}).items():
                 analyse(v, f"{name}/{field}.{ch}")
+        if "light_color_multiplier" in rc:
+            analyse(rc["light_color_multiplier"], f"{name}/light_color_multiplier")
+        for entry in rc.get("materials", []):
+            for pat, mref in entry.items():
+                if not mref.startswith("Material.") or mref.split(".", 1)[1] not in desc.get("materials", {}):
+                    err(f"{name}: material {mref} not declared in the client entity")
         for entry in rc.get("part_visibility", []):
             for pat, cond in entry.items():
                 if not isinstance(cond, bool):

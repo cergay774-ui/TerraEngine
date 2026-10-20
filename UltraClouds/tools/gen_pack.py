@@ -15,13 +15,17 @@ How the sky works (short version, see README for the long one):
     wrapping cloud field (several hundred to several thousand blocks wide).
   * Every frame, Molang computes the camera position, the true 3D position
     of each cluster/sprite, and then re-projects the sprite along the view
-    ray onto a fixed view depth ("sky depth") with a size scaled to keep the
-    exact same on-screen size.  This keeps clouds visible at any render
-    distance (vanilla fog never reaches them) while preserving correct
-    parallax, perspective and motion.
-  * Sprites are billboards parallel to the view plane, ordered by a strictly
-    decreasing view depth that matches their draw order -> correct
-    painter's-algorithm blending whether or not the material writes depth.
+    ray into the "sky depth" range with a size scaled to keep the exact same
+    on-screen size.  This keeps clouds visible at any render distance while
+    preserving correct parallax, perspective and motion.
+  * The projected depth grows with the true distance of the cluster
+    (logarithmic map), so the depth buffer itself sorts the clouds.
+  * Every cloud is drawn twice: an alpha-tested core pass (dense inside,
+    writes depth only where the cloud is) and a blended halo pass (soft
+    edges, drawn after all cores).  Alpha testing is what makes overlaps
+    robust: transparent parts of a quad never write depth, so no invisible
+    rectangle can cut another cloud, in any draw order and with any depth
+    buffer precision (16-bit depth on many phones).
 """
 import json
 import math
@@ -37,7 +41,7 @@ GEN_TS = os.path.join(ROOT, "src", "scripts", "generated.ts")
 NS = "ultra_clouds"
 ENTITY_ID = f"{NS}:sky"
 ITEM_ID = f"{NS}:cloud_settings"
-VERSION = [1, 0, 0]
+VERSION = [1, 1, 0]
 MIN_ENGINE = [1, 26, 50]
 SERVER_VERSION = "2.10.0"        # stable @minecraft/server for 1.26.50+
 SERVER_UI_VERSION = "2.2.0"      # stable @minecraft/server-ui for 1.26.50+
@@ -98,7 +102,8 @@ META = json.load(open(os.path.join(ROOT, "tools", "atlas_meta.json")))["cells"]
 ASPECT = {c["index"]: c["aspect"] for c in META}
 PUFFS = [0, 1, 2, 3, 4, 5]
 BASES = [6, 7]
-SHEETS = [8, 9]
+SHEETS = [8, 9]                # stratus sheet, dense overcast slab
+SLAB = 9
 STREAKS = [10, 11]
 PATCHES = [12, 13]
 TOWER = 14
@@ -118,8 +123,8 @@ LAYERS = {
                size=[(560, 820), (480, 720), (420, 640), (380, 560)]),
     "ac": dict(P=2560, counts=[6, 5, 5, 4], alt=170.0, yj=18.0,
                size=[(300, 440), (260, 380), (220, 340), (200, 300)]),
-    "ci": dict(P=4096, counts=[8, 6, 4, 4], alt=430.0, yj=45.0,
-               size=[(1100, 1500), (950, 1300), (850, 1150), (750, 1000)]),
+    "ci": dict(P=4096, counts=[5, 4, 3, 3], alt=430.0, yj=45.0,
+               size=[(1300, 1800), (1150, 1550), (1050, 1400), (950, 1250)]),
 }
 # wind multiplier and direction offset (deg) per layer (high clouds are faster)
 WIND = {"cu": (1.0, 0.0), "st": (0.9, -8.0), "ac": (1.35, 12.0), "ci": (1.8, 22.0)}
@@ -157,8 +162,7 @@ class Sprite:
         self.height = height          # quad height relative to cluster size
         self.flags = set(flags)
         self.name = None
-        self.idx_below = None
-        self.idx_above = None
+        self.bias = 0              # index among the cluster's pieces of one group
 
 
 class Cluster:
@@ -206,16 +210,23 @@ def build_field():
 # Overcast ceiling: sheets that sit on the stratus deck around the camera
 # (elevation, azimuth, width in units of the deck height above the camera).
 # Fades in only for dense stratus / rain so overcast skies really close up.
-OV_SPRITES = [(90, 0, 3.4)] + [(52, a, 2.9) for a in (0, 90, 180, 270)] + \
-             [(27, a, 3.6) for a in (45, 135, 225, 315)]
+# Rings use the dense slab texture and are sized so that neighbouring slabs
+# overlap (width >= 1.35 x spacing x cot(elevation)) from ~2 degrees above
+# the horizon up to the zenith, with as little overdraw as possible.
+OV_RINGS = [(8, 14, 7.2), (24, 10, 3.6), (46, 6, 2.0)]
+OV_ZENITH = 3.0
+OV_SPRITES = [(el, (360 / n) * (i + 0.5 * (r % 2)), w)
+              for r, (el, n, w) in enumerate(OV_RINGS) for i in range(n)] + [(90, 0, OV_ZENITH)]
 
 
 def overcast_ceiling(rng):
-    cl = Cluster("ov", 0, 0, 0.0, 0.0, 1.0, 1000.0, 0.0, 0.0, 0.0)
+    cl = Cluster("ov", 999, 0, 0.0, 0.0, 1.0, 1000.0, 0.0, 0.0, 0.0)
     for i, (el, az, wf) in enumerate(OV_SPRITES):
-        cell = SHEETS[i % 2]
+        cell = SLAB
         sp = Sprite("ov", "st", cl, 0, cell, 0.0, 0.0, 0.0, wf / ASPECT[cell], flags=("ceiling",))
-        sp.el, sp.az = el, az + rng.uniform(-12, 12)
+        n = {el: n for el, n, w in OV_RINGS}.get(el, 1)
+        sp.el, sp.az = el, az + rng.uniform(-1, 1) * 25 / n
+        sp.ring = [r[0] for r in OV_RINGS].index(el) if el != 90 else len(OV_RINGS)
         cl.sprites.append(sp)
     return cl
 
@@ -265,40 +276,80 @@ def add_sprites(rng, cl):
         S.append(Sprite(L, "ac", cl, 2, c1, rng.uniform(-0.5, 0.5), rng.uniform(-4, 4) / cl.size,
                         rng.uniform(-0.5, 0.5), 0.65 / ASPECT[c1]))
     elif L == "ci":
+        # one streak per formation: thin translucent layers must not overlap
         c0 = rng.choice(STREAKS)
         S.append(Sprite(L, "ci", cl, 0, c0, 0.0, 0.0, 0.0, 1.0 / ASPECT[c0]))
-        c1 = STREAKS[1] if c0 == STREAKS[0] else STREAKS[0]
-        S.append(Sprite(L, "ci", cl, 1, c1, rng.uniform(-0.5, 0.5), rng.uniform(-10, 10) / cl.size,
-                        rng.uniform(-0.6, 0.6), 0.7 / ASPECT[c1]))
 
 
-# draw order of render-controller groups (farthest first)
-ORDER_BELOW = ["ci", "ac", "cu", "cb", "st"]
-ORDER_ABOVE = ["ci", "ac", "st", "cb", "cu"]
+# Render groups.  Every group except cirrus is drawn twice:
+#  * core pass  (entity_alphatest): the dense inside of every cloud.  Alpha
+#    tested pixels never write depth where the cloud is transparent, so the
+#    depth buffer resolves overlaps correctly in any draw order and at any
+#    depth precision - no invisible rectangles can cut other clouds.
+#  * halo pass (entity_alphablend): the soft outer edge, drawn after all
+#    cores.  Its quads write depth, so it is drawn roughly back to front.
+# Cirrus is thin and translucent all over: it has no core.  The halo pass of
+# the layer clouds (big, overlapping sheets) is split into distance bins
+# drawn far to near, so a near sheet never blocks the halo of a far one.
+GROUPS = ["ci", "ac", "cu", "cb", "st"]
 LOW_GROUP = {"cu", "cb", "st"}
+CORE_GROUPS = ["cu", "cb", "st", "ac"]
+# depth ties are won by the group drawn first (LESS depth test).  The base
+# (shaded underside seen from below) sits just behind the cumulus body, so
+# it only shows where it peeks out below and around the body.
+CORE_BELOW = ["st", "cu", "cb", "ac"]
+CORE_ABOVE = ["cu", "cb", "st", "ac"]
+# halo order: wide layer halos first (far bins first), the thin cumulus
+# halos last.  A near cumulus drawn before a far stratus sheet would punch a
+# hole into the sheet's wide halo; the other way round a far cumulus only
+# loses a few pixels of its thin halo where a near sheet covers it.
+HALO_ORDER = ["ci", "ac", "st", "cb", "cu"]
+# Halo distance bins (bin 0 is the nearest, drawn last).
+#  * altocumulus: by the distance / height ratio (count, ln of the ratio
+#    covered).  It is always farther than the low layers along the same view
+#    ray, so it is drawn first.
+#  * low layers (stratus, cumulus, cumulus bases): shared bins of the
+#    normalised log distance, drawn bin by bin: stratus, bases, cumulus.
+#    The overcast ceiling is drawn after everything (it is the nearest).
+LAYER_BINS = {"ac": (3, 1.4)}
+# Cirrus (the highest layer, translucent all over) does not use its true
+# distance for depth: every cirrus sprite owns a fixed depth slot in a band
+# behind all other clouds, strictly decreasing in draw order.  Slots are
+# ~2.3% apart, so even a 16-bit depth buffer never lets one cirrus quad cut
+# another.  (Lower clouds never project deeper than ~0.84 zfar.)
+CI_BAND = (0.87, 1.19)
+LOW_BINS = 6
+LOW_LZ = (0.10, 0.68)          # ~120 .. ~950 blocks
+# geometry is authored tiny: should a bone ever be drawn while its animation
+# is not playing, it stays at a sub-pixel rest size instead of a visible quad
+GEO_SCALE = 256
+PIECE_BIAS = 0.004             # relative depth step between pieces of a cluster
+CEIL_STEP = 0.02               # relative depth step between overcast ceiling sprites
 
 
 def order_sprites(clusters):
-    """Bone order inside each RC group + global depth-slot indices."""
-    groups = {g: [] for g in ORDER_BELOW}
-    # within a group: clusters sorted by altitude, high first (correct from below)
-    for cl in sorted(clusters, key=lambda c: (-c.yoff, c.layer, c.k)):
-        for sp in sorted(cl.sprites, key=lambda s: (s.rank, "tower" in s.flags)):
+    """Bone order inside each group: clusters high first, then by piece rank;
+    the overcast ceiling (nearest of all, around the camera) comes last, its
+    rings from the horizon up to the zenith, i.e. far to near.
+
+    Pieces of one cluster get a tiny decreasing depth in halo draw order
+    (later piece nearer), so on precise depth buffers their halos never cut
+    each other; on coarse ones they tie and the piece drawn first wins."""
+    groups = {g: [] for g in GROUPS}
+    for cl in sorted(clusters, key=lambda c: (c.layer == "ov", -c.yoff, c.layer, c.k)):
+        pieces = sorted(cl.sprites, key=lambda s: (HALO_ORDER.index(s.rc), getattr(s, "el", 0),
+                                                   s.rank, "tower" in s.flags))
+        for i, sp in enumerate(pieces):
+            sp.bias = i
             groups[sp.rc].append(sp)
     for g, lst in groups.items():
         for i, sp in enumerate(lst):
-            sp.name = f"{g}_t{sp.cluster.tier}r{sp.rank}_{sp.cluster.k:03d}_{i:03d}"
-    total = 0
-    for g in ORDER_BELOW:
-        for sp in groups[g]:
-            sp.idx_below = total
-            total += 1
-    i = 0
-    for g in ORDER_ABOVE:
-        for sp in groups[g]:
-            sp.idx_above = i
-            i += 1
-    return groups, total
+            if sp.cluster.layer == "ov":
+                # ceiling: ring number first, so the halo pass can pick rings
+                sp.name = f"ov{sp.ring}_{i:03d}"
+            else:
+                sp.name = f"{g}_t{sp.cluster.tier}r{sp.rank}_{sp.cluster.k:03d}_{i:03d}"
+    return groups, sum(len(v) for v in groups.values())
 
 
 # --------------------------------------------------------------------------
@@ -307,10 +358,10 @@ def order_sprites(clusters):
 
 def build_geometry(groups):
     bones = [{"name": "root", "pivot": [0, 0, 0]}]
-    for g in ORDER_BELOW:                      # bone order == draw order per RC
+    for g in GROUPS:                           # bone order == draw order per RC
         for sp in groups[g]:
             a = ASPECT[sp.cell]
-            w, h = round(16 * a, 4), 16
+            w, h = round(16 * a / GEO_SCALE, 6), round(16 / GEO_SCALE, 6)
             col, row = sp.cell % 4, sp.cell // 4
             bones.append({
                 "name": sp.name,
@@ -358,6 +409,44 @@ def section(statements):
     return " ".join(statements)
 
 
+# Depth map: true distance 80..4000 blocks -> view depth zmin..zfar (log).
+# Nearer clouds always get a smaller depth (about 1% of depth per 7% of
+# distance, coarser than a 16-bit depth buffer resolves at these depths),
+# and terrain nearer than zmin (0.44 of the render distance) always covers
+# the clouds.
+ZMIN_FRAC = 0.55
+LD_NEAR = 80.0
+LD_FAR = 4000.0
+
+
+def log_dist(m):
+    """Molang: normalised log distance (0 at 80, 1 at 4000 blocks) for a
+    cluster whose 0.12 * distance is m."""
+    k = 1.0 / math.log(LD_FAR / LD_NEAR)
+    return f"math.clamp((math.ln(math.max({m} * 8.3333, 1)) - {fmt(math.log(LD_NEAR))}) * {fmt(k)}, 0, 1)"
+
+
+def log_depth(m):
+    """Molang: 16 * projected depth for a cluster whose 0.12*distance is m."""
+    return f"16 * v.zmin * math.exp({log_dist(m)} * {fmt(-math.log(ZMIN_FRAC))})"
+
+
+def ceil_slot(ov, sp):
+    """Depth factor of an overcast ceiling sprite, relative to the true depth
+    of the lowest ring (v.ov_d).  Slots shrink by CEIL_STEP per draw slot, so
+    every sprite sits at or in front of its true depth (the deck is the
+    lowest layer) and no two sprites ever share a depth."""
+    return (1 - CEIL_STEP) ** sp.bias
+
+
+def ci_slot(groups, sp):
+    """Depth factor (x zfar) of a cirrus sprite: first drawn = farthest."""
+    lst = groups["ci"]
+    j = lst.index(sp)
+    lo, hi = CI_BAND
+    return lo * (hi / lo) ** ((len(lst) - 1 - j) / max(len(lst) - 1, 1))
+
+
 def pre_animation(clusters, groups, total):
     out = []
     # ---- settings (smoothed so that every change animates in) ------------
@@ -383,13 +472,17 @@ def pre_animation(clusters, groups, total):
     for t in range(4):
         for r in range(4):
             s.append(f"v.g{t}{r} = v.on && v.tq >= {t} && v.dq >= {r};")
-    s.append("v.softi = (v.p_soft >= 2) ? 1 : 0;")
+    s.append("v.softi = (v.p_soft >= 2) ? 1 : 0; v.fringe = v.on && v.p_soft >= 1;")
     out.append(section(s))
     # ---- camera: orientation, offset from the rig, world position --------
     s = ["v.cp = q.camera_rotation(0); v.cy = q.camera_rotation(1);",
          "t.sp = math.sin(v.cp); t.cc = math.cos(v.cp);",
          "v.fx = -math.sin(v.cy) * t.cc; v.fy = -t.sp; v.fz = math.cos(v.cy) * t.cc;",
          "v.flip = (v.cp < 0) ? -1 : 1;",
+         # sheets must not reach below the horizon: on the view plane the
+         # horizon lies (world height of the sprite centre) / cos(pitch)
+         # below it, so the cap grows when looking up
+         f"v.hcap = {fmt(0.1125 * GEO_SCALE)} / math.max(t.cc, 0.05);",
          # lighting normal factor of the vanilla actor shader (Fancy graphics)
          "v.lf = q.graphics_mode_is_any('fancy') ? (0.725 + 0.275 * math.abs(t.sp) + 0.1 * t.cc * t.cc * math.cos(2 * v.cy)) : 1;",
          # camera offset relative to the rig root (rig lags 0-2 ticks behind)
@@ -410,7 +503,7 @@ def pre_animation(clusters, groups, total):
          # in rain the vanilla fog closes in: pull the sky nearer so dark
          # storm clouds stay visible instead of fading into the fog colour
          "v.zfar = v.p_depth * (1 - 0.45 * math.clamp(v.p_rain * v.p_wxi, 0, 1));",
-         f"v.dz = v.zfar * 0.42 / {total};",
+         f"v.zmin = v.zfar * {fmt(ZMIN_FRAC)}; v.zf3 = v.zfar * {3 * GEO_SCALE};",
          "v.above = v.cw_y > (v.p_height + 30);"]
     out.append(section(s))
     # ---- weather & cloud type driven layer state -------------------------
@@ -442,17 +535,8 @@ def pre_animation(clusters, groups, total):
     out.append(section(s))
     # ---- lighting ----------------------------------------------------------
     out += lighting_sections()
-    # ---- depth slot bases per render group (above / below order) ----------
-    s = ["v.zf3 = v.zfar * 3;"]
-    for g in ORDER_BELOW:
-        lst = groups[g]
-        if not lst:
-            continue
-        first_b, first_a = lst[0].idx_below, lst[0].idx_above
-        if g in LOW_GROUP:
-            s.append(f"v.zb_{g} = v.zfar - (v.above ? {first_a} : {first_b}) * v.dz;")
-        else:
-            s.append(f"v.zb_{g} = v.zfar - {first_b} * v.dz;")
+    # ---- layer offsets relative to the camera -----------------------------
+    s = []
     for L in LAYERS:
         s.append(f"v.ox_{L} = v.w{L}x - v.cw_x; v.oz_{L} = v.w{L}z - v.cw_z; v.oy_{L} = v.alt_{L} - v.cw_y;")
     out.append(section(s))
@@ -477,14 +561,30 @@ def pre_animation(clusters, groups, total):
                 body.append(f"{vv}_x = t.x; {vv}_z = t.z;")
                 body.append(f"{vv}_f = t.x * v.fx + {vv}_y * v.fy + t.z * v.fz;")
                 body.append(f"{vv}_m = 0.12 * math.sqrt(t.dh + {vv}_y * {vv}_y);")
+                # projected depth of the whole cluster (its pieces share it)
+                vis = [f"t.lz = {log_dist(vv + '_m')};",
+                       f"{vv}_d = 16 * v.zmin * math.exp(t.lz * {fmt(-math.log(ZMIN_FRAC))});"]
                 if L == "cu":
                     # sine of the elevation of the cloud seen from the camera:
                     # side view (low) -> body sprites, from below -> flat base
-                    body.append(f"{vv}_e = math.clamp((0.12 * {vv}_y / math.max({vv}_m, 0.001) - 0.3) * 2.2, 0, 1);")
+                    vis.append(f"{vv}_e = math.clamp((0.12 * {vv}_y / math.max({vv}_m, 0.001) - 0.3) * 2.2, 0, 1);")
                 else:
                     # layer clouds are horizontal sheets: their apparent height
-                    # shrinks with the viewing elevation (thin bands at the horizon)
-                    body.append(f"{vv}_q = math.clamp(0.19 * math.abs({vv}_y) / math.max({vv}_m, 0.001), 0.06, 1);")
+                    # shrinks with the viewing elevation; very low sheets fade
+                    # out completely instead of turning into thin lines
+                    vis.append(f"t.se = 0.12 * math.abs({vv}_y) / math.max({vv}_m, 0.001);")
+                    vis.append(f"{vv}_q = math.clamp(1.6 * t.se, 0.3, 1);")
+                    vis.append(f"{vv}_h = math.clamp((t.se - 0.05) * 12, 0, 1);")
+                if L == "ci":
+                    pass
+                elif L not in LAYER_BINS:
+                    lo, hi = LOW_LZ
+                    vis.append(f"v.bin_{L}{cl.k} = math.min(math.floor(math.clamp((t.lz - {fmt(lo)}) * {fmt(1 / (hi - lo))}, 0, 1) * {LOW_BINS}), {LOW_BINS - 1});")
+                else:
+                    # distance bin of the halo pass (far bins drawn first)
+                    nb, span = LAYER_BINS[L]
+                    vis.append(f"v.bin_{L}{cl.k} = math.min(math.floor(math.clamp(math.ln(math.max({vv}_m, 0.001) / math.max(0.12 * math.abs({vv}_y), 0.001)) / {fmt(span)}, 0, 1) * {nb}), {nb - 1});")
+                body.append(f"({vv}_g > 0.5) ? {{ " + " ".join(vis) + " };")
             out.append(f"(v.g{tier}0) ? {{ " + " ".join(body) + " };")
             for rank in range(4):
                 body = []
@@ -494,14 +594,19 @@ def pre_animation(clusters, groups, total):
                         if sp.rank != rank:
                             continue
                         sv = f"v.s{sp.name}"
-                        g = sp.rc
-                        within = (sp.idx_below - groups[g][0].idx_below)
-                        extra = " * v.stormf" if "tower" in sp.flags else ""
-                        if "base" in sp.flags:
+                        extra = ""
+                        if "tower" in sp.flags:
+                            extra = " * v.stormf"
+                        elif "base" in sp.flags:
                             extra = f" * {vv}_e"
+                        elif L != "cu":
+                            extra = f" * {vv}_h"
+                        depth = f"{vv}_d" if sp.bias == 0 else f"{vv}_d * {fmt(1 - PIECE_BIAS * sp.bias)}"
+                        if L == "ci":
+                            depth = f"v.zfar * {16 * ci_slot(groups, sp):.4f}"
                         body.append(f"t.f = {vv}_f + {vv}_g * ({fmt(sp.ox)} * v.fx + {fmt(sp.oy)} * v.fy + {fmt(sp.oz)} * v.fz);")
-                        body.append(f"{sv}_k = (t.f > {vv}_m && {vv}_g > 0.5) ? 16 * (v.zb_{g} - {within} * v.dz) / t.f : 0;")
-                        body.append(f"{sv}_s = math.min({sv}_k * {vv}_g * {sp.height / 16:.7f}{extra}, v.zf3);")
+                        body.append(f"{sv}_k = (t.f > {vv}_m && {vv}_g > 0.5) ? {depth} / t.f : 0;")
+                        body.append(f"{sv}_s = math.min({sv}_k * {vv}_g * {sp.height * GEO_SCALE / 16:.6f}{extra}, v.zf3);")
                 if body:
                     out.append(f"(v.g{tier}{rank}) ? {{ " + " ".join(body) + " };")
     # ---- overcast ceiling -------------------------------------------------
@@ -509,18 +614,20 @@ def pre_animation(clusters, groups, total):
     body = ["v.ov_y = v.oy_st;",
             "v.ov_vis = (v.above ? 0 : 1) * math.clamp((v.d_st - 0.55) * 2.6, 0, 1);",
             "v.ov_phi = (v.ov_phi ?? 0) + v.p_wspeed * v.dt / math.max(v.ov_y, 20) * 40;"]
-    calc = []
+    # all ceiling sprites share the zenith depth plus a clear step per draw
+    # slot (far rings drawn first), large enough for 16-bit depth buffers
+    low = min(sp.el for sp in ov.sprites)
+    calc = [f"v.ov_d = {log_depth(f'0.12 * v.ov_y * {fmt(1 / math.sin(math.radians(low)))}')};"]
     for sp in ov.sprites:
         sv = f"v.s{sp.name}"
-        within = sp.idx_below - groups["st"][0].idx_below
         body.append(f"{sv}_k = 0; {sv}_s = 0;")
         cot = math.cos(math.radians(sp.el)) / math.sin(math.radians(sp.el))
         calc.append(f"t.a = {fmt(sp.az)} + v.ov_phi; t.hd = v.ov_y * {fmt(cot)};")
         calc.append(f"{sv}_vx = t.hd * math.sin(t.a); {sv}_vy = v.ov_y; {sv}_vz = t.hd * math.cos(t.a);")
         calc.append(f"t.f = {sv}_vx * v.fx + {sv}_vy * v.fy + {sv}_vz * v.fz;")
         calc.append(f"t.m = 0.12 * math.sqrt({sv}_vx * {sv}_vx + {sv}_vy * {sv}_vy + {sv}_vz * {sv}_vz);")
-        calc.append(f"{sv}_k = (t.f > t.m) ? 16 * (v.zb_st - {within} * v.dz) / t.f : 0;")
-        calc.append(f"{sv}_s = math.min({sv}_k * v.ov_y * {sp.height / 16:.7f} * v.ov_vis, v.zf3);")
+        calc.append(f"{sv}_k = (t.f > t.m) ? v.ov_d * {ceil_slot(ov, sp):.4f} / t.f : 0;")
+        calc.append(f"{sv}_s = math.min({sv}_k * v.ov_y * {sp.height * GEO_SCALE / 16:.6f} * v.ov_vis, v.zf3);")
     out.append(section(body) + " (v.g00 && v.ov_vis > 0.01 && v.ov_y > 5) ? { " + " ".join(calc) + " };")
     return out
 
@@ -576,6 +683,15 @@ def lighting_sections():
     s += tint("ti", "ci", (1.0, 1.0, 1.0), (1.0, 0.68, 0.55), (0.95, 0.55, 0.75), storm_mul=0.35)
     # lighting quality Low: one shared tint for every layer (cheapest look)
     s.append("(v.lq < 1) ? { v.tb_r = v.tu_r; v.tb_g = v.tu_g; v.tb_b = v.tu_b; v.ta_r = v.tu_r; v.ta_g = v.tu_g; v.ta_b = v.tu_b; v.ti_r = v.tu_r; v.ti_g = v.tu_g; v.ti_b = v.tu_b; };")
+    # split every tint into a material colour (never above 1, so the shader
+    # cannot clamp it; carries all darkening) and the part of the brightness
+    # above 1, which goes through light_color_multiplier together with the
+    # compensation of the actor shader's directional shading (that shading is
+    # what made the first version look grey).  If an engine ignored the
+    # multiplier, colours and night/storm darkness would still be right.
+    for X in RC_TINT.values():
+        s.append(f"v.{X}_l = math.max(math.max(v.{X}_r, v.{X}_g), math.max(v.{X}_b, 1));")
+        s.append(f"v.{X}_hr = v.{X}_r / v.{X}_l; v.{X}_hg = v.{X}_g / v.{X}_l; v.{X}_hb = v.{X}_b / v.{X}_l;")
     # contrast / haze: overlay towards the layer's mean tone
     s.append("v.oa = math.clamp((1 - v.p_contrast) * 0.34 + v.wet * 0.12 + ((v.p_soft == 0) ? -0.08 : 0), 0, 0.6);")
     s.append("v.alpha_ci = math.clamp(0.82 + 0.18 * v.p_contrast, 0, 1);")
@@ -585,51 +701,89 @@ def lighting_sections():
                      "v.ol = v.lf + 0.35 * v.oa;"])]
 
 
-def rc_color(tint, alpha="1"):
+RC_TINT = {"cu": "tu", "cb": "tb", "st": "ts", "ac": "ta", "ci": "ti"}
+CORE_ALPHA = 0.55              # alpha test keeps texture alpha >= 0.91
+
+
+def rc_color(tint, alpha):
     return {
-        "color": {"r": f"v.{tint}_r / v.ol", "g": f"v.{tint}_g / v.ol", "b": f"v.{tint}_b / v.ol",
-                  "a": alpha},
-        "overlay_color": {"r": f"v.{tint}_r * 0.8 / v.ol", "g": f"v.{tint}_g * 0.8 / v.ol",
-                          "b": f"v.{tint}_b * 0.82 / v.ol", "a": "v.oa"},
+        "color": {"r": f"v.{tint}_hr", "g": f"v.{tint}_hg", "b": f"v.{tint}_hb", "a": alpha},
+        "overlay_color": {"r": f"v.{tint}_hr * 0.82", "g": f"v.{tint}_hg * 0.82",
+                          "b": f"v.{tint}_hb * 0.84", "a": "v.oa"},
+        "light_color_multiplier": f"math.min(v.{tint}_l / v.ol, 2.5)",
     }
 
 
-RC_TINT = {"cu": "tu", "cb": "tb", "st": "ts", "ac": "ta", "ci": "ti"}
+def tier_rank_visibility(sprites, g):
+    """Core pass: every piece whose quality tier / detail rank is active
+    (bones of inactive levels are not drawn at all - no wasted draw calls)."""
+    vis = [{"*": False}]
+    for t, r in sorted({(sp.cluster.tier, sp.rank) for sp in sprites if sp.cluster.layer != "ov"}):
+        vis.append({f"{g}_t{t}r{r}_*": f"v.g{t}{r}"})
+    return vis
+
+
+def binned_visibility(sprites, g, b, layer_var):
+    """Halo bin b of a group: one rule per (tier, rank, cluster)."""
+    vis = [{"*": False}]
+    for t, r, k in sorted({(sp.cluster.tier, sp.rank, sp.cluster.k) for sp in sprites if sp.cluster.layer != "ov"}):
+        vis.append({f"{g}_t{t}r{r}_{k:03d}_*": f"v.g{t}{r} && v.bin_{layer_var}{k} == {b}"})
+    return vis
 
 
 def build_render_controllers(groups):
+    """Returns (render controller file, ordered entity render controller list)."""
+    R = "controller.render.ultra_clouds."
     rcs = {}
-    order = []
-    for g in ORDER_BELOW:
-        variants = [("", None)] if g not in LOW_GROUP else [("_b", "!v.above"), ("_a", "v.above")]
-        for suffix, cond in variants:
-            name = f"controller.render.ultra_clouds.{g}{suffix}"
-            vis = [{"*": False}]
-            seen = set()
-            for sp in groups[g]:
-                key = (sp.cluster.tier, sp.rank)
-                if key in seen:
-                    continue
-                seen.add(key)
-                vis.append({f"{g}_t{key[0]}r{key[1]}*": f"v.g{key[0]}{key[1]}"})
-            rc = {
-                "arrays": {"textures": {"Array.atlas": ["Texture.natural", "Texture.soft"]}},
-                "geometry": "Geometry.default",
-                "materials": [{"*": "Material.default"}],
-                "textures": ["Array.atlas[v.softi]"],
-                "part_visibility": vis,
-                "ignore_lighting": True,
-            }
-            rc.update(rc_color(RC_TINT[g], "v.alpha_ci" if g == "ci" else "1"))
-            rcs[name] = rc
-            order.append((name, cond))
-    # entity render order: ci, ac, [above: st, cb, cu], [below: cu, cb, st]
-    seq = ["ci", "ac"]
-    final = [{f"controller.render.ultra_clouds.{g}": "v.on"} for g in seq]
-    for g in ["st", "cb", "cu"]:
-        final.append({f"controller.render.ultra_clouds.{g}_a": "v.on && v.above"})
-    for g in ["cu", "cb", "st"]:
-        final.append({f"controller.render.ultra_clouds.{g}_b": "v.on && !v.above"})
+    base = {"arrays": {"textures": {"Array.atlas": ["Texture.natural", "Texture.soft"]}},
+            "geometry": "Geometry.default",
+            "ignore_lighting": True}
+
+    def add(name, g, material, texture, vis, alpha):
+        rc = dict(base, materials=[{"*": material}], textures=[texture], part_visibility=vis)
+        rc.update(rc_color(RC_TINT[g], alpha))
+        rcs[R + name] = rc
+        return R + name
+
+    # core pass: alpha tested, natural atlas, opaque.  Variants only change
+    # which group wins depth ties (below: lower layers in front).
+    core = {}
+    for g in CORE_GROUPS:
+        for suffix in (("_b", "_a") if g in LOW_GROUP else ("",)):
+            core[g + suffix] = add(f"core_{g}{suffix}", g, "Material.core", "Texture.natural",
+                                   tier_rank_visibility(groups[g], g), fmt(CORE_ALPHA))
+    # the overcast ceiling is the nearest of all: drawn first, so the GPU can
+    # reject the clouds hidden behind it before shading them
+    final = [{add("core_ceiling", "st", "Material.core", "Texture.natural", [{"*": False}, {"ov*": True}],
+                  fmt(CORE_ALPHA)): "v.on && v.ov_vis > 0.01"}]
+    final += [{core[g + "_b"]: "v.on && !v.above"} for g in CORE_BELOW if g in LOW_GROUP]
+    final += [{core[g + "_a"]: "v.on && v.above"} for g in CORE_ABOVE if g in LOW_GROUP]
+    final += [{core[g]: "v.on"} for g in CORE_BELOW if g not in LOW_GROUP]
+
+    # halo pass: blended, natural or soft atlas, far to near
+    soft = "Array.atlas[v.softi]"
+    # cirrus has no core: its halo is drawn even with crisp edges
+    name = add("halo_ci", "ci", "Material.default", soft, tier_rank_visibility(groups["ci"], "ci"), "v.alpha_ci")
+    final.append({name: "v.on"})
+    nb = LAYER_BINS["ac"][0]
+    for b in reversed(range(nb)):
+        name = add(f"halo_ac{b}", "ac", "Material.default", soft, binned_visibility(groups["ac"], "ac", b, "ac"), "1")
+        final.append({name: "v.fringe"})
+    for b in reversed(range(LOW_BINS)):
+        for g in ("st", "cb", "cu"):
+            name = add(f"halo_{g}{b}", g, "Material.default", soft,
+                       binned_visibility(groups[g], g, b, "st" if g == "st" else "cu"), "1")
+            final.append({name: "v.fringe"})
+    # overcast ceiling, nearest of all: the lowest ring always has soft edges
+    # (they meet the horizon); the upper rings only while the deck is still
+    # opening up - once it is closed their edges are hidden and skipping them
+    # saves the most expensive overdraw of the sky
+    name = add("halo_ceiling_low", "st", "Material.default", soft, [{"*": False}, {"ov0_*": True}], "1")
+    final.append({name: "v.fringe"})
+    upper = [{f"ov{r}_*": True} for r in range(1, len(OV_RINGS) + 1)]
+    name = add("halo_ceiling_high", "st", "Material.default", soft, [{"*": False}] + upper, "1")
+    final.append({name: "v.fringe && v.ov_vis < 0.97"})
+    assert all(list(e)[0] in rcs for e in final) and len(final) == len(rcs)
     return {"format_version": "1.8.0", "render_controllers": rcs}, final
 
 
@@ -644,7 +798,7 @@ def build_animations(clusters, groups):
     }
     names = {"root": "animation.ultra_clouds.root"}
     by_group = {}
-    for g in ORDER_BELOW:
+    for g in GROUPS:
         for sp in groups[g]:
             by_group.setdefault((sp.cluster.tier, sp.rank), []).append(sp)
     for (tier, rank), sps in sorted(by_group.items()):
@@ -653,11 +807,11 @@ def build_animations(clusters, groups):
             vv = sp.cluster.var
             sv = f"v.s{sp.name}"
             if "ceiling" in sp.flags:
-                q = min(1.0, max(0.06, 1.6 * math.sin(math.radians(sp.el))))
+                q = min(1.0, max(0.3, 1.6 * math.sin(math.radians(sp.el))))
                 bones[sp.name] = {
                     "position": [f"{sv}_vx * {sv}_k", f"{sv}_vy * {sv}_k", f"-{sv}_vz * {sv}_k"],
                     "rotation": ["v.cp", "v.cy", 0],
-                    "scale": [f"{sv}_s", f"math.min({sv}_s * {fmt(q)}, {sv}_k * 0.1125 * math.abs({sv}_vy))", "v.flip"],
+                    "scale": [f"{sv}_s", f"math.min({sv}_s * {fmt(q)}, {sv}_k * v.hcap * math.abs({sv}_vy))", "v.flip"],
                 }
                 continue
             # root sits on the camera; k already contains the 16 px/block factor
@@ -668,8 +822,9 @@ def build_animations(clusters, groups):
                     f"-({vv}_z + {vv}_g * {fmt(sp.oz)}) * {sv}_k",
                 ],
                 "rotation": ["v.cp", "v.cy", 0],
+                # sheets: foreshortened, and never reaching below the horizon
                 "scale": [f"{sv}_s", f"{sv}_s" if sp.layer == "cu" else
-                          f"math.min({sv}_s * {vv}_q, {sv}_k * 0.1125 * math.abs({vv}_y))", "v.flip"],
+                          f"math.min({sv}_s * {vv}_q, {sv}_k * v.hcap * math.abs({vv}_y))", "v.flip"],
             }
         aname = f"animation.ultra_clouds.t{tier}r{rank}"
         anims[aname] = {"loop": True, "bones": bones}
@@ -687,7 +842,7 @@ def build_client_entity(clusters, groups, total, anim_names, rc_order):
         "minecraft:client_entity": {
             "description": {
                 "identifier": ENTITY_ID,
-                "materials": {"default": "entity_alphablend"},
+                "materials": {"default": "entity_alphablend", "core": "entity_alphatest"},
                 "textures": {
                     "natural": "textures/ultra_clouds/atlas_natural",
                     "soft": "textures/ultra_clouds/atlas_soft",
