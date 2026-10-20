@@ -13,9 +13,9 @@ const NOISE_SIZE := 128
 
 # Общая часть шейдеров огня: цвет по «жару» h (0 — край, 1 — белое ядро).
 const FIRE_FN := """
-vec3 fire_ramp(float h, vec3 mid) {
+vec3 fire_ramp(float h, vec3 mid, float white) {
 	vec3 edge = mid * vec3(0.95, 0.36, 0.30);
-	vec3 hot = mix(mid, vec3(1.0, 0.96, 0.88), 0.82);
+	vec3 hot = mix(mid, vec3(1.0, 0.96, 0.88), white);
 	vec3 c = mix(edge, mid, smoothstep(0.10, 0.50, h));
 	return mix(c, hot, smoothstep(0.50, 0.92, h));
 }
@@ -35,6 +35,7 @@ uniform float turbo = 0.0;
 uniform float lift = 0.10;
 uniform float seed = 0.0;
 uniform float energy = 1.0;
+uniform float base_w = 0.4;
 
 varying vec2 fuv;
 
@@ -63,27 +64,35 @@ void fragment() {
 	float spd = mix(2.6, 5.0, turbo);
 	float n1 = texture(noise_tex, vec2(u * 0.22 + seed, t * flame_len * 0.10 - TIME * spd * 0.22)).r;
 	float n2 = texture(noise_tex, vec2(u * 0.55 - seed * 1.7, t * flame_len * 0.30 - TIME * spd * 0.75)).r;
-	float calm = 1.0 - 0.75 * turbo;
+	float calm = 1.0 - 0.8 * turbo;
 	// волна по ширине и рваный край
 	float wob = (n1 - 0.5) * 0.9 * t * calm;
-	float w = (0.48 + 0.52 * smoothstep(0.0, 0.2, t)) * pow(1.0 - t, mix(0.7, 0.5, turbo));
+	float w = mix(base_w, 1.0, smoothstep(0.0, 0.25, t)) * pow(1.0 - t, mix(0.7, 0.45, turbo));
 	float d = abs(u + wob) / max(w, 1e-3);
 	float rag = (n2 - 0.5) * (0.35 + 0.9 * t) * calm;
-	float body = 1.0 - smoothstep(0.45, 1.0, d + rag);
-	float tip = 1.0 - smoothstep(0.45, 1.0, t + (n1 - 0.5) * 0.45 * calm);
-	float core = (1.0 - smoothstep(0.0, 0.5, d)) * (1.0 - smoothstep(0.0, mix(0.45, 0.25, turbo), t));
-	float h = body * tip * (0.35 + 0.65 * pow(1.0 - t, 0.8)) + core * 0.45 + (n2 - 0.5) * 0.12;
-	h = clamp(h, 0.0, 1.0);
-	vec3 c = fire_ramp(h, col_mid);
-	float a = clamp(h * 1.7, 0.0, 1.0) * body * tip;
-	// форсаж: синяя оболочка прозрачнее, внутри — ряд ярких ромбов
-	float k = t * 6.5 - 0.15;
-	float dw = 0.42 * tri(k) * (1.0 - smoothstep(0.15, 0.95, t));
-	float diamonds = (1.0 - smoothstep(0.6, 1.0, abs(u) / max(w * dw, 1e-3))) * step(0.5, k);
-	diamonds *= turbo * (1.0 - smoothstep(0.35, 0.9, t)) * (0.85 + 0.3 * n2);
-	a *= mix(1.0, 0.8, turbo);
-	vec3 dcol = mix(vec3(1.0, 0.92, 0.95), col_mid, 0.25);
-	vec3 outc = c * (0.55 + 2.1 * h) * a + dcol * diamonds * 2.6;
+	float body = 1.0 - smoothstep(0.4, 1.0, d + rag);
+	float tip = 1.0 - smoothstep(0.4, 1.0, t + (n1 - 0.5) * 0.5 * calm);
+	float core = (1.0 - smoothstep(0.0, 0.55, d)) * (1.0 - smoothstep(0.0, mix(0.38, 0.2, turbo), t));
+	// продольные струи внутри пламени
+	float n3 = texture(noise_tex, vec2(u * 0.9 + seed * 3.1, t * flame_len * 0.06 - TIME * spd * 0.5)).r;
+	float h = body * tip * (0.3 + 0.7 * pow(1.0 - t, 1.2)) * (0.72 + 0.56 * n3 * calm + 0.28 * turbo) + (n2 - 0.5) * 0.15;
+	h = clamp(h * mix(1.0, 0.62, turbo), 0.0, 1.0);
+	float white = mix(0.75, 0.4, turbo);
+	vec3 c = fire_ramp(h, col_mid, white);
+	float a = smoothstep(0.0, 0.3, h) * body * tip * mix(1.0, 0.5, turbo);
+	vec3 hot = mix(col_mid, vec3(1.0, 0.97, 0.9), white);
+	vec3 outc = c * (0.25 + 1.05 * h * h) * a + hot * core * core * 0.8;
+	// форсаж: светящаяся синяя оболочка, внутри — ряд мягких ромбов (скачки уплотнения)
+	float env = body * tip * (0.35 + 0.65 * pow(1.0 - t, 0.6));
+	outc += col_mid * env * turbo * 0.35;
+	float k = t * 4.6 - 0.15;
+	float cell = fract(k);
+	float rad = abs(u) / max(w, 1e-3);
+	float dw = 0.5 * (1.0 - abs(cell * 2.0 - 1.0)) * (1.0 - smoothstep(0.1, 0.85, t));
+	float diamonds = (1.0 - smoothstep(dw * 0.25, dw, rad)) + 0.6 * exp(-pow(cell - 0.5, 2.0) * 40.0 - rad * rad * 40.0);
+	diamonds *= step(0.5, k) * turbo * (1.0 - smoothstep(0.2, 0.75, t)) * (0.8 + 0.4 * n2);
+	vec3 dcol = mix(vec3(0.9, 0.96, 1.0), col_mid, 0.25);
+	outc += dcol * diamonds * 1.2;
 	ALBEDO = outc * power * energy;
 	ALPHA = 1.0;
 }
@@ -111,7 +120,32 @@ void fragment() {
 	float halo = max(0.0, exp(-r2 * 4.5) - 0.011);
 	float core = exp(-r2 * 26.0);
 	vec3 hot = mix(col, vec3(1.0, 0.97, 0.9), 0.8);
-	ALBEDO = (col * halo * 1.1 + hot * core * 2.2 * core_k) * power;
+	ALBEDO = (col * halo * 0.9 + hot * core * 1.4 * core_k) * power;
+	ALPHA = 1.0;
+}
+"""
+
+# Ореол поверх деталей: мягкий свет хлопка «перетекает» через край того, что закрывает
+# трубу (как свечение объектива). Без проверки глубины, слабый.
+const HALO_SHADER := """
+shader_type spatial;
+render_mode blend_add, unshaded, cull_disabled, depth_draw_never, depth_test_disabled, shadows_disabled, fog_disabled;
+
+uniform vec3 col : source_color = vec3(1.0, 0.55, 0.15);
+uniform float power = 0.0;
+
+void vertex() {
+	mat4 mw = mat4(normalize(INV_VIEW_MATRIX[0]), normalize(INV_VIEW_MATRIX[1]), normalize(INV_VIEW_MATRIX[2]), MODEL_MATRIX[3]);
+	float s = length(MODEL_MATRIX[0].xyz);
+	MODELVIEW_MATRIX = VIEW_MATRIX * mw * mat4(vec4(s, 0.0, 0.0, 0.0), vec4(0.0, s, 0.0, 0.0), vec4(0.0, 0.0, s, 0.0), vec4(0.0, 0.0, 0.0, 1.0));
+	MODELVIEW_NORMAL_MATRIX = mat3(MODELVIEW_MATRIX);
+}
+
+void fragment() {
+	vec2 p = (UV - 0.5) * 2.0;
+	float r2 = dot(p, p);
+	float g = max(0.0, exp(-r2 * 3.2) - 0.04);
+	ALBEDO = col * g * power;
 	ALPHA = 1.0;
 }
 """
@@ -139,7 +173,7 @@ void fragment() {
 	float halo = max(0.0, exp(-r * r * 7.0) - 0.001);
 	float core = exp(-r * r * 45.0);
 	float rays = pow(max(0.0, cos(ang * 3.0 + rot)), 28.0) + 0.6 * pow(max(0.0, cos(ang * 4.0 - rot * 1.7 + 0.7)), 44.0);
-	rays *= max(0.0, 1.0 - r) * max(0.0, 1.0 - r);
+	rays *= max(0.0, 1.0 - r) * max(0.0, 1.0 - r) * 0.6;
 	vec3 hot = mix(col, vec3(1.0, 0.97, 0.9), 0.75);
 	ALBEDO = (col * halo * 1.4 + hot * core * 3.0 + hot * rays * 1.6) * power;
 	ALPHA = 1.0;
@@ -151,9 +185,9 @@ const SPARK_SHADER := """
 shader_type spatial;
 render_mode blend_add, unshaded, cull_disabled, depth_draw_never, shadows_disabled, fog_disabled, skip_vertex_transform;
 
-uniform float streak = 0.5;
-uniform float thick = 0.05;
-uniform float boost = 3.0;
+uniform float streak = 0.9;
+uniform float thick = 0.022;
+uniform float boost = 3.5;
 
 varying vec2 suv;
 
@@ -166,7 +200,8 @@ void vertex() {
 	vec3 tc = normalize(cam - o);
 	vec3 side = normalize(cross(dir, tc) + vec3(0.0, 1e-4, 0.0));
 	float age = INSTANCE_CUSTOM.y;
-	float L = streak * sc * (1.0 - 0.65 * age) + thick * 2.0;
+	float L = streak * sc * (1.0 - 0.6 * age) + thick * 4.0;
+	// голова искры — в точке частицы, хвост тянется назад по скорости
 	vec3 p = o + dir * (VERTEX.y - 0.5) * L + side * VERTEX.x * 2.0 * thick * sc;
 	VERTEX = (VIEW_MATRIX * vec4(p, 1.0)).xyz;
 	NORMAL = normalize((VIEW_MATRIX * vec4(tc, 0.0)).xyz);
@@ -174,10 +209,12 @@ void vertex() {
 }
 
 void fragment() {
-	float across = 1.0 - suv.x * suv.x;
-	float along = mix(1.0, 0.15, suv.y);
-	float s = across * along;
-	ALBEDO = COLOR.rgb * boost * s * COLOR.a;
+	float across = 1.0 - smoothstep(0.0, 1.0, abs(suv.x));
+	float y = suv.y;
+	float along = pow(1.0 - y, 1.6) * smoothstep(0.0, 0.06, y + 0.02);
+	float head = exp(-y * 9.0);
+	vec3 c = mix(COLOR.rgb, vec3(1.0, 0.95, 0.85), head * 0.6);
+	ALBEDO = c * boost * across * (along + head * 0.8) * COLOR.a;
 	ALPHA = 1.0;
 }
 """
@@ -215,11 +252,11 @@ void fragment() {
 	float age = cust.y;
 	float n = texture(noise_tex, UV * 0.45 + vec2(seed, seed * 1.9) + vec2(0.0, age * 0.35)).r;
 	float n2 = texture(noise_tex, UV * 1.1 - vec2(seed * 2.3, age * 0.6)).r;
-	float h = (1.0 - r) * 1.45 + (n - 0.5) * 1.1 + (n2 - 0.5) * 0.5 - age * 1.05;
+	float h = (1.0 - r) * 1.15 + (n - 0.5) * 1.1 + (n2 - 0.5) * 0.5 - age * 1.3;
 	h = clamp(h, 0.0, 1.0);
 	float a = smoothstep(0.02, 0.3, h) * (1.0 - smoothstep(0.75, 1.0, r));
-	vec3 col = fire_ramp(h, col_mid);
-	ALBEDO = col * (0.5 + 2.0 * h) * a * COLOR.a * energy;
+	vec3 col = fire_ramp(h, col_mid, 0.7);
+	ALBEDO = col * (0.3 + 1.2 * h * h) * a * COLOR.a * energy;
 	ALPHA = 1.0;
 }
 """
@@ -231,8 +268,8 @@ shader_type spatial;
 render_mode blend_mix, unshaded, cull_disabled, depth_draw_never, shadows_disabled;
 
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
-uniform vec3 col_light : source_color = vec3(0.62, 0.63, 0.66);
-uniform vec3 col_dark : source_color = vec3(0.035, 0.035, 0.04);
+uniform vec3 col_light : source_color = vec3(0.36, 0.37, 0.40);
+uniform vec3 col_dark : source_color = vec3(0.2, 0.19, 0.185);
 uniform float dark = 0.0;
 uniform float density = 1.0;
 uniform vec3 glow_col : source_color = vec3(1.0, 0.5, 0.15);
@@ -240,6 +277,7 @@ uniform float glow = 0.0;
 
 varying vec4 cust;
 varying float vy;
+varying vec2 lgt;
 varying float seed;
 
 void vertex() {
@@ -251,7 +289,9 @@ void vertex() {
 	float sc = length(MODEL_MATRIX[0].xyz);
 	MODELVIEW_MATRIX = VIEW_MATRIX * mw * mat4(vec4(sc, 0.0, 0.0, 0.0), vec4(0.0, sc, 0.0, 0.0), vec4(0.0, 0.0, sc, 0.0), vec4(0.0, 0.0, 0.0, 1.0));
 	MODELVIEW_NORMAL_MATRIX = mat3(MODELVIEW_MATRIX);
+	// где «верх» экрана в координатах повёрнутого квадрата: свет падает сверху
 	vy = (-s * VERTEX.x + c * VERTEX.y) * 2.0;
+	lgt = vec2(-s, -c);
 	cust = INSTANCE_CUSTOM;
 	seed = fract(float(INSTANCE_ID) * 0.7548776);
 }
@@ -261,16 +301,21 @@ void fragment() {
 	float r = length(p);
 	float age = cust.y;
 	vec2 off = vec2(seed, seed * 1.618);
-	float n1 = texture(noise_tex, UV * 0.42 + off + vec2(0.0, -age * 0.18)).r;
-	float n2 = texture(noise_tex, UV * 1.05 + off.yx - vec2(age * 0.3, 0.0)).r;
-	float n = n1 * 0.65 + n2 * 0.35;
-	float mask = 1.0 - smoothstep(0.25, 1.0, r + (n - 0.5) * 0.9);
-	float dens = clamp(mask * (0.4 + n * 1.1) - 0.12, 0.0, 1.0);
+	vec2 uv1 = UV * 0.3 + off + vec2(0.0, -age * 0.1);
+	float n1 = texture(noise_tex, uv1).r;
+	float n2 = texture(noise_tex, UV * 0.62 + off.yx - vec2(age * 0.16, 0.0)).r;
+	float n = n1 * 0.6 + n2 * 0.4;
+	// клуб: круглое пятно, края изъедены шумом («цветная капуста»)
+	float mask = 1.0 - smoothstep(0.2, 0.95, r + (0.5 - n) * 0.85 + age * 0.12);
+	float dens = smoothstep(0.0, 0.6, mask * (0.45 + n));
+	// самозатенение: шум, сдвинутый к свету, — освещённые края и тёмная середина клубов
+	float nl = texture(noise_tex, uv1 + lgt * 0.06).r;
 	float top = clamp(vy * 0.5 + 0.5, 0.0, 1.0);
-	float shade = 0.62 + 0.38 * top + (n2 - 0.5) * 0.3;
-	vec3 base = mix(col_light, col_dark, dark) * shade;
-	float g = glow * (1.0 - smoothstep(0.0, 0.3, age)) * (1.0 - top * 0.6);
-	ALBEDO = base + glow_col * g * 1.2;
+	float lit = clamp(0.66 + (n1 - nl) * 2.6 + 0.35 * (top - 0.5) - 0.25 * (1.0 - mask), 0.25, 1.35);
+	lit = mix(lit, lit * lit * 1.15, dark);
+	vec3 base = mix(col_light, col_dark, dark) * lit;
+	float g = glow * (1.0 - smoothstep(0.0, 0.18, age)) * (1.0 - top * 0.6);
+	ALBEDO = base + glow_col * g * 0.6;
 	ALPHA = clamp(dens * COLOR.a * density, 0.0, 1.0);
 }
 """
@@ -284,6 +329,8 @@ var _mouth: MeshInstance3D
 var _mouth_mat: ShaderMaterial
 var _flash: MeshInstance3D
 var _flash_mat: ShaderMaterial
+var _halo: MeshInstance3D
+var _halo_mat: ShaderMaterial
 var _light: OmniLight3D
 var _smoke: GPUParticles3D
 var _smoke_pm: ParticleProcessMaterial
@@ -312,6 +359,11 @@ var _time: float = 0.0
 var _jit: float = 0.5
 var _warm: bool = false
 var _smoke_v: float = -1.0
+var _smoke_off: float = -1.0
+var _snap_col: bool = false
+var _pipe_r: float = 0.25      # радиус выхлопной трубы в координатах корня
+var _limit_on: bool = false
+var _smoke_ratio: float = -1.0
 
 
 # ---------------------------------------------------------------------
@@ -417,6 +469,7 @@ func _particles(amount: int, life: float, pm: ParticleProcessMaterial, mat: Mate
 func setup() -> void:
 	var n := pq()
 	var hi := q() >= 2
+	var ultra := q() >= 3 and n >= 2
 	var noise := _noise_tex()
 
 	# язык пламени: лента 2×13 вершин, форма задаётся шейдером
@@ -452,6 +505,9 @@ func setup() -> void:
 	_flash_mat = _mat("flash", FLASH_SHADER, 4)
 	_flash = _quad(_flash_mat)
 	_flash.visible = false
+	_halo_mat = _mat("halo", HALO_SHADER, 5)
+	_halo = _quad(_halo_mat)
+	_halo.visible = false
 
 	_light = make_omni(Color(1.0, 0.5, 0.15), 10.0)
 	_light.light_specular = 0.6
@@ -465,17 +521,18 @@ func setup() -> void:
 	_smoke_pm.spread = 14.0
 	_smoke_pm.initial_velocity_min = 1.0
 	_smoke_pm.initial_velocity_max = 2.0
-	_smoke_pm.damping_min = 1.6
-	_smoke_pm.damping_max = 2.4
-	_smoke_pm.gravity = Vector3(0, 0.9, 0)
+	_smoke_pm.damping_min = 0.8
+	_smoke_pm.damping_max = 1.3
+	_smoke_pm.gravity = Vector3(0, 1.4, 0)
 	_smoke_pm.angle_min = -180.0
 	_smoke_pm.angle_max = 180.0
 	_smoke_pm.angular_velocity_min = -25.0
 	_smoke_pm.angular_velocity_max = 25.0
 	_smoke_pm.scale_min = 0.7
 	_smoke_pm.scale_max = 1.1
-	_smoke_pm.scale_curve = _curve([Vector2(0, 0.35), Vector2(0.4, 0.75), Vector2(1, 1.0)])
-	_smoke_pm.color_ramp = _ramp([0.0, 0.12, 0.55, 1.0], [Color(1, 1, 1, 0), Color(1, 1, 1, 0.9), Color(1, 1, 1, 0.5), Color(1, 1, 1, 0)])
+	_smoke_pm.scale_curve = _curve([Vector2(0, 0.25), Vector2(0.4, 0.7), Vector2(1, 1.0)])
+	_smoke_pm.color_ramp = _ramp([0.0, 0.2, 0.65, 1.0], [Color(1, 1, 1, 0), Color(1, 1, 1, 0.8), Color(1, 1, 1, 0.5), Color(1, 1, 1, 0)])
+	_smoke_pm.emission_shape_offset = Vector3(0, 0.6, 0)
 	_smoke_pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
 	_smoke_pm.emission_sphere_radius = 0.12
 	_smoke_pm.lifetime_randomness = 0.3
@@ -483,9 +540,9 @@ func setup() -> void:
 		_smoke_pm.turbulence_enabled = true
 		_smoke_pm.turbulence_noise_strength = 1.2
 		_smoke_pm.turbulence_noise_scale = 4.0
-		_smoke_pm.turbulence_influence_min = 0.04
-		_smoke_pm.turbulence_influence_max = 0.1
-	_smoke = _particles([10, 28, 56][n], 2.6, _smoke_pm, _smoke_mat)
+		_smoke_pm.turbulence_influence_min = 0.015
+		_smoke_pm.turbulence_influence_max = 0.04
+	_smoke = _particles(72 if ultra else [10, 28, 56][n], 2.6, _smoke_pm, _smoke_mat)
 	(_smoke.draw_pass_1 as QuadMesh).size = Vector2(2.6, 2.6)
 
 	# огненные шары хлопка
@@ -511,7 +568,7 @@ func setup() -> void:
 	bpm.emission_sphere_radius = 0.15
 	bpm.lifetime_randomness = 0.35
 	for i in 2:
-		var b := _particles([4, 7, 10][n], 0.45, bpm, _ball_mat)
+		var b := _particles(12 if ultra else [4, 7, 10][n], 0.45, bpm, _ball_mat)
 		(b.draw_pass_1 as QuadMesh).size = Vector2(1.5, 1.5)
 		b.one_shot = true
 		b.explosiveness = 0.85
@@ -540,7 +597,7 @@ func setup() -> void:
 		spm.collision_bounce = 0.35
 		spm.collision_friction = 0.3
 	for i in 2:
-		var s := _particles([0, 22, 44][n], 0.9, spm, spark_mat)
+		var s := _particles(60 if ultra else [0, 22, 44][n], 0.9, spm, spark_mat)
 		s.one_shot = true
 		s.explosiveness = 0.92
 		if bounce:
@@ -576,7 +633,7 @@ func setup() -> void:
 	puff_mat.set_shader_parameter("dark", 0.75)
 	puff_mat.set_shader_parameter("density", 0.9)
 	for i in 2:
-		var p := _particles([0, 6, 10][n], 1.4, ppm, puff_mat)
+		var p := _particles(12 if ultra else [0, 6, 10][n], 1.4, ppm, puff_mat)
 		(p.draw_pass_1 as QuadMesh).size = Vector2(2.2, 2.2)
 		p.one_shot = true
 		p.explosiveness = 0.8
@@ -590,7 +647,7 @@ func setup() -> void:
 	lpm.spread = 16.0
 	lpm.scale_min = 0.4
 	lpm.scale_max = 0.8
-	_limit_sparks = _particles([0, 10, 20][n], 0.5, lpm, spark_mat)
+	_limit_sparks = _particles(28 if ultra else [0, 10, 20][n], 0.5, lpm, spark_mat)
 	_limit_sparks.visible = n > 0
 
 
@@ -603,10 +660,17 @@ func on_event(event_name: String, _data: Dictionary) -> void:
 		"pop":
 			_do_pop(1.0)
 		"turbo_start":
+			_snap_col = true
+			_turbo = 1.0
 			_do_pop(1.35)
 		"limiter":
 			_spit = maxf(_spit, 0.7 + 0.3 * randf())
 			_limit_t = 0.25
+		"exhausted":
+			# мотор захлебнулся: из трубы — клуб чёрного дыма
+			if pq() > 0:
+				_slot = (_slot + 1) % 2
+				_fire(_puffs[_slot])
 
 
 func _do_pop(k: float) -> void:
@@ -619,28 +683,48 @@ func _do_pop(k: float) -> void:
 	_pop_k = k
 	_flash_t = 1.0
 	_flash_rot = randf() * TAU
+	_flame_mat.set_shader_parameter("seed", randf())
 	_slot = (_slot + 1) % 2
-	var b: GPUParticles3D = _balls[_slot]
-	b.restart()
-	b.emitting = true
+	_fire(_balls[_slot])
 	if pq() > 0:
-		var s: GPUParticles3D = _sparks[_slot]
-		s.restart()
-		s.emitting = true
-		var p: GPUParticles3D = _puffs[_slot]
-		p.restart()
-		p.emitting = true
+		_fire(_sparks[_slot])
+		_fire(_puffs[_slot])
 
 
+## Выстрел одноразового эмиттера из трубы (положение берётся в момент выстрела).
+func _fire(p: GPUParticles3D) -> void:
+	p.transform = _tail_xf()
+	p.restart()
+	p.emitting = true
+
+
+func _tail_xf() -> Transform3D:
+	return Transform3D(_basis_y(view.fx_tail_dir()), view.fx_tail())
+
+
+func on_rebuild() -> void:
+	# мотор приведён к одному размеру масштабом — труба (радиус 0.3 в координатах мотора) тоже
+	var k: float = view.fx_point(Vector3.ZERO).distance_to(view.fx_point(Vector3(1, 0, 0)))
+	_pipe_r = clampf(0.3 * k, 0.1, 0.6)
+
+
+## Прогрев: эмиттеры работают с amount_ratio = 0 — шейдеры частиц и их отрисовки
+## собираются, но ни одна частица не вылетает (иначе после каждой сборки мотора был бы
+## «хлопок»). Пламя, вспышки и свет видны с нулевой яркостью.
 func warmup(on: bool) -> void:
 	_warm = on
-	if on:
-		for arr in [_balls, _sparks, _puffs]:
-			for p in arr:
+	var xf := _tail_xf()
+	for arr in [_balls, _sparks, _puffs, [_limit_sparks]]:
+		for p in arr:
+			p.transform = xf
+			if on:
+				p.amount_ratio = 0.0
 				p.restart()
 				p.emitting = true
-		_limit_sparks.emitting = true
-		_smoke.emitting = true
+			else:
+				p.emitting = false
+				p.amount_ratio = 1.0
+	_limit_on = on
 
 
 # ---------------------------------------------------------------------
@@ -656,7 +740,8 @@ func update(delta: float, st: Dictionary) -> void:
 	var throttle: bool = st.throttle
 	var demo: bool = st.demo
 	var fc: Color = st.flame_col
-	_col = _col.lerp(fc, 1.0 - exp(-delta * 8.0))
+	_col = fc if _snap_col else _col.lerp(fc, 1.0 - exp(-delta * 8.0))
+	_snap_col = false
 	_turbo = move_toward(_turbo, 1.0 if st.turbo else 0.0, delta * 3.0)
 	var want_rev := smoothstep(0.3, 1.0, ratio) if throttle else 0.0
 	if demo:
@@ -682,16 +767,17 @@ func update(delta: float, st: Dictionary) -> void:
 		_flame.transform = Transform3D(b, tail)
 		_flame_mat.set_shader_parameter("flame_len", fl)
 		_flame_mat.set_shader_parameter("flame_w", fw)
-		_flame_mat.set_shader_parameter("power", maxf(0.05, clampf(0.35 + f, 0.0, 1.3) * (0.9 + 0.2 * _jit)))
+		_flame_mat.set_shader_parameter("base_w", clampf(_pipe_r * 2.0 / fw, 0.15, 0.9))
+		_flame_mat.set_shader_parameter("power", clampf(0.35 + f, 0.0, 1.3) * (0.9 + 0.2 * _jit) if f > 0.01 else 0.0)
 		_flame_mat.set_shader_parameter("turbo", _turbo)
 		_flame_mat.set_shader_parameter("col_mid", col3)
 
 	# жерло трубы: светится от пламени и нагрева
-	var mouth_p := 0.12 * _rev + 0.9 * f + 0.25 * float(st.heat) * float(throttle)
+	var mouth_p := 0.1 * _rev + 0.3 * f + 0.12 * float(st.heat) * float(throttle)
 	_mouth.visible = mouth_p > 0.01 or _warm
 	if _mouth.visible:
 		_mouth.position = tail + dir * 0.15
-		_mouth.scale = Vector3.ONE * (0.9 + 1.3 * f)
+		_mouth.scale = Vector3.ONE * (_pipe_r * 3.2 + 0.8 * f)
 		_mouth_mat.set_shader_parameter("col", col3)
 		_mouth_mat.set_shader_parameter("power", mouth_p * flick)
 
@@ -700,20 +786,26 @@ func update(delta: float, st: Dictionary) -> void:
 	if _flash.visible:
 		var e := _flash_t * _flash_t
 		_flash.position = tail + dir * 0.7
-		_flash.scale = Vector3.ONE * (2.2 + 2.6 * (1.0 - _flash_t)) * _pop_k
+		_flash.scale = Vector3.ONE * (1.6 + 1.8 * (1.0 - _flash_t)) * _pop_k
 		_flash_mat.set_shader_parameter("col", col3)
-		_flash_mat.set_shader_parameter("power", e * 1.4)
+		_flash_mat.set_shader_parameter("power", e * 0.8)
 		_flash_mat.set_shader_parameter("rot", _flash_rot + (1.0 - _flash_t) * 0.6)
 
-	# огонь и искры хлопка вылетают из трубы
+	# мягкий ореол поверх деталей: хлопки и форсаж видны, даже если трубу закрывает фильтр
+	var hp := 0.2 * _flash_t * _flash_t + 0.12 * pop_f + 0.05 * turbo_f + 0.04 * _spit
+	_halo.visible = hp > 0.01 or _warm
+	if _halo.visible:
+		_halo.position = tail + dir * (0.6 + 0.8 * f)
+		_halo.scale = Vector3.ONE * (2.4 + 1.6 * f)
+		_halo_mat.set_shader_parameter("col", col3)
+		_halo_mat.set_shader_parameter("power", hp * flick)
+
 	var xf := Transform3D(b, tail)
-	for arr in [_balls, _sparks, _puffs]:
-		for p in arr:
-			p.transform = xf
-	_ball_mat.set_shader_parameter("col_mid", col3)
+	if _pop > 0.0:
+		_ball_mat.set_shader_parameter("col_mid", col3)
 
 	# свет от пламени
-	var le := (1.2 * _rev + 2.5 * _turbo * (1.0 if throttle else 0.4) + 9.0 * _flash_t * _flash_t + 4.0 * pop_f + 2.0 * _spit) * flick
+	var le := (1.0 * _rev + 2.0 * _turbo * (1.0 if throttle else 0.4) + 6.0 * _flash_t * _flash_t + 3.0 * pop_f + 1.5 * _spit) * flick
 	_light.visible = q() >= 1 and (le > 0.03 or _warm)
 	if _light.visible:
 		_light.position = tail + dir * 1.4 + Vector3(0, 0.4, 0)
@@ -729,18 +821,38 @@ func update(delta: float, st: Dictionary) -> void:
 		want_thick = 1.0
 	_thick = lerpf(_thick, want_thick, 1.0 - exp(-delta * 3.0))
 	_smoke.transform = xf
-	_smoke.emitting = true
-	_smoke.amount_ratio = clampf(0.35 + 0.65 * _thick, 0.05, 1.0)
-	var v := snappedf(1.0 + 3.5 * ratio * (1.0 if throttle else 0.4), 0.1)
+	if not _smoke.emitting:
+		_smoke.emitting = true
+	var sr := snappedf(clampf(0.35 + 0.65 * _thick, 0.05, 1.0), 0.05)
+	if sr != _smoke_ratio:
+		_smoke_ratio = sr
+		_smoke.amount_ratio = sr
+	var v := snappedf(1.0 + 3.5 * ratio * (1.0 if throttle else 0.4) + 0.6 * _dark, 0.1)
 	if v != _smoke_v:
 		_smoke_v = v
 		_smoke_pm.initial_velocity_min = v * 0.7
 		_smoke_pm.initial_velocity_max = v * 1.2
+		_smoke_pm.gravity = Vector3(0, 1.4 + 3.4 * _dark, 0)
+		# чёрный дым валит вверх столбом: направление выброса загибается к небу
+		var up_local := b.transposed() * Vector3.UP
+		_smoke_pm.direction = Vector3(0, 1, 0).lerp(up_local, 0.6 * _dark).normalized()
+		_smoke_pm.spread = 14.0 + 10.0 * _dark
+		_smoke_pm.scale_min = 0.7 + 0.25 * _dark
+		_smoke_pm.scale_max = 1.1 + 0.5 * _dark
+	var off := snappedf(0.6 + (0.55 * (0.5 + 3.3 * f) if _flame.visible else 0.0), 0.25)
+	if off != _smoke_off:
+		_smoke_off = off
+		_smoke_pm.emission_shape_offset = Vector3(0, off, 0)
 	_smoke_mat.set_shader_parameter("dark", _dark)
-	_smoke_mat.set_shader_parameter("density", lerpf(0.32, 0.55, _thick) + 0.4 * _dark)
+	_smoke_mat.set_shader_parameter("density", (lerpf(0.22, 0.42, _thick) + 0.45 * _dark) * (1.0 - 0.45 * _turbo * (1.0 - _dark)))
 	_smoke_mat.set_shader_parameter("glow_col", col3)
-	_smoke_mat.set_shader_parameter("glow", minf(1.0, f * 1.4))
+	_smoke_mat.set_shader_parameter("glow", minf(1.0, f * 1.4) * (1.0 - 0.7 * _turbo))
 
-	# отсечка
-	_limit_sparks.transform = xf
-	_limit_sparks.emitting = (_limit_t > 0.0 and pq() > 0) or _warm
+	# отсечка: искры летят, пока обороты бьются об ограничитель
+	if not _warm:
+		var lim := _limit_t > 0.0 and pq() > 0
+		if lim:
+			_limit_sparks.transform = xf
+		if lim != _limit_on:
+			_limit_on = lim
+			_limit_sparks.emitting = lim
