@@ -722,23 +722,11 @@ func _income_popup(amount: Big) -> void:
 
 
 func float_text(text: String, color: Color, size: int = 26, at: Vector2 = Vector2(-1, -1)) -> void:
-	var l := UI.label(text, size, color, HORIZONTAL_ALIGNMENT_CENTER)
-	l.add_theme_constant_override("outline_size", 6)
-	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.7))
-	var center := _engine_point(0.5, 0.3)
+	# надпись влетает с перелётом и вспышкой, по ней бежит блик; крупные — со свечением
+	# и горстью блёсток (всё — узлы с шейдерами и частицы, см. ui_fx.gd)
 	if at.x < 0.0:
-		at = center + Vector2(randf_range(-150, 150), randf_range(-60, 60))
-	l.size = Vector2(400, 40 + size)
-	l.position = at - l.size * 0.5
-	l.pivot_offset = l.size * 0.5
-	l.scale = Vector2(0.4, 0.4)
-	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_float_layer.add_child(l)
-	var tw := l.create_tween().set_parallel(true)
-	tw.tween_property(l, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "position:y", l.position.y - 90.0, 1.3).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "modulate:a", 0.0, 0.5).set_delay(0.85)
-	tw.chain().tween_callback(l.queue_free)
+		at = _engine_point(0.5, 0.3) + Vector2(randf_range(-150, 150), randf_range(-60, 60))
+	preload("res://scripts/ui/ui_fx.gd").pop_text(_float_layer, text, color, size, at)
 
 
 func show_toast(text: String, color: Color = UI.TEXT) -> void:
@@ -781,6 +769,13 @@ func _flush_level_up() -> void:
 	if (lvl - 1) % 10 != 0:
 		show_toast("Уровень %d! Доход x1.05" % lvl, Color("8fc4ff"))
 		Sfx.play("buy", 1.2)
+		# золотое кольцо и искры вокруг значка уровня, блик по полосе опыта
+		# (координаты — как у плашки level_tab: фон 838x326, значок (152, 286), полоса (414, 144, 392, 75))
+		var bg_size := Vector2(838, 326)
+		var k := minf(_level_tab.size.x / bg_size.x, _level_tab.size.y / bg_size.y)
+		var badge: Vector2 = _level_tab.position + Vector2(152, 286) * k
+		var bar := Rect2(_level_tab.position + Vector2(414, 144) * k, Vector2(392, 75) * k)
+		preload("res://scripts/ui/ui_fx.gd").level_up(_float_layer, badge, bar)
 
 
 func _on_new_epoch(ei: int) -> void:
@@ -804,16 +799,16 @@ func _on_new_epoch(ei: int) -> void:
 func _on_turbo() -> void:
 	Sfx.play("turbo")
 	engine_view.turbo_kick()
-	float_text("ТУРБО x%s!" % _fmt_mult(G.d_turbo_mult), Color("6fb6ff"), 40,
-		_engine_point(0.5, 0.15))
+	preload("res://scripts/ui/ui_fx.gd").pop_text(_float_layer, "ТУРБО x%s!" % _fmt_mult(G.d_turbo_mult),
+		Color("6fb6ff"), 44, _engine_point(0.5, 0.15), "turbo")
 
 
 func _on_crit(amount: Big) -> void:
 	Sfx.play("crit")
 	engine_view.burst_sparks()
 	G.vibrate(40)
-	float_text("КРИТ! +%s" % G.fmt(amount), Color("ffb02e"), 42,
-		_engine_point(0.5, 0.25))
+	preload("res://scripts/ui/ui_fx.gd").pop_text(_float_layer, "КРИТ! +%s" % G.fmt(amount),
+		Color("ffb02e"), 46, _engine_point(0.5, 0.25), "crit")
 
 
 func _on_gold(n: int) -> void:
