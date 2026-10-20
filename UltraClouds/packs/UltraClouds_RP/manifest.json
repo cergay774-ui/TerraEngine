@@ -1,0 +1,62 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "pack.name",
+    "description": "pack.description",
+    "uuid": "85eb36dc-140c-53bd-8d39-bf539d42c5dc",
+    "version": [
+      1,
+      0,
+      0
+    ],
+    "min_engine_version": [
+      1,
+      26,
+      50
+    ]
+  },
+  "modules": [
+    {
+      "type": "resources",
+      "uuid": "3a436fb9-5f87-53b3-bf2d-506f2a1513f9",
+      "version": [
+        1,
+        0,
+        0
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "uuid": "2bd6da50-44a4-5d52-8102-4f7aba568210",
+      "version": [
+        1,
+        0,
+        0
+      ]
+    }
+  ],
+  "subpacks": [
+    {
+      "folder_name": "keep_vanilla",
+      "name": "Keep vanilla clouds (turn them off in Video settings)",
+      "memory_tier": 0
+    },
+    {
+      "folder_name": "lite",
+      "name": "Lite: 512px textures, vanilla clouds hidden",
+      "memory_tier": 0
+    },
+    {
+      "folder_name": "standard",
+      "name": "Standard: 1024px textures, vanilla clouds hidden",
+      "memory_tier": 8
+    }
+  ],
+  "metadata": {
+    "authors": [
+      "M1X"
+    ],
+    "product_type": "addon"
+  }
+}

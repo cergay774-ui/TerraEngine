@@ -1,0 +1,523 @@
+{
+  "format_version": "1.8.0",
+  "render_controllers": {
+    "controller.render.ultra_clouds.ci": {
+      "arrays": {
+        "textures": {
+          "Array.atlas": [
+            "Texture.natural",
+            "Texture.soft"
+          ]
+        }
+      },
+      "geometry": "Geometry.default",
+      "materials": [
+        {
+          "*": "Material.default"
+        }
+      ],
+      "textures": [
+        "Array.atlas[v.softi]"
+      ],
+      "part_visibility": [
+        {
+          "*": false
+        },
+        {
+          "ci_t0r0*": "v.g00"
+        },
+        {
+          "ci_t0r1*": "v.g01"
+        },
+        {
+          "ci_t3r0*": "v.g30"
+        },
+        {
+          "ci_t3r1*": "v.g31"
+        },
+        {
+          "ci_t1r0*": "v.g10"
+        },
+        {
+          "ci_t1r1*": "v.g11"
+        },
+        {
+          "ci_t2r0*": "v.g20"
+        },
+        {
+          "ci_t2r1*": "v.g21"
+        }
+      ],
+      "ignore_lighting": true,
+      "color": {
+        "r": "v.ti_r / v.ol",
+        "g": "v.ti_g / v.ol",
+        "b": "v.ti_b / v.ol",
+        "a": "v.alpha_ci"
+      },
+      "overlay_color": {
+        "r": "v.ti_r * 0.8 / v.ol",
+        "g": "v.ti_g * 0.8 / v.ol",
+        "b": "v.ti_b * 0.82 / v.ol",
+        "a": "v.oa"
+      }
+    },
+    "controller.render.ultra_clouds.ac": {
+      "arrays": {
+        "textures": {
+          "Array.atlas": [
+            "Texture.natural",
+            "Texture.soft"
+          ]
+        }
+      },
+      "geometry": "Geometry.default",
+      "materials": [
+        {
+          "*": "Material.default"
+        }
+      ],
+      "textures": [
+        "Array.atlas[v.softi]"
+      ],
+      "part_visibility": [
+        {
+          "*": false
+        },
+        {
+          "ac_t0r0*": "v.g00"
+        },
+        {
+          "ac_t0r2*": "v.g02"
+        },
+        {
+          "ac_t2r0*": "v.g20"
+        },
+        {
+          "ac_t2r2*": "v.g22"
+        },
+        {
+          "ac_t1r0*": "v.g10"
+        },
+        {
+          "ac_t1r2*": "v.g12"
+        },
+        {
+          "ac_t3r0*": "v.g30"
+        },
+        {
+          "ac_t3r2*": "v.g32"
+        }
+      ],
+      "ignore_lighting": true,
+      "color": {
+        "r": "v.ta_r / v.ol",
+        "g": "v.ta_g / v.ol",
+        "b": "v.ta_b / v.ol",
+        "a": "1"
+      },
+      "overlay_color": {
+        "r": "v.ta_r * 0.8 / v.ol",
+        "g": "v.ta_g * 0.8 / v.ol",
+        "b": "v.ta_b * 0.82 / v.ol",
+        "a": "v.oa"
+      }
+    },
+    "controller.render.ultra_clouds.cu_b": {
+      "arrays": {
+        "textures": {
+          "Array.atlas": [
+            "Texture.natural",
+            "Texture.soft"
+          ]
+        }
+      },
+      "geometry": "Geometry.default",
+      "materials": [
+        {
+          "*": "Material.default"
+        }
+      ],
+      "textures": [
+        "Array.atlas[v.softi]"
+      ],
+      "part_visibility": [
+        {
+          "*": false
+        },
+        {
+          "cu_t3r0*": "v.g30"
+        },
+        {
+          "cu_t3r1*": "v.g31"
+        },
+        {
+          "cu_t2r0*": "v.g20"
+        },
+        {
+          "cu_t2r1*": "v.g21"
+        },
+        {
+          "cu_t2r2*": "v.g22"
+        },
+        {
+          "cu_t0r0*": "v.g00"
+        },
+        {
+          "cu_t0r1*": "v.g01"
+        },
+        {
+          "cu_t0r2*": "v.g02"
+        },
+        {
+          "cu_t0r3*": "v.g03"
+        },
+        {
+          "cu_t1r0*": "v.g10"
+        },
+        {
+          "cu_t1r1*": "v.g11"
+        },
+        {
+          "cu_t1r2*": "v.g12"
+        },
+        {
+          "cu_t1r3*": "v.g13"
+        }
+      ],
+      "ignore_lighting": true,
+      "color": {
+        "r": "v.tu_r / v.ol",
+        "g": "v.tu_g / v.ol",
+        "b": "v.tu_b / v.ol",
+        "a": "1"
+      },
+      "overlay_color": {
+        "r": "v.tu_r * 0.8 / v.ol",
+        "g": "v.tu_g * 0.8 / v.ol",
+        "b": "v.tu_b * 0.82 / v.ol",
+        "a": "v.oa"
+      }
+    },
+    "controller.render.ultra_clouds.cu_a": {
+      "arrays": {
+        "textures": {
+          "Array.atlas": [
+            "Texture.natural",
+            "Texture.soft"
+          ]
+        }
+      },
+      "geometry": "Geometry.default",
+      "materials": [
+        {
+          "*": "Material.default"
+        }
+      ],
+      "textures": [
+        "Array.atlas[v.softi]"
+      ],
+      "part_visibility": [
+        {
+          "*": false
+        },
+        {
+          "cu_t3r0*": "v.g30"
+        },
+        {
+          "cu_t3r1*": "v.g31"
+        },
+        {
+          "cu_t2r0*": "v.g20"
+        },
+        {
+          "cu_t2r1*": "v.g21"
+        },
+        {
+          "cu_t2r2*": "v.g22"
+        },
+        {
+          "cu_t0r0*": "v.g00"
+        },
+        {
+          "cu_t0r1*": "v.g01"
+        },
+        {
+          "cu_t0r2*": "v.g02"
+        },
+        {
+          "cu_t0r3*": "v.g03"
+        },
+        {
+          "cu_t1r0*": "v.g10"
+        },
+        {
+          "cu_t1r1*": "v.g11"
+        },
+        {
+          "cu_t1r2*": "v.g12"
+        },
+        {
+          "cu_t1r3*": "v.g13"
+        }
+      ],
+      "ignore_lighting": true,
+      "color": {
+        "r": "v.tu_r / v.ol",
+        "g": "v.tu_g / v.ol",
+        "b": "v.tu_b / v.ol",
+        "a": "1"
+      },
+      "overlay_color": {
+        "r": "v.tu_r * 0.8 / v.ol",
+        "g": "v.tu_g * 0.8 / v.ol",
+        "b": "v.tu_b * 0.82 / v.ol",
+        "a": "v.oa"
+      }
+    },
+    "controller.render.ultra_clouds.cb_b": {
+      "arrays": {
+        "textures": {
+          "Array.atlas": [
+            "Texture.natural",
+            "Texture.soft"
+          ]
+        }
+      },
+      "geometry": "Geometry.default",
+      "materials": [
+        {
+          "*": "Material.default"
+        }
+      ],
+      "textures": [
+        "Array.atlas[v.softi]"
+      ],
+      "part_visibility": [
+        {
+          "*": false
+        },
+        {
+          "cb_t3r0*": "v.g30"
+        },
+        {
+          "cb_t2r0*": "v.g20"
+        },
+        {
+          "cb_t0r0*": "v.g00"
+        },
+        {
+          "cb_t1r0*": "v.g10"
+        }
+      ],
+      "ignore_lighting": true,
+      "color": {
+        "r": "v.tb_r / v.ol",
+        "g": "v.tb_g / v.ol",
+        "b": "v.tb_b / v.ol",
+        "a": "1"
+      },
+      "overlay_color": {
+        "r": "v.tb_r * 0.8 / v.ol",
+        "g": "v.tb_g * 0.8 / v.ol",
+        "b": "v.tb_b * 0.82 / v.ol",
+        "a": "v.oa"
+      }
+    },
+    "controller.render.ultra_clouds.cb_a": {
+      "arrays": {
+        "textures": {
+          "Array.atlas": [
+            "Texture.natural",
+            "Texture.soft"
+          ]
+        }
+      },
+      "geometry": "Geometry.default",
+      "materials": [
+        {
+          "*": "Material.default"
+        }
+      ],
+      "textures": [
+        "Array.atlas[v.softi]"
+      ],
+      "part_visibility": [
+        {
+          "*": false
+        },
+        {
+          "cb_t3r0*": "v.g30"
+        },
+        {
+          "cb_t2r0*": "v.g20"
+        },
+        {
+          "cb_t0r0*": "v.g00"
+        },
+        {
+          "cb_t1r0*": "v.g10"
+        }
+      ],
+      "ignore_lighting": true,
+      "color": {
+        "r": "v.tb_r / v.ol",
+        "g": "v.tb_g / v.ol",
+        "b": "v.tb_b / v.ol",
+        "a": "1"
+      },
+      "overlay_color": {
+        "r": "v.tb_r * 0.8 / v.ol",
+        "g": "v.tb_g * 0.8 / v.ol",
+        "b": "v.tb_b * 0.82 / v.ol",
+        "a": "v.oa"
+      }
+    },
+    "controller.render.ultra_clouds.st_b": {
+      "arrays": {
+        "textures": {
+          "Array.atlas": [
+            "Texture.natural",
+            "Texture.soft"
+          ]
+        }
+      },
+      "geometry": "Geometry.default",
+      "materials": [
+        {
+          "*": "Material.default"
+        }
+      ],
+      "textures": [
+        "Array.atlas[v.softi]"
+      ],
+      "part_visibility": [
+        {
+          "*": false
+        },
+        {
+          "st_t0r0*": "v.g00"
+        },
+        {
+          "st_t1r0*": "v.g10"
+        },
+        {
+          "st_t1r1*": "v.g11"
+        },
+        {
+          "st_t1r2*": "v.g12"
+        },
+        {
+          "st_t2r0*": "v.g20"
+        },
+        {
+          "st_t2r1*": "v.g21"
+        },
+        {
+          "st_t2r2*": "v.g22"
+        },
+        {
+          "st_t0r1*": "v.g01"
+        },
+        {
+          "st_t0r2*": "v.g02"
+        },
+        {
+          "st_t3r0*": "v.g30"
+        },
+        {
+          "st_t3r1*": "v.g31"
+        },
+        {
+          "st_t3r2*": "v.g32"
+        }
+      ],
+      "ignore_lighting": true,
+      "color": {
+        "r": "v.ts_r / v.ol",
+        "g": "v.ts_g / v.ol",
+        "b": "v.ts_b / v.ol",
+        "a": "1"
+      },
+      "overlay_color": {
+        "r": "v.ts_r * 0.8 / v.ol",
+        "g": "v.ts_g * 0.8 / v.ol",
+        "b": "v.ts_b * 0.82 / v.ol",
+        "a": "v.oa"
+      }
+    },
+    "controller.render.ultra_clouds.st_a": {
+      "arrays": {
+        "textures": {
+          "Array.atlas": [
+            "Texture.natural",
+            "Texture.soft"
+          ]
+        }
+      },
+      "geometry": "Geometry.default",
+      "materials": [
+        {
+          "*": "Material.default"
+        }
+      ],
+      "textures": [
+        "Array.atlas[v.softi]"
+      ],
+      "part_visibility": [
+        {
+          "*": false
+        },
+        {
+          "st_t0r0*": "v.g00"
+        },
+        {
+          "st_t1r0*": "v.g10"
+        },
+        {
+          "st_t1r1*": "v.g11"
+        },
+        {
+          "st_t1r2*": "v.g12"
+        },
+        {
+          "st_t2r0*": "v.g20"
+        },
+        {
+          "st_t2r1*": "v.g21"
+        },
+        {
+          "st_t2r2*": "v.g22"
+        },
+        {
+          "st_t0r1*": "v.g01"
+        },
+        {
+          "st_t0r2*": "v.g02"
+        },
+        {
+          "st_t3r0*": "v.g30"
+        },
+        {
+          "st_t3r1*": "v.g31"
+        },
+        {
+          "st_t3r2*": "v.g32"
+        }
+      ],
+      "ignore_lighting": true,
+      "color": {
+        "r": "v.ts_r / v.ol",
+        "g": "v.ts_g / v.ol",
+        "b": "v.ts_b / v.ol",
+        "a": "1"
+      },
+      "overlay_color": {
+        "r": "v.ts_r * 0.8 / v.ol",
+        "g": "v.ts_g * 0.8 / v.ol",
+        "b": "v.ts_b * 0.82 / v.ol",
+        "a": "v.oa"
+      }
+    }
+  }
+}

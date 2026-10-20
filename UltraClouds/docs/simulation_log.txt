@@ -1,0 +1,81 @@
+{
+  "static": {
+    "order_violations": 0,
+    "max_screen_err_px": 0.1583196557326846,
+    "max_size_err": 0.010536356936272865,
+    "behind": 0,
+    "truth_behind": 0,
+    "max_facing_err": 0.0,
+    "visible": 120,
+    "depth_range": [
+      46.85493230174077,
+      79.35009671179887
+    ]
+  },
+  "above_clouds": {
+    "above": 1.0,
+    "order_violations": 0,
+    "max_screen_err_px": 0.1583196557326846,
+    "max_size_err": 0.010536356936272865,
+    "behind": 0,
+    "truth_behind": 0,
+    "max_facing_err": 0.0,
+    "visible": 120,
+    "depth_range": [
+      46.464990328820114,
+      73.17601547388782
+    ]
+  },
+  "rig_lag": {
+    "convention_aim_at_camera": {
+      "vote": 1.0,
+      "max_shift_px": 0.0,
+      "sprites": 61
+    },
+    "convention_opposite": {
+      "vote": -1.0,
+      "max_shift_px": 0.0,
+      "sprites": 61
+    }
+  },
+  "motion": {
+    "frames": 1400,
+    "distance_blocks": 2970,
+    "max_frame_to_frame_px": 17.08,
+    "jumps_over_40px": 0
+  },
+  "cost": {
+    "Performance": {
+      "molang_nodes_per_frame": 10600,
+      "animated_bones": 72,
+      "draw_calls_estimate": 11
+    },
+    "Balanced": {
+      "molang_nodes_per_frame": 21874,
+      "animated_bones": 185,
+      "draw_calls_estimate": 25
+    },
+    "High": {
+      "molang_nodes_per_frame": 36637,
+      "animated_bones": 355,
+      "draw_calls_estimate": 46
+    },
+    "Ultra": {
+      "molang_nodes_per_frame": 51009,
+      "animated_bones": 518,
+      "draw_calls_estimate": 66
+    }
+  }
+}
+  rendered docs/preview_noon_realistic.png
+  rendered docs/preview_afternoon_cumulus.png
+  rendered docs/preview_sunset_realistic.png
+  rendered docs/preview_dusk_cirrus.png
+  rendered docs/preview_night_moon.png
+  rendered docs/preview_overcast.png
+  rendered docs/preview_storm.png
+  rendered docs/preview_fantasy.png
+  rendered docs/preview_minimal.png
+  rendered docs/preview_above_clouds.png
+PASS (194s)
+exit 0

@@ -1,0 +1,1523 @@
+{
+"math": {
+"math.abs": [
+1,
+1
+],
+"math.acos": [
+1,
+1
+],
+"math.asin": [
+1,
+1
+],
+"math.atan": [
+1,
+1
+],
+"math.atan2": [
+2,
+2
+],
+"math.ceil": [
+1,
+1
+],
+"math.clamp": [
+3,
+3
+],
+"math.copy_sign": [
+2,
+2
+],
+"math.cos": [
+1,
+1
+],
+"math.die_roll": [
+3,
+3
+],
+"math.die_roll_integer": [
+3,
+3
+],
+"math.ease_in_back": [
+3,
+3
+],
+"math.ease_in_bounce": [
+3,
+3
+],
+"math.ease_in_circ": [
+3,
+3
+],
+"math.ease_in_cubic": [
+3,
+3
+],
+"math.ease_in_elastic": [
+3,
+3
+],
+"math.ease_in_expo": [
+3,
+3
+],
+"math.ease_in_out_back": [
+3,
+3
+],
+"math.ease_in_out_bounce": [
+3,
+3
+],
+"math.ease_in_out_circ": [
+3,
+3
+],
+"math.ease_in_out_cubic": [
+3,
+3
+],
+"math.ease_in_out_elastic": [
+3,
+3
+],
+"math.ease_in_out_expo": [
+3,
+3
+],
+"math.ease_in_out_quad": [
+3,
+3
+],
+"math.ease_in_out_quart": [
+3,
+3
+],
+"math.ease_in_out_quint": [
+3,
+3
+],
+"math.ease_in_out_sine": [
+3,
+3
+],
+"math.ease_in_quad": [
+3,
+3
+],
+"math.ease_in_quart": [
+3,
+3
+],
+"math.ease_in_quint": [
+3,
+3
+],
+"math.ease_in_sine": [
+3,
+3
+],
+"math.ease_out_back": [
+3,
+3
+],
+"math.ease_out_bounce": [
+3,
+3
+],
+"math.ease_out_circ": [
+3,
+3
+],
+"math.ease_out_cubic": [
+3,
+3
+],
+"math.ease_out_elastic": [
+3,
+3
+],
+"math.ease_out_expo": [
+3,
+3
+],
+"math.ease_out_quad": [
+3,
+3
+],
+"math.ease_out_quart": [
+3,
+3
+],
+"math.ease_out_quint": [
+3,
+3
+],
+"math.ease_out_sine": [
+3,
+3
+],
+"math.exp": [
+1,
+1
+],
+"math.floor": [
+1,
+1
+],
+"math.hermite_blend": [
+1,
+1
+],
+"math.inverse_lerp": [
+3,
+3
+],
+"math.lerp": [
+3,
+3
+],
+"math.lerprotate": [
+3,
+3
+],
+"math.ln": [
+1,
+1
+],
+"math.max": [
+2,
+2
+],
+"math.min": [
+2,
+2
+],
+"math.min_angle": [
+1,
+1
+],
+"math.mod": [
+2,
+2
+],
+"math.pi": [
+0,
+0
+],
+"math.pow": [
+2,
+2
+],
+"math.random": [
+2,
+2
+],
+"math.random_integer": [
+2,
+2
+],
+"math.round": [
+1,
+1
+],
+"math.sign": [
+1,
+1
+],
+"math.sin": [
+1,
+1
+],
+"math.sqrt": [
+1,
+1
+],
+"math.trunc": [
+1,
+1
+]
+},
+"queries": {
+"query.above_top_solid": [
+0,
+0
+],
+"query.actor_count": [
+0,
+0
+],
+"query.all": [
+3,
+3
+],
+"query.all_animations_finished": [
+0,
+0
+],
+"query.all_tags": [
+0,
+0
+],
+"query.anger_level": [
+0,
+0
+],
+"query.anim_time": [
+0,
+0
+],
+"query.any": [
+3,
+3
+],
+"query.any_animation_finished": [
+0,
+0
+],
+"query.any_tag": [
+0,
+0
+],
+"query.approx_eq": [
+2,
+2
+],
+"query.armor_color_slot": [
+2,
+2
+],
+"query.armor_damage_slot": [
+1,
+1
+],
+"query.armor_material_slot": [
+1,
+1
+],
+"query.armor_texture_slot": [
+1,
+1
+],
+"query.average_frame_time": [
+0,
+1
+],
+"query.base_swing_duration": [
+0,
+0
+],
+"query.block_face": [
+0,
+0
+],
+"query.block_has_all_tags": [
+4,
+4
+],
+"query.block_has_any_tag": [
+4,
+4
+],
+"query.block_neighbor_has_all_tags": [
+1,
+1
+],
+"query.block_neighbor_has_any_tag": [
+1,
+1
+],
+"query.block_property": [
+1,
+1
+],
+"query.block_state": [
+1,
+1
+],
+"query.blocking": [
+0,
+0
+],
+"query.body_x_rotation": [
+0,
+0
+],
+"query.body_y_rotation": [
+0,
+0
+],
+"query.bone_aabb": [
+1,
+1
+],
+"query.bone_orientation_matrix": [
+1,
+2
+],
+"query.bone_orientation_trs": [
+1,
+2
+],
+"query.bone_origin": [
+1,
+1
+],
+"query.bone_rotation": [
+1,
+1
+],
+"query.camera_distance_range_lerp": [
+2,
+2
+],
+"query.camera_rotation": [
+1,
+1
+],
+"query.can_climb": [
+0,
+0
+],
+"query.can_damage_nearby_mobs": [
+0,
+0
+],
+"query.can_dash": [
+0,
+0
+],
+"query.can_fly": [
+0,
+0
+],
+"query.can_power_jump": [
+0,
+0
+],
+"query.can_swim": [
+0,
+0
+],
+"query.can_walk": [
+0,
+0
+],
+"query.cape_flap_amount": [
+0,
+0
+],
+"query.cardinal_block_face_placed_on": [
+0,
+0
+],
+"query.cardinal_facing": [
+0,
+0
+],
+"query.cardinal_facing_2d": [
+0,
+0
+],
+"query.cardinal_player_facing": [
+0,
+0
+],
+"query.client_max_render_distance": [
+0,
+0
+],
+"query.client_memory_tier": [
+0,
+0
+],
+"query.combine_entities": [
+0,
+0
+],
+"query.cooldown_time": [
+1,
+2
+],
+"query.cooldown_time_remaining": [
+0,
+2
+],
+"query.count": [
+0,
+0
+],
+"query.current_squish_value": [
+0,
+0
+],
+"query.dash_cooldown_progress": [
+0,
+0
+],
+"query.day": [
+0,
+0
+],
+"query.death_ticks": [
+0,
+0
+],
+"query.debug_output": [
+1,
+1
+],
+"query.delta_time": [
+0,
+0
+],
+"query.distance_from_camera": [
+0,
+0
+],
+"query.effect_emitter_count": [
+0,
+0
+],
+"query.effect_particle_count": [
+0,
+0
+],
+"query.entity_biome_has_all_tags": [
+1,
+1
+],
+"query.entity_biome_has_any_identifier": [
+1,
+1
+],
+"query.entity_biome_has_any_tags": [
+1,
+1
+],
+"query.equipment_count": [
+0,
+0
+],
+"query.equipped_item_all_tags": [
+0,
+1
+],
+"query.equipped_item_any_tag": [
+0,
+1
+],
+"query.equipped_item_is_attachable": [
+1,
+1
+],
+"query.eye_target_x_rotation": [
+0,
+0
+],
+"query.eye_target_y_rotation": [
+0,
+0
+],
+"query.facing_target_to_range_attack": [
+0,
+0
+],
+"query.frame_alpha": [
+0,
+0
+],
+"query.fuse_time": [
+0,
+0
+],
+"query.get_actor_info_id": [
+1,
+1
+],
+"query.get_animation_frame": [
+0,
+0
+],
+"query.get_default_bone_pivot": [
+0,
+0
+],
+"query.get_equipped_item_name": [
+0,
+2
+],
+"query.get_level_seed_based_fraction": [
+0,
+0
+],
+"query.get_locator_offset": [
+0,
+0
+],
+"query.get_name": [
+0,
+1
+],
+"query.get_pack_setting": [
+1,
+1
+],
+"query.get_root_locator_offset": [
+2,
+2
+],
+"query.graphics_mode_is_any": [
+1,
+255
+],
+"query.ground_speed": [
+0,
+0
+],
+"query.had_component_group": [
+1,
+1
+],
+"query.has_all_biome_tags": [
+0,
+0
+],
+"query.has_any_biome_tags": [
+0,
+0
+],
+"query.has_any_family": [
+1,
+1
+],
+"query.has_any_leashed_entity_of_type": [
+0,
+0
+],
+"query.has_armor_slot": [
+1,
+1
+],
+"query.has_biome_tag": [
+0,
+0
+],
+"query.has_block_property": [
+1,
+1
+],
+"query.has_block_state": [
+1,
+1
+],
+"query.has_cape": [
+0,
+0
+],
+"query.has_collision": [
+0,
+0
+],
+"query.has_dash_cooldown": [
+0,
+0
+],
+"query.has_gravity": [
+0,
+0
+],
+"query.has_head_gear": [
+0,
+0
+],
+"query.has_owner": [
+0,
+0
+],
+"query.has_player_rider": [
+0,
+0
+],
+"query.has_property": [
+1,
+1
+],
+"query.has_rider": [
+0,
+0
+],
+"query.has_target": [
+0,
+0
+],
+"query.head_is_in_water": [
+0,
+0
+],
+"query.head_roll_angle": [
+0,
+0
+],
+"query.head_x_rotation": [
+1,
+1
+],
+"query.head_y_rotation": [
+1,
+1
+],
+"query.health": [
+0,
+0
+],
+"query.heartbeat_interval": [
+0,
+0
+],
+"query.heartbeat_phase": [
+0,
+0
+],
+"query.heightmap": [
+0,
+0
+],
+"query.hurt_direction": [
+0,
+0
+],
+"query.hurt_time": [
+0,
+0
+],
+"query.in_range": [
+3,
+3
+],
+"query.invulnerable_ticks": [
+0,
+0
+],
+"query.is_admiring": [
+0,
+0
+],
+"query.is_alive": [
+0,
+0
+],
+"query.is_angry": [
+0,
+0
+],
+"query.is_attached": [
+0,
+0
+],
+"query.is_attached_to_entity": [
+0,
+0
+],
+"query.is_avoiding_block": [
+0,
+0
+],
+"query.is_avoiding_mobs": [
+0,
+0
+],
+"query.is_baby": [
+0,
+0
+],
+"query.is_breathing": [
+0,
+0
+],
+"query.is_bribed": [
+0,
+0
+],
+"query.is_carrying_block": [
+0,
+0
+],
+"query.is_casting": [
+0,
+0
+],
+"query.is_celebrating": [
+0,
+0
+],
+"query.is_celebrating_special": [
+0,
+0
+],
+"query.is_charged": [
+0,
+0
+],
+"query.is_charging": [
+0,
+0
+],
+"query.is_chested": [
+0,
+0
+],
+"query.is_cooldown_category": [
+1,
+2
+],
+"query.is_crawling": [
+0,
+0
+],
+"query.is_critical": [
+0,
+0
+],
+"query.is_croaking": [
+0,
+0
+],
+"query.is_dancing": [
+0,
+0
+],
+"query.is_delayed_attacking": [
+0,
+0
+],
+"query.is_digging": [
+0,
+0
+],
+"query.is_eating": [
+0,
+0
+],
+"query.is_eating_mob": [
+0,
+0
+],
+"query.is_elder": [
+0,
+0
+],
+"query.is_emerging": [
+0,
+0
+],
+"query.is_emoting": [
+0,
+0
+],
+"query.is_enchanted": [
+0,
+0
+],
+"query.is_feeling_happy": [
+0,
+0
+],
+"query.is_fire_immune": [
+0,
+0
+],
+"query.is_first_person": [
+0,
+0
+],
+"query.is_ghost": [
+0,
+0
+],
+"query.is_gliding": [
+0,
+0
+],
+"query.is_grazing": [
+0,
+0
+],
+"query.is_idling": [
+0,
+0
+],
+"query.is_ignited": [
+0,
+0
+],
+"query.is_illager_captain": [
+0,
+0
+],
+"query.is_in_contact_with_water": [
+0,
+0
+],
+"query.is_in_lava": [
+0,
+0
+],
+"query.is_in_love": [
+0,
+0
+],
+"query.is_in_ui": [
+0,
+0
+],
+"query.is_in_water": [
+0,
+0
+],
+"query.is_in_water_or_rain": [
+0,
+0
+],
+"query.is_interested": [
+0,
+0
+],
+"query.is_invisible": [
+0,
+0
+],
+"query.is_item_equipped": [
+0,
+1
+],
+"query.is_item_name_any": [
+2,
+2
+],
+"query.is_jump_goal_jumping": [
+0,
+0
+],
+"query.is_jumping": [
+0,
+0
+],
+"query.is_laying_down": [
+0,
+0
+],
+"query.is_laying_egg": [
+0,
+0
+],
+"query.is_leashed": [
+0,
+0
+],
+"query.is_levitating": [
+0,
+0
+],
+"query.is_lingering": [
+0,
+0
+],
+"query.is_local_player": [
+0,
+0
+],
+"query.is_moving": [
+0,
+0
+],
+"query.is_name_any": [
+1,
+1
+],
+"query.is_on_fire": [
+0,
+0
+],
+"query.is_on_ground": [
+0,
+0
+],
+"query.is_onfire": [
+0,
+0
+],
+"query.is_orphaned": [
+0,
+0
+],
+"query.is_owner_identifier_any": [
+1,
+1
+],
+"query.is_pack_setting_enabled": [
+1,
+1
+],
+"query.is_pack_setting_selected": [
+2,
+2
+],
+"query.is_persona_or_premium_skin": [
+0,
+0
+],
+"query.is_playing_dead": [
+0,
+0
+],
+"query.is_powered": [
+0,
+0
+],
+"query.is_pregnant": [
+0,
+0
+],
+"query.is_ram_attacking": [
+0,
+0
+],
+"query.is_resting": [
+0,
+0
+],
+"query.is_riding": [
+0,
+0
+],
+"query.is_riding_any_entity_of_type": [
+0,
+0
+],
+"query.is_rising": [
+0,
+0
+],
+"query.is_roaring": [
+0,
+0
+],
+"query.is_rolling": [
+0,
+0
+],
+"query.is_saddled": [
+0,
+0
+],
+"query.is_scared": [
+0,
+0
+],
+"query.is_scenting": [
+0,
+0
+],
+"query.is_searching": [
+0,
+0
+],
+"query.is_selected_item": [
+0,
+0
+],
+"query.is_shaking": [
+0,
+0
+],
+"query.is_shaking_wetness": [
+0,
+0
+],
+"query.is_sheared": [
+0,
+0
+],
+"query.is_shield_powered": [
+0,
+0
+],
+"query.is_silent": [
+0,
+0
+],
+"query.is_sitting": [
+0,
+0
+],
+"query.is_sleeping": [
+0,
+0
+],
+"query.is_sneaking": [
+0,
+0
+],
+"query.is_sneezing": [
+0,
+0
+],
+"query.is_sniffing": [
+0,
+0
+],
+"query.is_sonic_boom": [
+0,
+0
+],
+"query.is_spectator": [
+0,
+0
+],
+"query.is_sprinting": [
+0,
+0
+],
+"query.is_stackable": [
+0,
+0
+],
+"query.is_stalking": [
+0,
+0
+],
+"query.is_standing": [
+0,
+0
+],
+"query.is_stunned": [
+0,
+0
+],
+"query.is_swimming": [
+0,
+0
+],
+"query.is_tamed": [
+0,
+0
+],
+"query.is_transforming": [
+0,
+0
+],
+"query.is_using_item": [
+0,
+0
+],
+"query.is_wall_climbing": [
+0,
+0
+],
+"query.item_in_use_duration": [
+0,
+0
+],
+"query.item_is_charged": [
+0,
+1
+],
+"query.item_max_use_duration": [
+0,
+0
+],
+"query.item_remaining_use_duration": [
+0,
+0
+],
+"query.item_slot_to_bone_name": [
+1,
+1
+],
+"query.key_frame_lerp_time": [
+0,
+0
+],
+"query.kinetic_weapon_damage_duration": [
+0,
+0
+],
+"query.kinetic_weapon_delay": [
+0,
+0
+],
+"query.kinetic_weapon_dismount_duration": [
+0,
+0
+],
+"query.kinetic_weapon_knockback_duration": [
+0,
+0
+],
+"query.last_frame_time": [
+0,
+1
+],
+"query.last_hit_by_player": [
+0,
+0
+],
+"query.last_input_mode_is_any": [
+1,
+1
+],
+"query.leashed_entity_count": [
+0,
+0
+],
+"query.lie_amount": [
+0,
+0
+],
+"query.life_span": [
+0,
+0
+],
+"query.life_time": [
+0,
+0
+],
+"query.lod_index": [
+0,
+0
+],
+"query.log": [
+1,
+1
+],
+"query.main_hand_item_max_duration": [
+0,
+0
+],
+"query.main_hand_item_use_duration": [
+0,
+0
+],
+"query.mark_variant": [
+0,
+0
+],
+"query.max_durability": [
+0,
+0
+],
+"query.max_health": [
+0,
+0
+],
+"query.max_trade_tier": [
+0,
+0
+],
+"query.maximum_frame_time": [
+0,
+1
+],
+"query.minimum_frame_time": [
+0,
+1
+],
+"query.model_scale": [
+0,
+0
+],
+"query.modified_distance_moved": [
+0,
+0
+],
+"query.modified_move_speed": [
+0,
+0
+],
+"query.modified_swing_duration": [
+0,
+0
+],
+"query.moon_brightness": [
+0,
+0
+],
+"query.moon_phase": [
+0,
+0
+],
+"query.movement_direction": [
+1,
+1
+],
+"query.noise": [
+0,
+0
+],
+"query.on_fire_time": [
+0,
+0
+],
+"query.out_of_control": [
+0,
+0
+],
+"query.overlay_alpha": [
+0,
+0
+],
+"query.owner_identifier": [
+0,
+0
+],
+"query.player_level": [
+0,
+0
+],
+"query.position": [
+1,
+1
+],
+"query.position_delta": [
+1,
+1
+],
+"query.previous_squish_value": [
+0,
+0
+],
+"query.property": [
+1,
+1
+],
+"query.relative_block_has_all_tags": [
+1,
+1
+],
+"query.relative_block_has_any_tag": [
+1,
+1
+],
+"query.remaining_durability": [
+0,
+0
+],
+"query.ride_body_x_rotation": [
+0,
+0
+],
+"query.ride_body_y_rotation": [
+0,
+0
+],
+"query.ride_head_x_rotation": [
+0,
+0
+],
+"query.ride_head_y_rotation": [
+0,
+1
+],
+"query.rider_body_x_rotation": [
+1,
+1
+],
+"query.rider_body_y_rotation": [
+1,
+1
+],
+"query.rider_head_x_rotation": [
+1,
+1
+],
+"query.rider_head_y_rotation": [
+1,
+2
+],
+"query.roll_counter": [
+0,
+0
+],
+"query.rotation_to_camera": [
+1,
+1
+],
+"query.scoreboard": [
+1,
+1
+],
+"query.server_memory_tier": [
+0,
+0
+],
+"query.shake_angle": [
+0,
+0
+],
+"query.shake_time": [
+0,
+0
+],
+"query.shield_blocking_bob": [
+0,
+0
+],
+"query.show_bottom": [
+0,
+0
+],
+"query.sit_amount": [
+0,
+0
+],
+"query.skin_id": [
+0,
+0
+],
+"query.sleep_rotation": [
+0,
+0
+],
+"query.sneeze_counter": [
+0,
+0
+],
+"query.spellcolor": [
+0,
+0
+],
+"query.standing_scale": [
+0,
+0
+],
+"query.state_time": [
+0,
+0
+],
+"query.structural_integrity": [
+0,
+0
+],
+"query.surface_particle_color": [
+0,
+0
+],
+"query.surface_particle_texture_coordinate": [
+0,
+0
+],
+"query.surface_particle_texture_size": [
+0,
+0
+],
+"query.swell_amount": [
+0,
+0
+],
+"query.swelling_dir": [
+0,
+0
+],
+"query.swim_amount": [
+0,
+0
+],
+"query.tail_angle": [
+0,
+0
+],
+"query.target_x_rotation": [
+0,
+0
+],
+"query.target_y_rotation": [
+0,
+0
+],
+"query.texture_frame_index": [
+0,
+0
+],
+"query.ticks_since_last_kinetic_weapon_hit": [
+0,
+0
+],
+"query.time_of_day": [
+0,
+0
+],
+"query.time_since_last_vibration_detection": [
+0,
+0
+],
+"query.time_stamp": [
+0,
+0
+],
+"query.timer_flag_1": [
+0,
+0
+],
+"query.timer_flag_2": [
+0,
+0
+],
+"query.timer_flag_3": [
+0,
+0
+],
+"query.total_emitter_count": [
+0,
+0
+],
+"query.total_particle_count": [
+0,
+0
+],
+"query.touch_only_affects_hotbar": [
+0,
+0
+],
+"query.trade_tier": [
+0,
+0
+],
+"query.unhappy_counter": [
+0,
+0
+],
+"query.variant": [
+0,
+0
+],
+"query.vertical_speed": [
+0,
+0
+],
+"query.walk_distance": [
+0,
+0
+],
+"query.wing_flap_position": [
+0,
+0
+],
+"query.wing_flap_speed": [
+0,
+0
+],
+"query.yaw_speed": [
+0,
+0
+]
+},
+"source": "Mojang/bedrock-samples v1.26.50.4 metadata/molang_modules/mojang-molang-queries.json (names and argument counts only)"
+}

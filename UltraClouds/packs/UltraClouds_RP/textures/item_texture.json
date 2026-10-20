@@ -1,0 +1,9 @@
+{
+  "resource_pack_name": "ultra_clouds",
+  "texture_name": "atlas.items",
+  "texture_data": {
+    "ultra_clouds_settings": {
+      "textures": "textures/ultra_clouds/icon_settings"
+    }
+  }
+}

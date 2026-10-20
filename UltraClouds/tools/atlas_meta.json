@@ -1,0 +1,84 @@
+{
+ "cells": [
+  {
+   "index": 0,
+   "kind": "puff",
+   "aspect": 1.4167
+  },
+  {
+   "index": 1,
+   "kind": "puff",
+   "aspect": 1.1017
+  },
+  {
+   "index": 2,
+   "kind": "puff",
+   "aspect": 1.6471
+  },
+  {
+   "index": 3,
+   "kind": "puff",
+   "aspect": 1.8298
+  },
+  {
+   "index": 4,
+   "kind": "puff",
+   "aspect": 1.8765
+  },
+  {
+   "index": 5,
+   "kind": "puff",
+   "aspect": 1.9186
+  },
+  {
+   "index": 6,
+   "kind": "base",
+   "aspect": 1.5238
+  },
+  {
+   "index": 7,
+   "kind": "base",
+   "aspect": 1.5664
+  },
+  {
+   "index": 8,
+   "kind": "stratus",
+   "aspect": 1.5245
+  },
+  {
+   "index": 9,
+   "kind": "stratus",
+   "aspect": 1.5725
+  },
+  {
+   "index": 10,
+   "kind": "cirrus",
+   "aspect": 1.9554
+  },
+  {
+   "index": 11,
+   "kind": "cirrus_hook",
+   "aspect": 1.9464
+  },
+  {
+   "index": 12,
+   "kind": "alto",
+   "aspect": 1.1908
+  },
+  {
+   "index": 13,
+   "kind": "alto",
+   "aspect": 1.4737
+  },
+  {
+   "index": 14,
+   "kind": "tower",
+   "aspect": 1.1397
+  },
+  {
+   "index": 15,
+   "kind": "wisp",
+   "aspect": 2.2625
+  }
+ ]
+}

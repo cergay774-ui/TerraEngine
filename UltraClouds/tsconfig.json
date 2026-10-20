@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ES2020",
+    "moduleResolution": "node",
+    "lib": ["ES2020"],
+    "strict": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "rootDir": "src/scripts",
+    "outDir": "packs/UltraClouds_BP/scripts",
+    "removeComments": false,
+    "skipLibCheck": false,
+    "types": []
+  },
+  "include": ["src/scripts/**/*.ts"]
+}
