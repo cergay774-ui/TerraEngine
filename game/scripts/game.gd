@@ -46,6 +46,7 @@ var settings: Dictionary = {
 	"sfx": 0.8, "music": 0.6, "sci": false, "lang": "ru", "xray": false,
 	"shadows": 1, "msaa": 0, "glow": false, "particles": 1, "res_scale": 0.75, "fps3d": 0,
 	"garage": true, "cam_sway": true, "cam_zoom": 1.0, "show_fps": false,
+	"gfx_version": 0,
 }
 
 ## Пресеты графики: Низкое, Среднее, Высокое, Ультра.
@@ -60,6 +61,7 @@ var stall_downgraded: bool = false   # графику снизили из-за �
 var stall_renderer_switched: bool = false
 
 const GRAPHICS_OVERRIDE := "user://graphics_override.cfg"
+const GFX_VERSION := 2
 
 # --- рантайм ---
 var holding: bool = false
@@ -112,6 +114,15 @@ func _ready() -> void:
 	load_game()
 	recalc()
 	_refresh_daily()
+	# новая графика (Vulkan и эффекты): один раз выставляем пресет под устройство —
+	# иначе у тех, кому раньше снизило графику, новые эффекты так и останутся выключенными
+	if int(settings.get("gfx_version", 0)) < GFX_VERSION:
+		settings.gfx_version = GFX_VERSION
+		var gq := 1 if uses_compat_renderer() else 2
+		for k in PRESETS[gq]:
+			settings[k] = PRESETS[gq][k]
+		settings.quality = gq
+		Diag.event("графика нового поколения: пресет %d" % gq)
 	# прошлый запуск завис — начинаем с «Низкой» графики (если зависание было из-за видеокарты
 	# или перегрева, это его снимет; вернуть можно в настройках)
 	if Diag.prev_stalled and int(settings.quality) > 0:
