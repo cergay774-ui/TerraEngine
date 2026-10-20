@@ -1338,6 +1338,7 @@ func turbo_kick() -> void:
 func fx_event(event_name: String, data: Dictionary = {}) -> void:
 	for m in _fx:
 		m.on_event(event_name, data)
+	GarageScene.on_event(_garage, event_name, data)
 
 
 # ---------------------------------------------------------------------
@@ -1453,6 +1454,7 @@ func _update_effects(delta: float, ratio: float, throttle: bool) -> void:
 	}
 	for m in _fx:
 		m.update(delta, st)
+	GarageScene.update(_garage, delta, st)
 	if _warm_frames > 0:
 		_warm_frames -= 1
 		if _warm_frames == 0:
@@ -1488,7 +1490,7 @@ func _update_tints() -> void:
 		glow_amt = clampf(ratio - 0.4, 0.0, 0.6)
 	var hc := _part_color("exhaust", Color("8a8a8f"))
 	hm.albedo_color = hc.lerp(Color("6a5a7a"), clampf(heat + ratio * 0.3, 0.0, 1.0) * 0.5)
-	hm.emission = Color(1.0, 0.24, 0.04) * glow_amt * glow_amt * 1.25
+	hm.emission = Color(1.0, 0.2, 0.03) * glow_amt * glow_amt * 0.85
 	if _xray() != (_mats.block.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA):
 		_apply_xray()
 

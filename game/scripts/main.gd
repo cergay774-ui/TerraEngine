@@ -112,6 +112,8 @@ func _ready() -> void:
 		call_deferred("_show_offline")
 	# сторож зависаний — после того как игра загрузилась и шейдеры первого кадра собраны
 	get_tree().create_timer(4.0).timeout.connect(Diag.arm)
+	# эффекты интерфейса (крит, турбо, уровень, кейс) компилируются заранее, почти невидимо
+	get_tree().create_timer(2.5).timeout.connect(func(): preload("res://scripts/ui/ui_fx.gd").warmup(_float_layer))
 	if G.stall_renderer_switched:
 		G.stall_renderer_switched = false
 		get_tree().create_timer(1.5).timeout.connect(func():
