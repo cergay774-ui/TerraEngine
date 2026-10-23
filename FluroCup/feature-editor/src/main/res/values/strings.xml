@@ -30,6 +30,7 @@
     <string name="editor_reason_corrupt">файл повреждён или не читается</string>
     <string name="editor_unknown_file">файл</string>
     <string name="editor_undo">Отменить</string>
+    <string name="editor_export">Экспорт</string>
     <string name="editor_redo">Повторить</string>
     <string name="editor_fullscreen">Во весь экран</string>
     <string name="editor_exit_fullscreen">Свернуть</string>

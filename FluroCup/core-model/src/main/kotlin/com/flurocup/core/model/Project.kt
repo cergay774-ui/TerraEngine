@@ -23,6 +23,17 @@ data class Project(
     val firstMediaClip: MediaClip?
         get() = timeline.mainTrack?.items?.filterIsInstance<MediaClip>()?.minByOrNull { it.startUs }
 
+    /** Width / height of the output frame: the chosen ratio, or the first clip's shape. */
+    fun outputAspect(): Float {
+        val ratio = settings.aspectRatio
+        if (ratio.widthRatio > 0 && ratio.heightRatio > 0) return ratio.widthRatio.toFloat() / ratio.heightRatio
+        val info = firstMediaClip?.source?.info
+        if (info != null && info.displayWidth > 0 && info.displayHeight > 0) {
+            return info.displayWidth.toFloat() / info.displayHeight
+        }
+        return 9f / 16f
+    }
+
     fun toSummary(thumbnailPath: String?): ProjectSummary {
         val info = firstMediaClip?.source?.info
         return ProjectSummary(

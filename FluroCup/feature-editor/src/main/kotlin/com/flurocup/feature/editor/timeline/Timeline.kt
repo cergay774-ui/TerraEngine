@@ -141,7 +141,7 @@ internal fun Timeline(
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val decay = rememberSplineBasedDecay<Float>()
-    val textMeasurer = rememberTextMeasurer()
+    val textMeasurer = rememberTextMeasurer(cacheSize = 32)
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
     val labelStyle = remember(labelColor) { TextStyle(fontSize = 10.sp, color = labelColor) }
 
@@ -559,7 +559,12 @@ private fun DrawScope.drawRuler(state: TimelineState, textMeasurer: TextMeasurer
         val x = center + (t - position).toFloat() * pxPerUs
         if (t % major == 0L) {
             drawLine(FluroColors.OnSurfaceMuted, Offset(x, baseline - 8.dp.toPx()), Offset(x, baseline), strokeWidth = 1.dp.toPx())
-            drawText(textMeasurer, formatDuration(t), Offset(x + 3.dp.toPx(), 0f), style)
+            // Labels are measured without constraints: drawText(textMeasurer, text, topLeft) sizes
+            // the text to "canvas width - x", which fails for labels past the right edge.
+            val labelX = x + 3.dp.toPx()
+            if (labelX < size.width) {
+                drawText(textMeasurer.measure(formatDuration(t), style), topLeft = Offset(labelX, 0f))
+            }
         } else {
             drawCircle(FluroColors.Outline, radius = 1.2.dp.toPx(), center = Offset(x, baseline - 2.dp.toPx()))
         }

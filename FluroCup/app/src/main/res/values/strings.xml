@@ -2,4 +2,9 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="ru">
     <string name="app_name" translatable="false">FluroCup</string>
     <string name="splash_tagline">Монтаж, который светится</string>
+    <string name="crash_title">FluroCup закрылся с ошибкой</string>
+    <string name="crash_message">Скопируйте отчёт и отправьте разработчику — так ошибку найдут быстрее. Проекты сохранены.</string>
+    <string name="crash_copy">Скопировать</string>
+    <string name="crash_close">Закрыть</string>
+    <string name="crash_copied">Отчёт скопирован</string>
 </resources>

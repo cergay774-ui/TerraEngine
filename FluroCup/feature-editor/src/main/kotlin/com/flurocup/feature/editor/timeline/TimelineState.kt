@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import com.flurocup.core.model.MediaKind
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -53,7 +54,15 @@ class FilmstripLoader(scope: CoroutineScope, private val load: suspend (FrameKey
         repeat(WORKERS) {
             scope.launch {
                 for (key in queue) {
-                    load(key)?.let { frames[key] = it }
+                    // A frame that can't be read stays blank; it must never take the editor down.
+                    val frame = try {
+                        load(key)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        null
+                    }
+                    if (frame != null) frames[key] = frame
                 }
             }
         }

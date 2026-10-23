@@ -19,7 +19,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.flurocup.app.splash.FluroSplash
+import androidx.navigation.toRoute
 import com.flurocup.feature.editor.EditorScreen
+import com.flurocup.feature.export.ExportScreen
 import com.flurocup.feature.home.HomeScreen
 
 private const val LOGO_KEY = "fluro-logo"
@@ -88,7 +90,23 @@ fun FluroNavHost() {
                         fadeOut(tween(250))
                 },
             ) {
-                EditorScreen(onBack = { navController.popBackStack() })
+                EditorScreen(
+                    onBack = { navController.popBackStack() },
+                    onExport = { position ->
+                        val projectId = it.toRoute<EditorRoute>().projectId
+                        navController.navigate(ExportRoute(projectId, position))
+                    },
+                )
+            }
+            composable<ExportRoute>(
+                enterTransition = {
+                    slideIntoContainer(SlideDirection.Up, spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn(tween(250))
+                },
+                popExitTransition = {
+                    slideOutOfContainer(SlideDirection.Down, spring(stiffness = Spring.StiffnessMediumLow)) + fadeOut(tween(250))
+                },
+            ) {
+                ExportScreen(onBack = { navController.popBackStack() })
             }
         }
     }

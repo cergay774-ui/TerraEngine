@@ -70,17 +70,8 @@ data class EditorUiState(
 
     val durationUs: Long get() = clips.lastOrNull()?.clip?.endUs ?: 0L
 
-    /** Width / height of the preview frame: the chosen ratio, or the first clip's. */
-    val previewAspect: Float
-        get() {
-            val ratio = project?.settings?.aspectRatio ?: AspectRatio.ORIGINAL
-            if (ratio.widthRatio > 0 && ratio.heightRatio > 0) return ratio.widthRatio.toFloat() / ratio.heightRatio
-            val info = project?.firstMediaClip?.source?.info
-            if (info != null && info.displayWidth > 0 && info.displayHeight > 0) {
-                return info.displayWidth.toFloat() / info.displayHeight
-            }
-            return 9f / 16f
-        }
+    /** Width / height of the preview frame, the same as the exported frame. */
+    val previewAspect: Float get() = project?.outputAspect() ?: (9f / 16f)
 }
 
 sealed interface EditorMessage {

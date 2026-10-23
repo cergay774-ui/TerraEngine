@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -94,6 +95,7 @@ import com.flurocup.feature.editor.timeline.TimelineState
 @Composable
 fun EditorScreen(
     onBack: () -> Unit,
+    onExport: (positionUs: Long) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: EditorViewModel = hiltViewModel(),
 ) {
@@ -214,6 +216,16 @@ fun EditorScreen(
                         Icon(Icons.AutoMirrored.Rounded.Redo, contentDescription = stringResource(R.string.editor_redo))
                     }
                     PreviewSettingsMenu(source = state.previewSource, onSourceChange = viewModel::setPreviewSource)
+                    GradientButton(
+                        onClick = {
+                            viewModel.pause()
+                            onExport(timeline.positionUs)
+                        },
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(end = 8.dp),
+                    ) {
+                        Text(stringResource(R.string.editor_export))
+                    }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,

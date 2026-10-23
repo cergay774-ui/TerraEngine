@@ -11,12 +11,9 @@ import androidx.media3.transformer.DefaultEncoderFactory
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.Effects
-import androidx.media3.transformer.ExportException
-import androidx.media3.transformer.ExportResult
-import androidx.media3.transformer.ProgressHolder
-import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
 import com.flurocup.core.engine.media.CodecSupport
+import com.flurocup.core.engine.media.runTransformer
 import com.flurocup.core.engine.media.sha1
 import com.flurocup.core.model.HdrType
 import com.flurocup.core.model.MediaInfo
@@ -27,13 +24,10 @@ import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -124,27 +118,6 @@ class ProxyManager @Inject constructor(
         val fps = if (info.frameRate > 0f) info.frameRate else 30f
         val bitrate = (width.toLong() * height * fps * BITS_PER_PIXEL).toLong().coerceIn(MIN_BITRATE, MAX_BITRATE).toInt()
 
-        val done = CompletableDeferred<Unit>()
-        val transformer = Transformer.Builder(context)
-            .setVideoMimeType(MimeTypes.VIDEO_H264)
-            .setAudioMimeType(MimeTypes.AUDIO_AAC)
-            .setEncoderFactory(
-                DefaultEncoderFactory.Builder(context)
-                    .setRequestedVideoEncoderSettings(VideoEncoderSettings.Builder().setBitrate(bitrate).build())
-                    .setEnableFallback(true)
-                    .build(),
-            )
-            .addListener(object : Transformer.Listener {
-                override fun onCompleted(composition: Composition, exportResult: ExportResult) {
-                    done.complete(Unit)
-                }
-
-                override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
-                    done.completeExceptionally(exportException)
-                }
-            })
-            .build()
-
         val item = EditedMediaItem.Builder(MediaItem.fromUri(request.sourceUri))
             .setEffects(Effects(emptyList(), listOf(Presentation.createForWidthAndHeight(width, height, Presentation.LAYOUT_SCALE_TO_FIT))))
             .build()
@@ -153,26 +126,22 @@ class ProxyManager @Inject constructor(
                 if (info.hdr != HdrType.NONE) setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
             }
             .build()
-
-        transformer.start(composition, output.path)
-        try {
-            coroutineScope {
-                val poller = launch {
-                    val holder = ProgressHolder()
-                    while (true) {
-                        if (transformer.getProgress(holder) == Transformer.PROGRESS_STATE_AVAILABLE) {
-                            onProgress(holder.progress / 100f)
-                        }
-                        delay(PROGRESS_POLL_MS)
-                    }
-                }
-                done.await()
-                poller.cancel()
-            }
-        } catch (e: CancellationException) {
-            transformer.cancel()
-            throw e
-        }
+        runTransformer(
+            context = context,
+            composition = composition,
+            outputPath = output.path,
+            configure = {
+                setVideoMimeType(MimeTypes.VIDEO_H264)
+                setAudioMimeType(MimeTypes.AUDIO_AAC)
+                setEncoderFactory(
+                    DefaultEncoderFactory.Builder(context)
+                        .setRequestedVideoEncoderSettings(VideoEncoderSettings.Builder().setBitrate(bitrate).build())
+                        .setEnableFallback(true)
+                        .build(),
+                )
+            },
+            onProgress = onProgress,
+        )
     }
 
     private fun setState(uri: String, state: ProxyState) {
@@ -180,7 +149,6 @@ class ProxyManager @Inject constructor(
     }
 
     private companion object {
-        const val PROGRESS_POLL_MS = 250L
         const val BITS_PER_PIXEL = 0.1
         const val MIN_BITRATE = 2_000_000L
         const val MAX_BITRATE = 16_000_000L
