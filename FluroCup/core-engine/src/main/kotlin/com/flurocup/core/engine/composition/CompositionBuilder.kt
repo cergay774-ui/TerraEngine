@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.annotation.OptIn
+import androidx.media3.common.C
 import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
@@ -13,7 +14,9 @@ import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.Effects
+import com.flurocup.core.engine.effects.BackgroundFillEffect
 import com.flurocup.core.engine.effects.ClipLookEffect
+import com.flurocup.core.model.Background
 import com.flurocup.core.engine.effects.ClipTransformation
 import com.flurocup.core.model.ClipLook
 import com.flurocup.core.model.HdrType
@@ -82,10 +85,10 @@ class CompositionBuilder @Inject constructor(
         val totalUs = max(main.lastOrNull()?.endUs ?: 0L, layers.maxOfOrNull { layer -> layer.last().endUs } ?: 0L)
 
         val sequences = if (layers.isEmpty()) {
-            listOf(sequence { main.forEach { addItem(item(it, spec)) } })
+            listOf(sequence(trackTypesFor(main)) { main.forEach { addItem(item(it, spec)) } })
         } else {
             buildList {
-                add(sequence { addItem(filler(totalUs, spec)) })
+                add(sequence(VIDEO_ONLY) { addItem(filler(totalUs, spec)) })
                 // Overlay tracks are stored bottom-up; the compositor wants the top layer first.
                 layers.asReversed().forEach { add(layered(it, totalUs, spec)) }
                 if (main.isNotEmpty()) add(layered(main, totalUs, spec))
@@ -95,9 +98,13 @@ class CompositionBuilder @Inject constructor(
         val clips = main + layers.flatten()
         val anyHdr = clips.any { (it.source.info?.hdr ?: HdrType.NONE) != HdrType.NONE }
         val hasSound = clips.any(::hasAudio)
+        // Transparent areas (masks, keys, opacity, space around a smaller clip) end up as the
+        // project background, the same on screen and in the file.
+        val background = (project.settings.background as? Background.Color)?.argb ?: 0xFF000000
+        val finalEffects = compositionEffects + BackgroundFillEffect(background)
         return Composition.Builder(sequences)
             .apply {
-                if (compositionEffects.isNotEmpty()) setEffects(Effects(emptyList(), compositionEffects))
+                setEffects(Effects(emptyList(), finalEffects))
                 if (anyHdr && (layers.isNotEmpty() || !keepHdr)) setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
                 if (forExport && hasSound) experimentalSetForceAudioTrack(true)
             }
@@ -108,7 +115,7 @@ class CompositionBuilder @Inject constructor(
     fun audioOnly(project: Project, uriFor: (MediaClip) -> String): Composition? {
         val tracks = listOf(playable(MainTrackEdits.clips(project))) + overlayLayers(project)
         val sequences = tracks.filter { track -> track.any(::hasAudio) }.map { clips ->
-            sequence {
+            sequence(AUDIO_ONLY) {
                 var t = 0L
                 clips.forEach { clip ->
                     if (clip.startUs > t) addGap(clip.startUs - t)
@@ -132,7 +139,7 @@ class CompositionBuilder @Inject constructor(
 
     private fun playable(clips: List<MediaClip>) = clips.filter { it.source.kind != MediaKind.AUDIO && it.durationUs > 0 }
 
-    private fun layered(clips: List<MediaClip>, totalUs: Long, spec: RenderSpec): EditedMediaItemSequence = sequence {
+    private fun layered(clips: List<MediaClip>, totalUs: Long, spec: RenderSpec): EditedMediaItemSequence = sequence(trackTypesFor(clips)) {
         var t = 0L
         clips.forEach { clip ->
             if (clip.startUs - t >= MIN_FILLER_US) addItem(filler(clip.startUs - t, spec))
@@ -217,10 +224,22 @@ class CompositionBuilder @Inject constructor(
         return Uri.fromFile(file).toString()
     }
 
-    private inline fun sequence(block: EditedMediaItemSequence.Builder.() -> Unit): EditedMediaItemSequence =
-        EditedMediaItemSequence.Builder().apply(block).build()
+    /** Sound only if some clip on the track has it; photos and silent clips then get silence. */
+    private fun trackTypesFor(clips: List<MediaClip>): Set<Int> =
+        if (clips.any(::hasAudio)) AUDIO_AND_VIDEO else VIDEO_ONLY
+
+    private inline fun sequence(trackTypes: Set<Int>, block: EditedMediaItemSequence.Builder.() -> Unit): EditedMediaItemSequence =
+        EditedMediaItemSequence.Builder(trackTypes)
+            .apply {
+                block()
+                if (C.TRACK_TYPE_AUDIO in trackTypes) experimentalSetForceAudioTrack(true)
+            }
+            .build()
 
     private companion object {
         const val MIN_FILLER_US = 2_000L
+        val VIDEO_ONLY = setOf(C.TRACK_TYPE_VIDEO)
+        val AUDIO_ONLY = setOf(C.TRACK_TYPE_AUDIO)
+        val AUDIO_AND_VIDEO = setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO)
     }
 }

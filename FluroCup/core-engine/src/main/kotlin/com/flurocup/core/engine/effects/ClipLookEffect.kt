@@ -21,8 +21,9 @@ class ClipLookEffect(private val look: AtomicReference<ClipLook>) : ShaderEffect
         program.float("uChromaOn", if (key != null) 1f else 0f)
         if (key != null) {
             program.color("uKeyColor", key.colorArgb)
-            program.float("uSimilarity", key.similarity.coerceIn(0f, 1f) * 0.5f)
-            program.float("uSmoothness", key.smoothness.coerceIn(0f, 1f) * 0.3f + 0.001f)
+            // Distances are in Cb/Cr space, where colours lie within about 0.7 of each other.
+            program.float("uSimilarity", key.similarity.coerceIn(0f, 1f) * 0.4f)
+            program.float("uSmoothness", key.smoothness.coerceIn(0f, 1f) * 0.25f + 0.005f)
             program.float("uSpill", key.spill.coerceIn(0f, 1f))
         }
 
@@ -137,13 +138,23 @@ void main() {
   float alpha = 1.0;
 
   if (uChromaOn > 0.5) {
-    float dist = distance(chroma(color.rgb), chroma(uKeyColor.rgb));
-    float keep = smoothstep(uSimilarity, uSimilarity + uSmoothness, dist);
-    alpha *= keep;
-    // Spill: pixels near the key colour lose its tint.
-    float spillAmount = (1.0 - smoothstep(uSimilarity, uSimilarity + uSmoothness * 4.0 + 0.1, dist)) * uSpill;
-    float luma = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
-    color.rgb = mix(color.rgb, vec3(luma), spillAmount);
+    vec2 c = chroma(color.rgb);
+    vec2 keyC = chroma(uKeyColor.rgb);
+    float dist = distance(c, keyC);
+    alpha *= smoothstep(uSimilarity, uSimilarity + uSmoothness, dist);
+    // Spill: remove the part of the pixel's colour that points towards the key colour, keeping
+    // its brightness, so green fringes and reflections turn neutral instead of grey.
+    float keyLen = length(keyC);
+    if (keyLen > 0.001 && uSpill > 0.0) {
+      vec2 dir = keyC / keyLen;
+      float along = max(dot(c, dir), 0.0);
+      vec2 cleaned = c - dir * along * uSpill;
+      float y = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+      color.rgb = clamp(vec3(
+          y + 1.402 * cleaned.y,
+          y - 0.344136 * cleaned.x - 0.714136 * cleaned.y,
+          y + 1.772 * cleaned.x), 0.0, 1.0);
+    }
   }
 
   if (uMaskShape > 0.5) {

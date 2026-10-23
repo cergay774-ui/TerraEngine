@@ -188,6 +188,18 @@ class EditorViewModel @Inject constructor(
 
     fun pause() = preview.pause()
 
+    /** A finger starts dragging the timeline: pause and switch the player to fast seeking. */
+    fun startScrub() {
+        preview.pause()
+        preview.setScrubbing(true)
+    }
+
+    /** The drag ended at [timelineUs]: land exactly there and leave fast-seek mode. */
+    fun endScrub(timelineUs: Long) {
+        preview.setScrubbing(false)
+        seekTo(timelineUs, final = true)
+    }
+
     /** Seeks while the timeline is dragged; [final] forces the last position through. */
     fun seekTo(timelineUs: Long, final: Boolean = false) {
         val now = SystemClock.uptimeMillis()
@@ -551,11 +563,14 @@ class EditorViewModel @Inject constructor(
         val sourceShort = project.timeline.allClips
             .mapNotNull { clip -> clip.source.info?.let { min(it.displayWidth, it.displayHeight) }?.takeIf { it > 0 } }
             .maxOrNull() ?: PREVIEW_SHORT_SIDE
-        val (width, height) = ExportMath.outputSize(project.outputAspect(), min(PREVIEW_SHORT_SIDE, sourceShort))
+        val layered = compositions.isLayered(project)
+        // Mixing layers costs more per frame; 720p looks the same on a phone screen.
+        val previewShort = if (layered) LAYERED_PREVIEW_SHORT_SIDE else PREVIEW_SHORT_SIDE
+        val (width, height) = ExportMath.outputSize(project.outputAspect(), min(previewShort, sourceShort))
         val forced = setOfNotNull(lookEditingClipId)
 
         // Looks are read live, so only what changes the structure of the composition is compared.
-        val key = listOf(width, height, fps, forced) + project.timeline.tracks.map { track ->
+        val key = listOf(width, height, fps, forced, project.settings.background) + project.timeline.tracks.map { track ->
             listOf(track.id, track.kind, track.hidden) + track.items.filterIsInstance<MediaClip>().map {
                 listOf(it.id, it.startUs, it.trimStartUs, it.trimEndUs, it.speed, uriFor(it), it.crop, it.look.needsShader)
             }
@@ -580,7 +595,7 @@ class EditorViewModel @Inject constructor(
         )
         val start = preview.positionUs.coerceAtMost((state.durationUs - 1).coerceAtLeast(0L))
         val composition = runCatching { compositions.video(project, spec) }.getOrNull()
-        preview.setComposition(composition, start, layered = compositions.isLayered(project))
+        preview.setComposition(composition, start, layered = layered)
     }
 
     private suspend fun makeProjectThumbnail(project: Project) {
@@ -597,5 +612,6 @@ class EditorViewModel @Inject constructor(
         private const val SEEK_INTERVAL_MS = 50L
         private const val FRAME_SIZE_PX = 160
         private const val PREVIEW_SHORT_SIDE = 1080
+        private const val LAYERED_PREVIEW_SHORT_SIDE = 720
     }
 }

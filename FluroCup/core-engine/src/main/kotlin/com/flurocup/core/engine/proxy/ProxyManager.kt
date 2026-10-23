@@ -2,6 +2,7 @@ package com.flurocup.core.engine.proxy
 
 import android.content.Context
 import androidx.annotation.OptIn
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
@@ -121,7 +122,11 @@ class ProxyManager @Inject constructor(
         val item = EditedMediaItem.Builder(MediaItem.fromUri(request.sourceUri))
             .setEffects(Effects(emptyList(), listOf(Presentation.createForWidthAndHeight(width, height, Presentation.LAYOUT_SCALE_TO_FIT))))
             .build()
-        val composition = Composition.Builder(EditedMediaItemSequence.Builder(item).build())
+        val composition = Composition.Builder(
+            EditedMediaItemSequence.Builder(
+                if (info.audioTrackCount > 0) setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO) else setOf(C.TRACK_TYPE_VIDEO),
+            ).addItem(item).build(),
+        )
             .apply {
                 if (info.hdr != HdrType.NONE) setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
             }
