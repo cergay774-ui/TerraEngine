@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.FluroCup" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/fluro_background</item>
+        <item name="android:colorAccent">@color/fluro_teal</item>
+    </style>
+
+    <!-- System splash: same background and mark, so the Compose splash continues it seamlessly. -->
+    <style name="Theme.FluroCup.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/fluro_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.FluroCup</item>
+    </style>
+</resources>

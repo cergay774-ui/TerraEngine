@@ -1,0 +1,45 @@
+name: FluroCup APK
+
+on:
+  push:
+    paths:
+      - "FluroCup/**"
+      - ".github/workflows/flurocup.yml"
+  pull_request:
+    paths:
+      - "FluroCup/**"
+      - ".github/workflows/flurocup.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: flurocup-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: FluroCup
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests
+        run: ./gradlew --no-daemon --stacktrace :core-model:test
+
+      - name: Build debug APK
+        run: ./gradlew --no-daemon --stacktrace :app:assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FluroCup-debug-apk
+          path: FluroCup/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

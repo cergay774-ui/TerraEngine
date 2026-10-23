@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="ru">
+    <string name="editor_back">Назад</string>
+    <string name="editor_loading">Открываем проект…</string>
+    <string name="editor_not_found">Проект не найден или повреждён</string>
+    <string name="editor_coming_soon_title">Здесь будет монтаж</string>
+    <string name="editor_coming_soon_text">Импорт видео, превью и таймлайн появятся на следующих этапах.</string>
+</resources>

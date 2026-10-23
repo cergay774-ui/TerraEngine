@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="ru">
+    <string name="home_create_new">Создать новый</string>
+    <string name="home_create_hint">Добавьте видео и фото, чтобы начать монтаж</string>
+    <string name="home_new_project">Новый проект</string>
+    <string name="home_my_projects">Мои проекты</string>
+    <string name="home_default_project_name">Проект</string>
+    <string name="home_copy_suffix">копия</string>
+    <string name="home_no_clips">Нет клипов</string>
+    <string name="home_project_actions">Действия с проектом</string>
+    <string name="home_action_rename">Переименовать</string>
+    <string name="home_action_duplicate">Дублировать</string>
+    <string name="home_action_delete">Удалить</string>
+    <string name="home_rename_title">Название проекта</string>
+    <string name="home_delete_title">Удалить проект?</string>
+    <string name="home_delete_message">«%1$s» будет удалён без возможности восстановления. Исходные видео в галерее останутся.</string>
+    <string name="home_save">Сохранить</string>
+    <string name="home_cancel">Отмена</string>
+    <plurals name="home_projects_count">
+        <item quantity="one">%d проект</item>
+        <item quantity="few">%d проекта</item>
+        <item quantity="many">%d проектов</item>
+        <item quantity="other">%d проекта</item>
+    </plurals>
+</resources>
