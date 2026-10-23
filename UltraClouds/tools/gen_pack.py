@@ -41,7 +41,7 @@ GEN_TS = os.path.join(ROOT, "src", "scripts", "generated.ts")
 NS = "ultra_clouds"
 ENTITY_ID = f"{NS}:sky"
 ITEM_ID = f"{NS}:cloud_settings"
-VERSION = [1, 1, 0]
+VERSION = [1, 2, 0]
 MIN_ENGINE = [1, 26, 50]
 SERVER_VERSION = "2.10.0"        # stable @minecraft/server for 1.26.50+
 SERVER_UI_VERSION = "2.2.0"      # stable @minecraft/server-ui for 1.26.50+
@@ -117,7 +117,7 @@ CELL = 256
 # P: wrap period of the layer (blocks); counts: clusters per quality tier
 # alt: altitude above the user "height"; size: cluster width range per tier
 LAYERS = {
-    "cu": dict(P=2048, counts=[20, 16, 16, 20], alt=0.0, yj=16.0,
+    "cu": dict(P=2048, counts=[36, 26, 22, 24], alt=0.0, yj=16.0,
                size=[(165, 250), (120, 185), (85, 140), (60, 105)]),
     "st": dict(P=2304, counts=[8, 6, 5, 5], alt=-8.0, yj=8.0,
                size=[(560, 820), (480, 720), (420, 640), (380, 560)]),
@@ -320,9 +320,10 @@ LAYER_BINS = {"ac": (3, 1.4)}
 CI_BAND = (0.87, 1.19)
 LOW_BINS = 6
 LOW_LZ = (0.10, 0.68)          # ~120 .. ~950 blocks
-# geometry is authored tiny: should a bone ever be drawn while its animation
-# is not playing, it stays at a sub-pixel rest size instead of a visible quad
-GEO_SCALE = 256
+# Quads are authored 16 px tall (the size 1.0 used and that the game is known
+# to render).  Bones of switched-off quality levels are hidden by
+# part_visibility, so their rest pose is never drawn.
+GEO_SCALE = 1
 PIECE_BIAS = 0.004             # relative depth step between pieces of a cluster
 CEIL_STEP = 0.02               # relative depth step between overcast ceiling sprites
 
@@ -348,7 +349,7 @@ def order_sprites(clusters):
                 # ceiling: ring number first, so the halo pass can pick rings
                 sp.name = f"ov{sp.ring}_{i:03d}"
             else:
-                sp.name = f"{g}_t{sp.cluster.tier}r{sp.rank}_{sp.cluster.k:03d}_{i:03d}"
+                sp.name = f"{g}_t{sp.cluster.tier}_{sp.cluster.k:03d}_r{sp.rank}_{i:03d}"
     return groups, sum(len(v) for v in groups.values())
 
 
@@ -541,6 +542,12 @@ def pre_animation(clusters, groups, total):
         s.append(f"v.ox_{L} = v.w{L}x - v.cw_x; v.oz_{L} = v.w{L}z - v.cw_z; v.oy_{L} = v.alt_{L} - v.cw_y;")
     out.append(section(s))
     # ---- clusters (per layer and tier), then sprites (per detail rank) -----
+    # v.bin_<layer><k> is the cluster's halo distance bin, -1 when the cluster
+    # is not drawn (invisible, or its quality tier is off).  The render
+    # controllers draw only clusters with a bin, so hidden clouds cost almost
+    # nothing.  Everything past the visibility test runs only for visible
+    # clusters; their sprites get their final transforms here, so the
+    # animation channels are plain variable reads.
     for L, spec in LAYERS.items():
         P = spec["P"]
         for tier in range(4):
@@ -558,11 +565,12 @@ def pre_animation(clusters, groups, total):
                 # clouds form and dissolve over a few minutes
                 body.append(f"{vv}_g = math.clamp((v.d_{L} - {fmt(cl.rank)} - 0.06 * math.sin(v.age * {fmt(cl.omega)} + {fmt(cl.phase)})) * 14, 0, 1)"
                             f" * math.clamp((v.R_{L} - math.sqrt(t.dh)) * v.Ri_{L}, 0, 1) * {fmt(cl.size)} * v.sz_{L};")
-                body.append(f"{vv}_x = t.x; {vv}_z = t.z;")
-                body.append(f"{vv}_f = t.x * v.fx + {vv}_y * v.fy + t.z * v.fz;")
-                body.append(f"{vv}_m = 0.12 * math.sqrt(t.dh + {vv}_y * {vv}_y);")
-                # projected depth of the whole cluster (its pieces share it)
-                vis = [f"t.lz = {log_dist(vv + '_m')};",
+                body.append(f"v.bin_{L}{cl.k} = -1;")
+                vis = [f"{vv}_x = t.x; {vv}_z = t.z;",
+                       f"{vv}_f = t.x * v.fx + {vv}_y * v.fy + t.z * v.fz;",
+                       f"{vv}_m = 0.12 * math.sqrt(t.dh + {vv}_y * {vv}_y);",
+                       # projected depth of the whole cluster (its pieces share it)
+                       f"t.lz = {log_dist(vv + '_m')};",
                        f"{vv}_d = 16 * v.zmin * math.exp(t.lz * {fmt(-math.log(ZMIN_FRAC))});"]
                 if L == "cu":
                     # sine of the elevation of the cloud seen from the camera:
@@ -576,7 +584,7 @@ def pre_animation(clusters, groups, total):
                     vis.append(f"{vv}_q = math.clamp(1.6 * t.se, 0.3, 1);")
                     vis.append(f"{vv}_h = math.clamp((t.se - 0.05) * 12, 0, 1);")
                 if L == "ci":
-                    pass
+                    vis.append(f"v.bin_{L}{cl.k} = 0;")
                 elif L not in LAYER_BINS:
                     lo, hi = LOW_LZ
                     vis.append(f"v.bin_{L}{cl.k} = math.min(math.floor(math.clamp((t.lz - {fmt(lo)}) * {fmt(1 / (hi - lo))}, 0, 1) * {LOW_BINS}), {LOW_BINS - 1});")
@@ -586,6 +594,8 @@ def pre_animation(clusters, groups, total):
                     vis.append(f"v.bin_{L}{cl.k} = math.min(math.floor(math.clamp(math.ln(math.max({vv}_m, 0.001) / math.max(0.12 * math.abs({vv}_y), 0.001)) / {fmt(span)}, 0, 1) * {nb}), {nb - 1});")
                 body.append(f"({vv}_g > 0.5) ? {{ " + " ".join(vis) + " };")
             out.append(f"(v.g{tier}0) ? {{ " + " ".join(body) + " };")
+            # quality tier switched off: its clusters leave the render lists
+            out.append(f"(!v.g{tier}0) ? {{ " + " ".join(f"v.bin_{L}{cl.k} = -1;" for cl in cls) + " };")
             for rank in range(4):
                 body = []
                 for cl in cls:
@@ -604,9 +614,17 @@ def pre_animation(clusters, groups, total):
                         depth = f"{vv}_d" if sp.bias == 0 else f"{vv}_d * {fmt(1 - PIECE_BIAS * sp.bias)}"
                         if L == "ci":
                             depth = f"v.zfar * {16 * ci_slot(groups, sp):.4f}"
-                        body.append(f"t.f = {vv}_f + {vv}_g * ({fmt(sp.ox)} * v.fx + {fmt(sp.oy)} * v.fy + {fmt(sp.oz)} * v.fz);")
-                        body.append(f"{sv}_k = (t.f > {vv}_m && {vv}_g > 0.5) ? {depth} / t.f : 0;")
-                        body.append(f"{sv}_s = math.min({sv}_k * {vv}_g * {sp.height * GEO_SCALE / 16:.6f}{extra}, v.zf3);")
+                        calc = [f"t.f = {vv}_f + {vv}_g * ({fmt(sp.ox)} * v.fx + {fmt(sp.oy)} * v.fy + {fmt(sp.oz)} * v.fz);",
+                                f"t.k = (t.f > {vv}_m) ? {depth} / t.f : 0;",
+                                f"{sv}_s = math.min(t.k * {vv}_g * {sp.height * GEO_SCALE / 16:.6f}{extra}, v.zf3);"]
+                        if L != "cu":
+                            # sheets: foreshortened, never reaching below the horizon
+                            calc.append(f"{sv}_sy = math.min({sv}_s * {vv}_q, t.k * v.hcap * math.abs({vv}_y));")
+                        calc += [f"{sv}_px = ({vv}_x + {vv}_g * {fmt(sp.ox)}) * t.k;",
+                                 f"{sv}_py = ({vv}_y + {vv}_g * {fmt(sp.oy)}) * t.k;",
+                                 f"{sv}_pz = -({vv}_z + {vv}_g * {fmt(sp.oz)}) * t.k;"]
+                        reset = f"{sv}_s = 0;" + (f" {sv}_sy = 0;" if L != "cu" else "")
+                        body.append(f"{reset} ({vv}_g > 0.5) ? {{ " + " ".join(calc) + " };")
                 if body:
                     out.append(f"(v.g{tier}{rank}) ? {{ " + " ".join(body) + " };")
     # ---- overcast ceiling -------------------------------------------------
@@ -620,14 +638,17 @@ def pre_animation(clusters, groups, total):
     calc = [f"v.ov_d = {log_depth(f'0.12 * v.ov_y * {fmt(1 / math.sin(math.radians(low)))}')};"]
     for sp in ov.sprites:
         sv = f"v.s{sp.name}"
-        body.append(f"{sv}_k = 0; {sv}_s = 0;")
+        body.append(f"{sv}_s = 0; {sv}_sy = 0;")
         cot = math.cos(math.radians(sp.el)) / math.sin(math.radians(sp.el))
+        q = min(1.0, max(0.3, 1.6 * math.sin(math.radians(sp.el))))
         calc.append(f"t.a = {fmt(sp.az)} + v.ov_phi; t.hd = v.ov_y * {fmt(cot)};")
         calc.append(f"{sv}_vx = t.hd * math.sin(t.a); {sv}_vy = v.ov_y; {sv}_vz = t.hd * math.cos(t.a);")
         calc.append(f"t.f = {sv}_vx * v.fx + {sv}_vy * v.fy + {sv}_vz * v.fz;")
         calc.append(f"t.m = 0.12 * math.sqrt({sv}_vx * {sv}_vx + {sv}_vy * {sv}_vy + {sv}_vz * {sv}_vz);")
-        calc.append(f"{sv}_k = (t.f > t.m) ? v.ov_d * {ceil_slot(ov, sp):.4f} / t.f : 0;")
-        calc.append(f"{sv}_s = math.min({sv}_k * v.ov_y * {sp.height * GEO_SCALE / 16:.6f} * v.ov_vis, v.zf3);")
+        calc.append(f"t.k = (t.f > t.m) ? v.ov_d * {ceil_slot(ov, sp):.4f} / t.f : 0;")
+        calc.append(f"{sv}_s = math.min(t.k * v.ov_y * {sp.height * GEO_SCALE / 16:.6f} * v.ov_vis, v.zf3);")
+        calc.append(f"{sv}_sy = math.min({sv}_s * {fmt(q)}, t.k * v.hcap * v.ov_y);")
+        calc.append(f"{sv}_px = {sv}_vx * t.k; {sv}_py = {sv}_vy * t.k; {sv}_pz = -{sv}_vz * t.k;")
     out.append(section(body) + " (v.g00 && v.ov_vis > 0.01 && v.ov_y > 5) ? { " + " ".join(calc) + " };")
     return out
 
@@ -714,20 +735,29 @@ def rc_color(tint, alpha):
     }
 
 
-def tier_rank_visibility(sprites, g):
-    """Core pass: every piece whose quality tier / detail rank is active
-    (bones of inactive levels are not drawn at all - no wasted draw calls)."""
+def layer_var(sp):
+    """Clusters' bin variables are per layer; bases belong to cumulus."""
+    return sp.cluster.layer
+
+
+def cluster_visibility(sprites, g):
+    """Core pass: the bones of every cluster that is drawn this frame (its
+    bin variable is -1 when it is invisible or its quality tier is off).
+    Pieces above the detail level are scaled to zero by their "hide"
+    animation."""
     vis = [{"*": False}]
-    for t, r in sorted({(sp.cluster.tier, sp.rank) for sp in sprites if sp.cluster.layer != "ov"}):
-        vis.append({f"{g}_t{t}r{r}_*": f"v.g{t}{r}"})
+    for t, k, lv in sorted({(sp.cluster.tier, sp.cluster.k, layer_var(sp)) for sp in sprites
+                            if sp.cluster.layer != "ov"}):
+        vis.append({f"{g}_t{t}_{k:03d}_*": f"v.bin_{lv}{k} >= 0"})
     return vis
 
 
-def binned_visibility(sprites, g, b, layer_var):
-    """Halo bin b of a group: one rule per (tier, rank, cluster)."""
+def binned_visibility(sprites, g, b):
+    """Halo bin b of a group: one rule per cluster."""
     vis = [{"*": False}]
-    for t, r, k in sorted({(sp.cluster.tier, sp.rank, sp.cluster.k) for sp in sprites if sp.cluster.layer != "ov"}):
-        vis.append({f"{g}_t{t}r{r}_{k:03d}_*": f"v.g{t}{r} && v.bin_{layer_var}{k} == {b}"})
+    for t, k, lv in sorted({(sp.cluster.tier, sp.cluster.k, layer_var(sp)) for sp in sprites
+                            if sp.cluster.layer != "ov"}):
+        vis.append({f"{g}_t{t}_{k:03d}_*": f"v.bin_{lv}{k} == {b}"})
     return vis
 
 
@@ -751,7 +781,7 @@ def build_render_controllers(groups):
     for g in CORE_GROUPS:
         for suffix in (("_b", "_a") if g in LOW_GROUP else ("",)):
             core[g + suffix] = add(f"core_{g}{suffix}", g, "Material.core", "Texture.natural",
-                                   tier_rank_visibility(groups[g], g), fmt(CORE_ALPHA))
+                                   cluster_visibility(groups[g], g), fmt(CORE_ALPHA))
     # the overcast ceiling is the nearest of all: drawn first, so the GPU can
     # reject the clouds hidden behind it before shading them
     final = [{add("core_ceiling", "st", "Material.core", "Texture.natural", [{"*": False}, {"ov*": True}],
@@ -763,16 +793,16 @@ def build_render_controllers(groups):
     # halo pass: blended, natural or soft atlas, far to near
     soft = "Array.atlas[v.softi]"
     # cirrus has no core: its halo is drawn even with crisp edges
-    name = add("halo_ci", "ci", "Material.default", soft, tier_rank_visibility(groups["ci"], "ci"), "v.alpha_ci")
+    name = add("halo_ci", "ci", "Material.default", soft, cluster_visibility(groups["ci"], "ci"), "v.alpha_ci")
     final.append({name: "v.on"})
     nb = LAYER_BINS["ac"][0]
     for b in reversed(range(nb)):
-        name = add(f"halo_ac{b}", "ac", "Material.default", soft, binned_visibility(groups["ac"], "ac", b, "ac"), "1")
+        name = add(f"halo_ac{b}", "ac", "Material.default", soft, binned_visibility(groups["ac"], "ac", b), "1")
         final.append({name: "v.fringe"})
     for b in reversed(range(LOW_BINS)):
         for g in ("st", "cb", "cu"):
             name = add(f"halo_{g}{b}", g, "Material.default", soft,
-                       binned_visibility(groups[g], g, b, "st" if g == "st" else "cu"), "1")
+                       binned_visibility(groups[g], g, b), "1")
             final.append({name: "v.fringe"})
     # overcast ceiling, nearest of all: the lowest ring always has soft edges
     # (they meet the horizon); the upper rings only while the deck is still
@@ -804,31 +834,24 @@ def build_animations(clusters, groups):
     for (tier, rank), sps in sorted(by_group.items()):
         bones = {}
         for sp in sps:
-            vv = sp.cluster.var
             sv = f"v.s{sp.name}"
-            if "ceiling" in sp.flags:
-                q = min(1.0, max(0.3, 1.6 * math.sin(math.radians(sp.el))))
-                bones[sp.name] = {
-                    "position": [f"{sv}_vx * {sv}_k", f"{sv}_vy * {sv}_k", f"-{sv}_vz * {sv}_k"],
-                    "rotation": ["v.cp", "v.cy", 0],
-                    "scale": [f"{sv}_s", f"math.min({sv}_s * {fmt(q)}, {sv}_k * v.hcap * math.abs({sv}_vy))", "v.flip"],
-                }
-                continue
-            # root sits on the camera; k already contains the 16 px/block factor
+            # all transforms were computed in pre_animation (root sits on the
+            # camera; the k factors already contain the 16 px/block scale)
+            sheet = sp.layer != "cu"
             bones[sp.name] = {
-                "position": [
-                    f"({vv}_x + {vv}_g * {fmt(sp.ox)}) * {sv}_k",
-                    f"({vv}_y + {vv}_g * {fmt(sp.oy)}) * {sv}_k",
-                    f"-({vv}_z + {vv}_g * {fmt(sp.oz)}) * {sv}_k",
-                ],
+                "position": [f"{sv}_px", f"{sv}_py", f"{sv}_pz"],
                 "rotation": ["v.cp", "v.cy", 0],
-                # sheets: foreshortened, and never reaching below the horizon
-                "scale": [f"{sv}_s", f"{sv}_s" if sp.layer == "cu" else
-                          f"math.min({sv}_s * {vv}_q, {sv}_k * v.hcap * math.abs({vv}_y))", "v.flip"],
+                "scale": [f"{sv}_s", f"{sv}_sy" if sheet else f"{sv}_s", "v.flip"],
             }
         aname = f"animation.ultra_clouds.t{tier}r{rank}"
         anims[aname] = {"loop": True, "bones": bones}
         names[f"t{tier}r{rank}"] = aname
+        if rank > 0:
+            # detail level below this rank: the pieces stay drawn by their
+            # tier's visibility rule, so they are scaled to nothing
+            hname = f"animation.ultra_clouds.x{tier}r{rank}"
+            anims[hname] = {"loop": True, "bones": {sp.name: {"scale": 0} for sp in sps}}
+            names[f"x{tier}r{rank}"] = hname
     return {"format_version": "1.8.0", "animations": anims}, names
 
 
@@ -836,7 +859,7 @@ def build_client_entity(clusters, groups, total, anim_names, rc_order):
     animate = [{"root": "v.on"}]
     for key in sorted(k for k in anim_names if k != "root"):
         t, r = int(key[1]), int(key[3])
-        animate.append({key: f"v.g{t}{r}"})
+        animate.append({key: f"v.g{t}{r}" if key[0] == "t" else f"v.g{t}0 && !v.g{t}{r}"})
     return {
         "format_version": "1.10.0",
         "minecraft:client_entity": {
@@ -931,26 +954,81 @@ def rp_manifest():
     }
 
 
+# Pack settings (manifest format 3): the world's settings screen of the
+# behavior pack (gear button of the pack, also reachable in game through
+# Settings > Behavior Packs).  The script reads them with
+# world.getPackSettings() and applies them to every player; /clouds still
+# allows personal changes until the owner changes the pack setting again.
+#   (type, key, text key, default, extra)
+PROFILE_OPTIONS = ["auto", "performance", "balanced", "high", "ultra", "cinematic"]
+TYPE_OPTIONS = ["realistic", "cumulus", "cirrus", "overcast", "storm", "fantasy", "minimal", "dynamic"]
+SOFT_OPTIONS = ["crisp", "natural", "soft"]
+PACK_SETTINGS = [
+    ("label", None, "uc.ps.header", None, None),
+    ("toggle", "enabled", "uc.enabled", True, None),
+    ("dropdown", "profile", "uc.profile", "auto", [("auto", "uc.ps.profile.auto")] +
+     [(o, f"uc.profile.{o}") for o in PROFILE_OPTIONS[1:]]),
+    ("dropdown", "type", "uc.type", "realistic", [(o, f"uc.type.{o}") for o in TYPE_OPTIONS]),
+    ("slider", "amount", "uc.density", 50, (0, 100, 5)),
+    ("label", None, "uc.ps.layers", None, None),
+    ("slider", "cumulus", "uc.amount.cu", 100, (0, 200, 10)),
+    ("slider", "stratus", "uc.amount.st", 100, (0, 200, 10)),
+    ("slider", "alto", "uc.amount.ac", 100, (0, 200, 10)),
+    ("slider", "cirrus", "uc.amount.ci", 100, (0, 200, 10)),
+    ("label", None, "uc.ps.look", None, None),
+    ("slider", "size", "uc.size", 100, (50, 200, 5)),
+    ("slider", "height", "uc.height", 200, (120, 400, 10)),
+    ("slider", "speed", "uc.speed", 20, (0, 100, 5)),
+    ("slider", "direction", "uc.dir", 75, (0, 355, 5)),
+    ("dropdown", "softness", "uc.softness", "natural", [(o, f"uc.soft.{i}") for i, o in enumerate(SOFT_OPTIONS)]),
+    ("slider", "brightness", "uc.bright", 100, (40, 160, 5)),
+    ("slider", "warmth", "uc.warm", 60, (0, 100, 5)),
+    ("label", None, "uc.ps.perf", None, None),
+    ("slider", "sky_depth", "uc.ps.skydepth", 0, (0, 16, 1)),
+    ("toggle", "perf_mode", "uc.perf", False, None),
+    ("toggle", "auto_quality", "uc.auto", True, None),
+    ("label", None, "uc.ps.footer", None, None),
+]
+
+
+def manifest_settings():
+    out = []
+    for typ, key, text, default, extra in PACK_SETTINGS:
+        if typ == "label":
+            out.append({"type": "label", "text": text})
+            continue
+        e = {"type": typ, "name": f"{NS}:{key}", "text": text}
+        if typ == "slider":
+            e["min"], e["max"], e["step"] = extra
+        if typ == "dropdown":
+            e["options"] = [{"name": n, "text": t} for n, t in extra]
+        e["default"] = default
+        out.append(e)
+    return out
+
+
 def bp_manifest():
+    v = ".".join(map(str, VERSION))
     return {
-        "format_version": 2,
+        "format_version": 3,
         "header": {
             "name": "pack.name",
             "description": "pack.description",
             "uuid": BP_UUID,
-            "version": VERSION,
-            "min_engine_version": MIN_ENGINE,
+            "version": v,
+            "min_engine_version": ".".join(map(str, MIN_ENGINE)),
         },
         "modules": [
-            {"type": "data", "uuid": BP_MOD_UUID, "version": VERSION},
+            {"type": "data", "uuid": BP_MOD_UUID, "version": v},
             {"type": "script", "language": "javascript", "uuid": BP_SCRIPT_UUID,
-             "version": VERSION, "entry": "scripts/main.js"},
+             "version": v, "entry": "scripts/main.js"},
         ],
         "dependencies": [
-            {"uuid": RP_UUID, "version": VERSION},
+            {"uuid": RP_UUID, "version": v},
             {"module_name": "@minecraft/server", "version": SERVER_VERSION},
             {"module_name": "@minecraft/server-ui", "version": SERVER_UI_VERSION},
         ],
+        "settings": manifest_settings(),
         "metadata": {"authors": ["M1X"], "product_type": "addon"},
     }
 
@@ -988,12 +1066,16 @@ def bp_entity():
 
 
 def bp_item():
+    """Legacy "Cloud Settings" item of 1.0/1.1.  It is no longer given to
+    anybody and is hidden from the creative inventory; the definition stays
+    only so that copies in existing worlds are still valid until the script
+    removes them from the players' inventories."""
     return {
         "format_version": "1.21.90",
         "minecraft:item": {
             "description": {
                 "identifier": ITEM_ID,
-                "menu_category": {"category": "items"},
+                "menu_category": {"category": "none", "is_hidden_in_commands": True},
             },
             "components": {
                 "minecraft:icon": "ultra_clouds_settings",
@@ -1011,6 +1093,7 @@ def generated_ts():
         f'export const NS = "{NS}";',
         f'export const ENTITY_ID = "{ENTITY_ID}";',
         f'export const ITEM_ID = "{ITEM_ID}";',
+        f'export const VERSION = "{".".join(map(str, VERSION))}";',
         "export interface PropDef { id: string; type: \"bool\" | \"int\" | \"float\"; min: number; max: number; def: number | boolean; }",
         "export const PROPS: Record<string, PropDef> = {",
     ]
@@ -1019,6 +1102,19 @@ def generated_ts():
         d = "true" if default is True else "false" if default is False else fmt(default)
         lines.append(f'  {name}: {{ id: "{NS}:{name}", type: "{typ}", min: {fmt(lo)}, max: {fmt(hi)}, def: {d} }},')
     lines.append("};")
+    lines.append("export interface PackSettingDef { key: string; id: string; type: \"toggle\" | \"slider\" | \"dropdown\"; def: boolean | number | string; min?: number; max?: number; options?: string[]; }")
+    lines.append("export const PACK_SETTINGS: PackSettingDef[] = [")
+    for typ, key, text, default, extra in PACK_SETTINGS:
+        if typ == "label":
+            continue
+        d = json.dumps(default)
+        more = ""
+        if typ == "slider":
+            more = f", min: {fmt(extra[0])}, max: {fmt(extra[1])}"
+        if typ == "dropdown":
+            more = f", options: {json.dumps([n for n, t in extra])}"
+        lines.append(f'  {{ key: "{key}", id: "{NS}:{key}", type: "{typ}", def: {d}{more} }},')
+    lines.append("];")
     return "\n".join(lines) + "\n"
 
 
@@ -1058,7 +1154,9 @@ def main():
     dump(os.path.join(BP, "manifest.json"), bp_manifest())
     dump(os.path.join(BP, "entities", "ultra_clouds_sky.json"), bp_entity())
     dump(os.path.join(BP, "items", "cloud_settings.json"), bp_item())
-    write_lang(BP, LANG_BP)
+    # the pack settings screen reads its texts from the behavior pack
+    write_lang(BP, LANG_BP, {"en_US": {k: v[0] for k, v in ui.items()},
+                             "ru_RU": {k: v[1] for k, v in ui.items()}})
     with open(GEN_TS, "w") as f:
         f.write(generated_ts())
 

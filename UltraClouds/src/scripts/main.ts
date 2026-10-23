@@ -2,15 +2,15 @@ import {
   CommandPermissionLevel,
   CustomCommandParamType,
   CustomCommandStatus,
-  ItemStack,
   Player,
   WeatherType,
   system,
   world,
 } from "@minecraft/server";
-import { ITEM_ID } from "./generated.js";
-import { cleanupOrphans, ensureRig, followRig, forgetPlayer, removeRig, syncRig } from "./rig.js";
+import { ITEM_ID, VERSION } from "./generated.js";
+import { cleanupOrphans, ensureRig, followRig, forgetPlayer, removeRig, rigInfo, syncRig } from "./rig.js";
 import { Settings, WorldState, defaultsFor, hasSavedSettings, loadSettings, saveSettings } from "./settings.js";
+import { PackValues, applyPackSettings, readPackSettings } from "./packsettings.js";
 import { MenuHost, forceClassic, openMenu } from "./ui.js";
 
 /**
@@ -24,19 +24,25 @@ import { MenuHost, forceClassic, openMenu } from "./ui.js";
 const OVERWORLD = "minecraft:overworld";
 const WEATHER_KEY = "ultra_clouds:weather";
 const SEED_KEY = "ultra_clouds:seed";
-const ITEM_GIVEN_KEY = "ultra_clouds:item_given";
 
 const settings = new Map<string, Settings>();
 const dirty = new Set<string>();
 const unsaved = new Set<string>();
 const worldState: WorldState = { rain: 0, thunder: 0, seed: 0 };
 let ready = false;
+let packValues: PackValues = readPackSettings();
+let packSignature = JSON.stringify(packValues);
 
 function get(player: Player): Settings {
   let s = settings.get(player.id);
   if (!s) {
     s = loadSettings(player);
     settings.set(player.id, s);
+    // world settings changed while this player was away (or first visit)
+    if (applyPackSettings(player, s, packValues)) {
+      dirty.add(player.id);
+      unsaved.add(player.id);
+    }
   }
   return s;
 }
@@ -62,13 +68,17 @@ function applyWeather(type: WeatherType | string): void {
   for (const id of settings.keys()) dirty.add(id);
 }
 
-function giveItem(player: Player): void {
+/** Versions 1.0/1.1 handed out a "Cloud Settings" item; settings now live in
+ * the pack settings and the /clouds menu, so old copies are taken away. */
+function removeLegacyItem(player: Player): void {
   try {
-    const inv = player.getComponent("minecraft:inventory");
-    inv?.container.addItem(new ItemStack(ITEM_ID, 1));
-    player.sendMessage({ translate: "uc.msg.item" });
+    const container = player.getComponent("minecraft:inventory")?.container;
+    if (!container) return;
+    for (let i = 0; i < container.size; i++) {
+      if (container.getItem(i)?.typeId === ITEM_ID) container.setItem(i);
+    }
   } catch (e) {
-    console.warn(`[Ultra Clouds] could not give the settings item: ${e}`);
+    console.warn(`[Ultra Clouds] could not remove the old settings item: ${e}`);
   }
 }
 
@@ -79,10 +89,7 @@ function onFirstSpawn(player: Player): void {
     saveSettings(player, s);
     player.sendMessage({ translate: "uc.msg.welcome" });
   }
-  if (player.getDynamicProperty(ITEM_GIVEN_KEY) !== true) {
-    player.setDynamicProperty(ITEM_GIVEN_KEY, true);
-    giveItem(player);
-  }
+  removeLegacyItem(player);
   dirty.add(player.id);
 }
 
@@ -98,6 +105,26 @@ function status(player: Player): void {
       ],
     },
   });
+}
+
+/** "/clouds debug": everything needed to diagnose a report from a screenshot. */
+function debugInfo(player: Player): void {
+  const s = get(player);
+  let device = "device: unknown";
+  try {
+    const info = player.clientSystemInfo;
+    device = `device: platform=${info.platformType} memoryTier=${info.memoryTier} maxRenderDistance=${info.maxRenderDistance}`;
+  } catch {
+    // simulated players have no client info
+  }
+  player.sendMessage(
+    `[Ultra Clouds ${VERSION}] ${device}\n` +
+      `settings: enabled=${s.enabled} profile=${s.profile} type=${s.type} amount=${s.density} ` +
+      `layers=${s.cumulusAmount}/${s.stratusAmount}/${s.altoAmount}/${s.cirrusAmount} quality=${s.quality} ` +
+      `detail=${s.detail} soft=${s.softness} skyDepth=${s.skyDepth} perf=${s.perfMode} auto=${s.autoQuality}\n` +
+      `weather: rain=${worldState.rain} thunder=${worldState.thunder} seed=${worldState.seed} y=${player.location.y.toFixed(1)}\n` +
+      rigInfo(player)
+  );
 }
 
 function runAction(player: Player, action: string | undefined): void {
@@ -117,11 +144,11 @@ function runAction(player: Player, action: string | undefined): void {
     case "reset":
       host.reset(player);
       break;
-    case "item":
-      giveItem(player);
-      break;
     case "status":
       status(player);
+      break;
+    case "debug":
+      debugInfo(player);
       break;
     case "classic":
       forceClassic(player);
@@ -132,14 +159,14 @@ function runAction(player: Player, action: string | undefined): void {
   }
 }
 
-// ---- commands: /clouds [menu|on|off|toggle|reset|item|status|classic] -------
+// ---- commands: /clouds [menu|on|off|toggle|reset|status|debug|classic] ------
 system.beforeEvents.startup.subscribe((ev) => {
   const reg = ev.customCommandRegistry;
-  reg.registerEnum("ultra_clouds:action", ["menu", "on", "off", "toggle", "reset", "item", "status", "classic"]);
+  reg.registerEnum("ultra_clouds:action", ["menu", "on", "off", "toggle", "reset", "status", "debug", "classic"]);
   reg.registerCommand(
     {
       name: "ultra_clouds:clouds",
-      description: "Ultra Clouds: settings menu, or on/off/toggle/reset/item/status/classic",
+      description: "Ultra Clouds: settings menu, or on/off/toggle/reset/status/debug/classic",
       permissionLevel: CommandPermissionLevel.Any,
       cheatsRequired: false,
       optionalParameters: [{ name: "ultra_clouds:action", type: CustomCommandParamType.Enum }],
@@ -158,6 +185,8 @@ system.beforeEvents.startup.subscribe((ev) => {
 
 // ---- world events -------------------------------------------------------------
 world.afterEvents.worldLoad.subscribe(() => {
+  packValues = readPackSettings();
+  packSignature = JSON.stringify(packValues);
   const saved = world.getDynamicProperty(WEATHER_KEY);
   if (typeof saved === "string") applyWeather(saved);
   let seed = world.getDynamicProperty(SEED_KEY);
@@ -224,6 +253,23 @@ system.runInterval(() => {
   }
   cleanupOrphans();
 }, 100);
+
+// pack settings (behavior pack settings screen) can change during the game;
+// stable Script API has no change event yet, so compare once a second
+system.runInterval(() => {
+  if (!ready) return;
+  const values = readPackSettings();
+  const signature = JSON.stringify(values);
+  if (signature === packSignature) return;
+  packValues = values;
+  packSignature = signature;
+  for (const player of world.getAllPlayers()) {
+    if (applyPackSettings(player, get(player), packValues)) {
+      dirty.add(player.id);
+      unsaved.add(player.id);
+    }
+  }
+}, 20);
 
 // settings saved a little after the last change (sliders send many updates)
 system.runInterval(() => {

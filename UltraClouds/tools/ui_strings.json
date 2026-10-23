@@ -1,6 +1,6 @@
 {
   "uc.title": ["Ultra Clouds", "Ultra Clouds"],
-  "uc.main.desc": ["Cloud system settings. Every change is applied instantly and saved in this world.", "Настройки облачной системы. Изменения применяются сразу и сохраняются в этом мире."],
+  "uc.main.desc": ["Your personal cloud settings. Changes apply instantly and are saved in this world. The world owner sets the defaults for everybody in the pack settings (Settings > Behavior Packs > Ultra Clouds > gear).", "Ваши личные настройки облаков. Изменения применяются сразу и сохраняются в этом мире. Настройки для всех игроков владелец мира задаёт в настройках пакета (Настройки > Наборы параметров поведения > Ultra Clouds > шестерёнка)."],
   "uc.enabled": ["Enable Ultra Clouds", "Включить Ultra Clouds"],
   "uc.enabled.d": ["Shows or hides the Ultra Clouds sky (only for you). Vanilla clouds are hidden by the resource pack sub-pack or by Settings > Video > Render Clouds.", "Показывает или скрывает небо Ultra Clouds (только для вас). Стандартные облака скрываются сабпаком ресурс-пака или в Настройки > Видео > Отображать облака."],
   "uc.profile": ["Profile", "Профиль"],
@@ -104,15 +104,21 @@
   "uc.haze.d": ["Adds a lower, thicker stratus mist layer.", "Добавляет более низкий и плотный слоистый туманный слой."],
   "uc.atmo": ["Atmospheric effects (%)", "Интенсивность атмосферных эффектов (%)"],
   "uc.atmo.d": ["Overall strength of sunset colours and twilight tints.", "Общая сила закатных красок и сумеречных оттенков."],
-  "uc.msg.welcome": ["Ultra Clouds is active. Open the settings with /clouds or the Cloud Settings item.", "Ultra Clouds активен. Откройте настройки командой /clouds или предметом «Настройки облаков»."],
+  "uc.msg.welcome": ["Ultra Clouds is active. Settings: /clouds, or the pack settings (gear button of Ultra Clouds in the world's Behavior Packs).", "Ultra Clouds активен. Настройки: команда /clouds или настройки пакета (шестерёнка у Ultra Clouds в «Наборах параметров поведения» мира)."],
   "uc.msg.reset": ["Ultra Clouds settings were reset to the defaults for your device.", "Настройки Ultra Clouds сброшены к значениям по умолчанию для вашего устройства."],
   "uc.msg.on": ["Ultra Clouds enabled.", "Ultra Clouds включены."],
   "uc.msg.off": ["Ultra Clouds disabled.", "Ultra Clouds выключены."],
-  "uc.msg.item": ["You received the Cloud Settings item.", "Вы получили предмет «Настройки облаков»."],
   "uc.msg.dim": ["Ultra Clouds is shown only in the Overworld.", "Ultra Clouds отображаются только в Верхнем мире."],
   "uc.msg.status": ["Ultra Clouds: %s | profile %s | quality %s", "Ultra Clouds: %s | профиль %s | качество %s"],
   "uc.msg.busy": ["Close the chat to see the Ultra Clouds menu.", "Закройте чат, чтобы увидеть меню Ultra Clouds."],
   "uc.state.on": ["on", "вкл"],
   "uc.state.off": ["off", "выкл"],
-  "uc.cmd.desc": ["Ultra Clouds: open settings or use on/off/reset/item/status/classic", "Ultra Clouds: настройки или on/off/reset/item/status/classic"]
+  "uc.cmd.desc": ["Ultra Clouds: open settings or use on/off/reset/status/debug/classic", "Ultra Clouds: настройки или on/off/reset/status/debug/classic"],
+  "uc.ps.header": ["§lUltra Clouds§r: sky settings of this world. They apply to every player and can be changed during the game (Settings > Behavior Packs > Ultra Clouds > gear). /clouds opens a personal menu.", "§lUltra Clouds§r: настройки неба этого мира. Действуют для всех игроков, их можно менять прямо в игре (Настройки > Наборы параметров поведения > Ultra Clouds > шестерёнка). Команда /clouds открывает личное меню."],
+  "uc.ps.profile.auto": ["Auto (by device)", "Авто (по устройству)"],
+  "uc.ps.layers": ["§lCloud amount by layer§r (100% = natural for the type)", "§lКоличество облаков по слоям§r (100% — естественно для типа)"],
+  "uc.ps.look": ["§lShape, motion and light", "§lФорма, движение и свет"],
+  "uc.ps.perf": ["§lPerformance", "§lПроизводительность"],
+  "uc.ps.skydepth": ["Sky depth, chunks (0 = automatic; keep it at or below your render distance)", "Глубина неба, чанки (0 — автоматически; не больше вашей дальности прорисовки)"],
+  "uc.ps.footer": ["Changes reach the sky within a second.", "Изменения появляются на небе в течение секунды."]
 }

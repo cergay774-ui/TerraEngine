@@ -306,6 +306,7 @@ def check_manifests():
             ver = json.load(open(pkg))["version"]
             if ver != mods.get(name):
                 err(f"manifest uses {name} {mods.get(name)} but scripts were type-checked against {ver}")
+    check_pack_settings(bp)
     # subpacks that hide the vanilla clouds must contain a fully transparent map
     try:
         from PIL import Image
@@ -315,6 +316,66 @@ def check_manifests():
                 err(f"{sp}/clouds.png is not fully transparent")
     except Exception as e:
         err(f"cannot check clouds.png: {e}")
+
+
+def check_pack_settings(bp):
+    """Manifest format 3 pack settings, checked against the rules of Mojang's
+    schema (bedrock-samples metadata/json_schemas/.../packaging/3.0.0)."""
+    if bp.get("format_version") != 3:
+        err("pack settings need manifest format_version 3")
+    semver = re.compile(r"^(0|[1-9]\d{0,4})\.(0|[1-9]\d{0,4})\.(0|[1-9]\d{0,4})$")
+    versions = [bp["header"]["version"], bp["header"]["min_engine_version"]]
+    versions += [m["version"] for m in bp["modules"]] + [d["version"] for d in bp["dependencies"] if "uuid" in d]
+    for v in versions:
+        if not isinstance(v, str) or not semver.match(v):
+            err(f"manifest v3 version {v!r} is not a SemVer string")
+    if not bp.get("metadata", {}).get("authors"):
+        err("manifest v3 needs metadata.authors")
+    settings = bp.get("settings", [])
+    if not (1 <= len(settings) <= 50):
+        err(f"{len(settings)} pack settings (1..50 allowed)")
+    name_re = re.compile(r"^(?:(?!^(minecraft):).)+:(?:.)+$", re.I)
+    lang = {}
+    for code in ("en_US", "ru_RU"):
+        path = os.path.join(BP, "texts", f"{code}.lang")
+        if os.path.exists(path):
+            lang[code] = dict(l.split("=", 1) for l in open(path, encoding="utf-8").read().splitlines() if "=" in l)
+    names = set()
+    required = {"label": {"text"}, "toggle": {"name", "text", "default"},
+                "slider": {"name", "text", "min", "max", "step", "default"},
+                "dropdown": {"name", "text", "options", "default"}}
+    for e in settings:
+        typ = e.get("type")
+        if typ not in required:
+            err(f"pack setting type {typ!r} not supported")
+            continue
+        missing = required[typ] - set(e)
+        if missing:
+            err(f"pack setting {e.get('name', e.get('text'))} misses {sorted(missing)}")
+        texts = [e.get("text")] + [o.get("text") for o in e.get("options", [])]
+        for t in texts:
+            for code, table in lang.items():
+                if t not in table:
+                    err(f"pack setting text {t} missing from behavior pack {code}.lang")
+        if typ == "label":
+            continue
+        if not name_re.match(e["name"]) or len(e["name"]) > 128:
+            err(f"pack setting name {e['name']} invalid")
+        if e["name"] in names:
+            err(f"pack setting name {e['name']} duplicated")
+        names.add(e["name"])
+        if typ == "toggle" and not isinstance(e["default"], bool):
+            err(f"{e['name']}: toggle default must be boolean")
+        if typ == "slider":
+            lo, hi, step, d = e["min"], e["max"], e["step"], e["default"]
+            if not (step > 0 and lo < hi and lo <= d <= hi) or abs(((d - lo) / step) - round((d - lo) / step)) > 1e-6:
+                err(f"{e['name']}: slider range/default invalid")
+        if typ == "dropdown":
+            opts = [o.get("name") for o in e["options"]]
+            if not (2 <= len(opts) <= 20) or len(set(opts)) != len(opts) or not all(opts):
+                err(f"{e['name']}: dropdown options invalid")
+            if e["default"] not in opts:
+                err(f"{e['name']}: dropdown default not among the options")
 
 
 def check_lang():

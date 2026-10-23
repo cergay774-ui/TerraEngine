@@ -2,6 +2,7 @@
 export const NS = "ultra_clouds";
 export const ENTITY_ID = "ultra_clouds:sky";
 export const ITEM_ID = "ultra_clouds:cloud_settings";
+export const VERSION = "1.2.0";
 export interface PropDef { id: string; type: "bool" | "int" | "float"; min: number; max: number; def: number | boolean; }
 export const PROPS: Record<string, PropDef> = {
   show: { id: "ultra_clouds:show", type: "bool", min: 0, max: 1, def: false },
@@ -35,3 +36,24 @@ export const PROPS: Record<string, PropDef> = {
   thunder: { id: "ultra_clouds:thunder", type: "float", min: 0, max: 1, def: 0 },
   seed: { id: "ultra_clouds:seed", type: "int", min: 0, max: 4095, def: 0 },
 };
+export interface PackSettingDef { key: string; id: string; type: "toggle" | "slider" | "dropdown"; def: boolean | number | string; min?: number; max?: number; options?: string[]; }
+export const PACK_SETTINGS: PackSettingDef[] = [
+  { key: "enabled", id: "ultra_clouds:enabled", type: "toggle", def: true },
+  { key: "profile", id: "ultra_clouds:profile", type: "dropdown", def: "auto", options: ["auto", "performance", "balanced", "high", "ultra", "cinematic"] },
+  { key: "type", id: "ultra_clouds:type", type: "dropdown", def: "realistic", options: ["realistic", "cumulus", "cirrus", "overcast", "storm", "fantasy", "minimal", "dynamic"] },
+  { key: "amount", id: "ultra_clouds:amount", type: "slider", def: 50, min: 0, max: 100 },
+  { key: "cumulus", id: "ultra_clouds:cumulus", type: "slider", def: 100, min: 0, max: 200 },
+  { key: "stratus", id: "ultra_clouds:stratus", type: "slider", def: 100, min: 0, max: 200 },
+  { key: "alto", id: "ultra_clouds:alto", type: "slider", def: 100, min: 0, max: 200 },
+  { key: "cirrus", id: "ultra_clouds:cirrus", type: "slider", def: 100, min: 0, max: 200 },
+  { key: "size", id: "ultra_clouds:size", type: "slider", def: 100, min: 50, max: 200 },
+  { key: "height", id: "ultra_clouds:height", type: "slider", def: 200, min: 120, max: 400 },
+  { key: "speed", id: "ultra_clouds:speed", type: "slider", def: 20, min: 0, max: 100 },
+  { key: "direction", id: "ultra_clouds:direction", type: "slider", def: 75, min: 0, max: 355 },
+  { key: "softness", id: "ultra_clouds:softness", type: "dropdown", def: "natural", options: ["crisp", "natural", "soft"] },
+  { key: "brightness", id: "ultra_clouds:brightness", type: "slider", def: 100, min: 40, max: 160 },
+  { key: "warmth", id: "ultra_clouds:warmth", type: "slider", def: 60, min: 0, max: 100 },
+  { key: "sky_depth", id: "ultra_clouds:sky_depth", type: "slider", def: 0, min: 0, max: 16 },
+  { key: "perf_mode", id: "ultra_clouds:perf_mode", type: "toggle", def: false },
+  { key: "auto_quality", id: "ultra_clouds:auto_quality", type: "toggle", def: true },
+];

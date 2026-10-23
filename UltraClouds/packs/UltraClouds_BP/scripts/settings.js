@@ -48,7 +48,7 @@ const BASE = {
     perfMode: false,
     autoQuality: true,
     drawDistance: 80,
-    skyDepth: 6,
+    skyDepth: 5,
     size: 100,
     height: 200,
     speed: 20,
@@ -76,12 +76,12 @@ export const PROFILES = {
     },
 };
 export const TYPES = {
-    realistic: { cu: 0.45, st: 0.08, ac: 0.25, ci: 0.35, storm: 0, fantasy: 0 },
-    cumulus: { cu: 0.62, st: 0.0, ac: 0.06, ci: 0.1, storm: 0, fantasy: 0 },
+    realistic: { cu: 0.55, st: 0.08, ac: 0.3, ci: 0.4, storm: 0, fantasy: 0 },
+    cumulus: { cu: 0.72, st: 0.0, ac: 0.08, ci: 0.12, storm: 0, fantasy: 0 },
     cirrus: { cu: 0.06, st: 0.0, ac: 0.18, ci: 0.85, storm: 0, fantasy: 0 },
     overcast: { cu: 0.35, st: 0.95, ac: 0.3, ci: 0.0, storm: 0.15, fantasy: 0 },
     storm: { cu: 0.72, st: 0.8, ac: 0.15, ci: 0.1, storm: 1, fantasy: 0 },
-    fantasy: { cu: 0.5, st: 0.0, ac: 0.45, ci: 0.55, storm: 0, fantasy: 1 },
+    fantasy: { cu: 0.55, st: 0.0, ac: 0.45, ci: 0.55, storm: 0, fantasy: 1 },
     minimal: { cu: 0.3, st: 0.0, ac: 0.0, ci: 0.22, storm: 0, fantasy: 0 },
 };
 /** Type cycle of the "dynamic" mode (fair weather heavy, occasional grey days). */
@@ -110,10 +110,10 @@ export function clampSetting(key, value) {
         return BASE[key];
     return Math.min(hi, Math.max(lo, value));
 }
-/** Device based default (the "automatic quality" first pick). */
-export function defaultsFor(player) {
-    const s = { ...BASE };
+/** Profile and sky depth that suit the player's device ("Auto"). */
+export function deviceDefaults(player) {
     let profile = "balanced";
+    let skyDepth = BASE.skyDepth;
     try {
         if (player) {
             const info = player.clientSystemInfo;
@@ -130,13 +130,20 @@ export function defaultsFor(player) {
             else if (tier >= MemoryTier.High)
                 profile = "high";
             // keep the projection inside the fog-free range of typical settings
-            s.skyDepth = Math.max(2, Math.min(info.maxRenderDistance, mobile ? 6 : 10));
+            skyDepth = Math.max(2, Math.min(info.maxRenderDistance, mobile ? 5 : 8));
         }
     }
     catch {
         // clientSystemInfo can be unavailable for simulated players
     }
-    applyProfile(s, profile);
+    return { profile, skyDepth };
+}
+/** Device based default (the "automatic quality" first pick). */
+export function defaultsFor(player) {
+    const s = { ...BASE };
+    const d = deviceDefaults(player);
+    s.skyDepth = d.skyDepth;
+    applyProfile(s, d.profile);
     return s;
 }
 export function applyProfile(s, profile) {

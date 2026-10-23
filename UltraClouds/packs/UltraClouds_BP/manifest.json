@@ -1,50 +1,30 @@
 {
-  "format_version": 2,
+  "format_version": 3,
   "header": {
     "name": "pack.name",
     "description": "pack.description",
     "uuid": "2bd6da50-44a4-5d52-8102-4f7aba568210",
-    "version": [
-      1,
-      1,
-      0
-    ],
-    "min_engine_version": [
-      1,
-      26,
-      50
-    ]
+    "version": "1.2.0",
+    "min_engine_version": "1.26.50"
   },
   "modules": [
     {
       "type": "data",
       "uuid": "6f069e2c-ccdb-55d6-92fa-3f610c867848",
-      "version": [
-        1,
-        1,
-        0
-      ]
+      "version": "1.2.0"
     },
     {
       "type": "script",
       "language": "javascript",
       "uuid": "e8f1120f-27cc-5d69-a405-ad3f2b1762fe",
-      "version": [
-        1,
-        1,
-        0
-      ],
+      "version": "1.2.0",
       "entry": "scripts/main.js"
     }
   ],
   "dependencies": [
     {
       "uuid": "85eb36dc-140c-53bd-8d39-bf539d42c5dc",
-      "version": [
-        1,
-        1,
-        0
-      ]
+      "version": "1.2.0"
     },
     {
       "module_name": "@minecraft/server",
@@ -53,6 +33,246 @@
     {
       "module_name": "@minecraft/server-ui",
       "version": "2.2.0"
+    }
+  ],
+  "settings": [
+    {
+      "type": "label",
+      "text": "uc.ps.header"
+    },
+    {
+      "type": "toggle",
+      "name": "ultra_clouds:enabled",
+      "text": "uc.enabled",
+      "default": true
+    },
+    {
+      "type": "dropdown",
+      "name": "ultra_clouds:profile",
+      "text": "uc.profile",
+      "options": [
+        {
+          "name": "auto",
+          "text": "uc.ps.profile.auto"
+        },
+        {
+          "name": "performance",
+          "text": "uc.profile.performance"
+        },
+        {
+          "name": "balanced",
+          "text": "uc.profile.balanced"
+        },
+        {
+          "name": "high",
+          "text": "uc.profile.high"
+        },
+        {
+          "name": "ultra",
+          "text": "uc.profile.ultra"
+        },
+        {
+          "name": "cinematic",
+          "text": "uc.profile.cinematic"
+        }
+      ],
+      "default": "auto"
+    },
+    {
+      "type": "dropdown",
+      "name": "ultra_clouds:type",
+      "text": "uc.type",
+      "options": [
+        {
+          "name": "realistic",
+          "text": "uc.type.realistic"
+        },
+        {
+          "name": "cumulus",
+          "text": "uc.type.cumulus"
+        },
+        {
+          "name": "cirrus",
+          "text": "uc.type.cirrus"
+        },
+        {
+          "name": "overcast",
+          "text": "uc.type.overcast"
+        },
+        {
+          "name": "storm",
+          "text": "uc.type.storm"
+        },
+        {
+          "name": "fantasy",
+          "text": "uc.type.fantasy"
+        },
+        {
+          "name": "minimal",
+          "text": "uc.type.minimal"
+        },
+        {
+          "name": "dynamic",
+          "text": "uc.type.dynamic"
+        }
+      ],
+      "default": "realistic"
+    },
+    {
+      "type": "slider",
+      "name": "ultra_clouds:amount",
+      "text": "uc.density",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "default": 50
+    },
+    {
+      "type": "label",
+      "text": "uc.ps.layers"
+    },
+    {
+      "type": "slider",
+      "name": "ultra_clouds:cumulus",
+      "text": "uc.amount.cu",
+      "min": 0,
+      "max": 200,
+      "step": 10,
+      "default": 100
+    },
+    {
+      "type": "slider",
+      "name": "ultra_clouds:stratus",
+      "text": "uc.amount.st",
+      "min": 0,
+      "max": 200,
+      "step": 10,
+      "default": 100
+    },
+    {
+      "type": "slider",
+      "name": "ultra_clouds:alto",
+      "text": "uc.amount.ac",
+      "min": 0,
+      "max": 200,
+      "step": 10,
+      "default": 100
+    },
+    {
+      "type": "slider",
+      "name": "ultra_clouds:cirrus",
+      "text": "uc.amount.ci",
+      "min": 0,
+      "max": 200,
+      "step": 10,
+      "default": 100
+    },
+    {
+      "type": "label",
+      "text": "uc.ps.look"
+    },
+    {
+      "type": "slider",
+      "name": "ultra_clouds:size",
+      "text": "uc.size",
+      "min": 50,
+      "max": 200,
+      "step": 5,
+      "default": 100
+    },
+    {
+      "type": "slider",
+      "name": "ultra_clouds:height",
+      "text": "uc.height",
+      "min": 120,
+      "max": 400,
+      "step": 10,
+      "default": 200
+    },
+    {
+      "type": "slider",
+      "name": "ultra_clouds:speed",
+      "text": "uc.speed",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "default": 20
+    },
+    {
+      "type": "slider",
+      "name": "ultra_clouds:direction",
+      "text": "uc.dir",
+      "min": 0,
+      "max": 355,
+      "step": 5,
+      "default": 75
+    },
+    {
+      "type": "dropdown",
+      "name": "ultra_clouds:softness",
+      "text": "uc.softness",
+      "options": [
+        {
+          "name": "crisp",
+          "text": "uc.soft.0"
+        },
+        {
+          "name": "natural",
+          "text": "uc.soft.1"
+        },
+        {
+          "name": "soft",
+          "text": "uc.soft.2"
+        }
+      ],
+      "default": "natural"
+    },
+    {
+      "type": "slider",
+      "name": "ultra_clouds:brightness",
+      "text": "uc.bright",
+      "min": 40,
+      "max": 160,
+      "step": 5,
+      "default": 100
+    },
+    {
+      "type": "slider",
+      "name": "ultra_clouds:warmth",
+      "text": "uc.warm",
+      "min": 0,
+      "max": 100,
+      "step": 5,
+      "default": 60
+    },
+    {
+      "type": "label",
+      "text": "uc.ps.perf"
+    },
+    {
+      "type": "slider",
+      "name": "ultra_clouds:sky_depth",
+      "text": "uc.ps.skydepth",
+      "min": 0,
+      "max": 16,
+      "step": 1,
+      "default": 0
+    },
+    {
+      "type": "toggle",
+      "name": "ultra_clouds:perf_mode",
+      "text": "uc.perf",
+      "default": false
+    },
+    {
+      "type": "toggle",
+      "name": "ultra_clouds:auto_quality",
+      "text": "uc.auto",
+      "default": true
+    },
+    {
+      "type": "label",
+      "text": "uc.ps.footer"
     }
   ],
   "metadata": {

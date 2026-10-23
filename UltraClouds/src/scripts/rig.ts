@@ -173,3 +173,16 @@ export function cleanupOrphans(): void {
 export function hasRig(player: Player): boolean {
   return valid(states.get(player.id)?.rig);
 }
+
+/** Diagnostics for "/clouds debug": rig state and the last values sent. */
+export function rigInfo(player: Player): string {
+  const st = states.get(player.id);
+  if (!st || !valid(st.rig)) return "rig: none";
+  const r = st.rig.location;
+  const p = player.location;
+  const d = Math.hypot(r.x - p.x, r.y - p.y, r.z - p.z);
+  const sent = [...st.sent.entries()]
+    .map(([k, v]) => `${k}=${typeof v === "number" ? Math.round(v * 1000) / 1000 : v}`)
+    .join(" ");
+  return `rig: ok, ${d.toFixed(1)} blocks away, shown=${st.shown}\n${sent}`;
+}

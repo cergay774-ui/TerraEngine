@@ -130,7 +130,8 @@ class Pack:
         for short, full in self.desc["animations"].items():
             out = {}
             for bone, ch in self.anims[full]["bones"].items():
-                out[bone] = {k: [molang.parse(v) for v in vals] for k, vals in ch.items()}
+                out[bone] = {k: [molang.parse(v) for v in (vals if isinstance(vals, list) else [vals] * 3)]
+                             for k, vals in ch.items()}
             self.channels[short] = out
         self.rc_order = [(list(e.keys())[0], molang.parse(list(e.values())[0])) for e in self.desc["render_controllers"]]
         self.rc_expr = {}
@@ -682,11 +683,11 @@ def run_checks(pack, clusters):
 
 
 PREVIEW_SHOTS = [
-    ("noon_realistic", 0.5, dict(cu=0.45, st=0.08, ac=0.25, ci=0.35), 0.0, (-24, 20)),
+    ("noon_realistic", 0.5, dict(cu=0.55, st=0.08, ac=0.3, ci=0.4), 0.0, (-24, 20)),
     ("afternoon_cumulus", 0.6, dict(cu=0.7, st=0.0, ac=0.06, ci=0.1, size=1.25), 0.0, (-18, 200)),
-    ("sunset_realistic", 0.735, dict(cu=0.45, st=0.08, ac=0.3, ci=0.45, warm=0.8, atmo=0.85), 0.0, (-14, 90)),
+    ("sunset_realistic", 0.735, dict(cu=0.55, st=0.08, ac=0.3, ci=0.45, warm=0.8, atmo=0.85), 0.0, (-14, 90)),
     ("dusk_cirrus", 0.765, dict(cu=0.08, st=0.0, ac=0.2, ci=0.9, warm=0.85, atmo=0.9), 0.0, (-20, 90)),
-    ("night_moon", 0.02, dict(cu=0.4, st=0.05, ac=0.25, ci=0.3), 0.0, (-30, 0)),
+    ("night_moon", 0.02, dict(cu=0.55, st=0.05, ac=0.3, ci=0.4), 0.0, (-30, 0)),
     ("overcast", 0.45, dict(cu=0.35, st=0.95, ac=0.3, ci=0.0, storm=0.15), 0.0, (-20, 300)),
     ("storm", 0.55, dict(cu=0.72, st=0.8, ac=0.15, ci=0.1, storm=1, rain=1, thunder=1), 1.0, (-12, 150)),
     ("fantasy", 0.7, dict(cu=0.5, st=0.0, ac=0.45, ci=0.55, fantasy=1, soft=2, size=1.35, warm=0.8), 0.0, (-22, 60)),
