@@ -441,10 +441,11 @@ private fun FailedView(state: ExportState.Failed, onRetry: () -> Unit) {
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center,
         )
-        if (!nothing && state.code != null) {
+        val code = state.code
+        if (!nothing && code != null) {
             Spacer(Modifier.height(6.dp))
             Text(
-                stringResource(R.string.export_failed_code, state.code),
+                stringResource(R.string.export_failed_code, code),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
