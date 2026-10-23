@@ -266,13 +266,13 @@ class CompositionBuilder @Inject constructor(
     private fun trackTypesFor(clips: List<MediaClip>): Set<Int> =
         if (clips.any(::hasAudio)) AUDIO_AND_VIDEO else VIDEO_ONLY
 
+    /**
+     * A sequence with these track types. Declaring sound is enough for Media3 to fill photos and
+     * silent clips with silence; its older "force audio track" switch must not be combined with
+     * declared track types (it throws).
+     */
     private inline fun sequence(trackTypes: Set<Int>, block: EditedMediaItemSequence.Builder.() -> Unit): EditedMediaItemSequence =
-        EditedMediaItemSequence.Builder(trackTypes)
-            .apply {
-                block()
-                if (C.TRACK_TYPE_AUDIO in trackTypes) experimentalSetForceAudioTrack(true)
-            }
-            .build()
+        EditedMediaItemSequence.Builder(trackTypes).apply(block).build()
 
     private companion object {
         const val MIN_FILLER_US = 2_000L

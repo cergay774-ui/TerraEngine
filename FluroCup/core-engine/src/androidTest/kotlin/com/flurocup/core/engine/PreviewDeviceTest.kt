@@ -58,7 +58,6 @@ import org.junit.runner.RunWith
  * Plays projects through the real preview engine on a device and checks that frames come out,
  * and compiles every effect shader on the device's GPU driver.
  */
-@androidx.annotation.OptIn(androidx.media3.common.util.ExperimentalApi::class)
 @UnstableApi
 @RunWith(AndroidJUnit4::class)
 class PreviewDeviceTest {
@@ -123,16 +122,17 @@ class PreviewDeviceTest {
         assertPlays(withEffects(MainTrackEdits.withClips(Project("p", "test", 0, 0), listOf(main, photo.copy(startUs = main.endUs)))))
     }
 
-    /** The player set up as before this fix, with Media3's experimental replayable frame cache. */
+    /** Export goes through the same composition, with sound, photos and effects. */
     @Test
-    fun replayableCachePlayerShowsFrames() {
-        val run = PlayerRun(replayableCache = true)
-        try {
-            run.start(plainProject())
-            run.awaitFrames(15, "replayable cache playback")
-        } finally {
-            run.release()
-        }
+    fun projectWithSoundPhotoAndEffectsExports() {
+        val photo = photoProject().timeline.findClip("photo")!!.second
+        val main = plainProject().timeline.findClip("main")!!.second
+        val project = withEffects(layered(MainTrackEdits.withClips(Project("p", "test", 0, 0), listOf(main, photo.copy(startUs = main.endUs)))))
+        val spec = RenderSpec(WIDTH, HEIGHT, 30f, uriFor = { it.source.uri }, lookFor = LiveLooks()::forClip)
+        val composition = checkNotNull(builder.video(project, spec, forExport = true))
+        val out = File(context.cacheDir, "export_test.mp4").apply { delete() }
+        runBlocking { withContext(Dispatchers.Main) { runTransformer(context, composition, out.path, {}, {}) } }
+        assertTrue("nothing exported", out.length() > 0)
     }
 
     private fun assertPlays(project: Project) {
@@ -189,7 +189,7 @@ class PreviewDeviceTest {
     }
 
     /** One preview engine drawing into an image reader that counts frames. */
-    private inner class PlayerRun(private val replayableCache: Boolean = false) {
+    private inner class PlayerRun {
         val frames = AtomicInteger()
         val lastPixel = AtomicReference(0)
         private val thread = HandlerThread("frames").apply { start() }
@@ -209,21 +209,11 @@ class PreviewDeviceTest {
         }
         private val holder = ReaderHolder(reader.surface)
         private var engine: PreviewEngine? = null
-        private var cachePlayer: androidx.media3.transformer.CompositionPlayer? = null
 
         fun start(project: Project) = onMain {
             val layered = builder.isLayered(project)
             val spec = RenderSpec(WIDTH, HEIGHT, 30f, uriFor = { it.source.uri }, lookFor = LiveLooks()::forClip)
             val composition = checkNotNull(builder.video(project, spec))
-            if (replayableCache) {
-                val p = androidx.media3.transformer.CompositionPlayer.Builder(context).experimentalSetEnableReplayableCache(true).build()
-                cachePlayer = p
-                p.setComposition(composition)
-                p.setVideoSurfaceHolder(holder)
-                p.prepare()
-                p.play()
-                return@onMain
-            }
             val e = engine ?: PreviewEngine(context).also { engine = it }
             e.setComposition(composition, 0, layered)
             e.player.value!!.setVideoSurfaceHolder(holder)
@@ -234,7 +224,7 @@ class PreviewDeviceTest {
         fun awaitFrames(count: Int, what: String) {
             val deadline = System.currentTimeMillis() + 30_000
             while (System.currentTimeMillis() < deadline) {
-                val error = onMain { engine?.error?.value ?: cachePlayer?.playerError }
+                val error = onMain { engine?.error?.value }
                 if (error != null) throw AssertionError("$what: player error ${PreviewEngine.describe(error)}", error)
                 if (frames.get() >= count) return
                 Thread.sleep(50)
@@ -244,10 +234,7 @@ class PreviewDeviceTest {
         }
 
         fun release() {
-            onMain {
-                engine?.release()
-                cachePlayer?.release()
-            }
+            onMain { engine?.release() }
             reader.close()
             thread.quitSafely()
         }
@@ -304,7 +291,6 @@ class PreviewDeviceTest {
             // With a silent sound track, like footage from a phone.
             val sequence = EditedMediaItemSequence.Builder(setOf(androidx.media3.common.C.TRACK_TYPE_AUDIO, androidx.media3.common.C.TRACK_TYPE_VIDEO))
                 .addItem(item)
-                .experimentalSetForceAudioTrack(true)
                 .build()
             val composition = Composition.Builder(sequence).build()
             runBlocking { withContext(Dispatchers.Main) { runTransformer(context, composition, video.path, {}, {}) } }
