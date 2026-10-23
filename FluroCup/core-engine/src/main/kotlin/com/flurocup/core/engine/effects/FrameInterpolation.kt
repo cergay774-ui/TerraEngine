@@ -244,7 +244,8 @@ private class FrameInterpolationShaderProgram(
         const val OUTPUT_CAPACITY = 3
         const val SMALL_FACTOR = 8
         const val MIN_SMALL = 16
-        const val SEARCH_RADIUS = 6f
+        /** Largest encoded offset in small pixels: the +-6 search plus the sub-pixel refinement. */
+        const val SEARCH_RADIUS = 7f
 
         fun texture(provider: GlObjectsProvider, w: Int, h: Int, highPrecision: Boolean): GlTextureInfo =
             provider.createBuffersForTexture(GlUtil.createTexture(w, h, highPrecision), w, h)
@@ -281,53 +282,75 @@ void main() {
 
         /**
          * Block matching: for each small pixel, the offset within +-6 small pixels where a 3x3
-         * patch of the previous picture best matches the current one. Encoded as rg = offset / 6
-         * mapped to 0..1, b = confidence (textured patch, good match).
+         * patch of the previous picture best matches the current one, refined to a fraction of a
+         * pixel by fitting a parabola through the neighbouring costs. Encoded as rg = offset / 7
+         * mapped to 0..1, b = how textured the patch is (flat patches can't tell motion),
+         * a = how good the match is.
          */
         const val FLOW_SHADER = """precision highp float;
 uniform sampler2D uPrevSmall;
 uniform sampler2D uCurSmall;
 uniform vec2 uTexel;
 varying vec2 vTexSamplingCoord;
-float cur(vec2 uv) { return texture2D(uCurSmall, uv).r; }
+float cost(vec2 uv, vec2 d, vec2 t) {
+  float c = 0.0;
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      vec2 o = vec2(float(i), float(j)) * t;
+      c += abs(texture2D(uPrevSmall, uv + o).r - texture2D(uCurSmall, uv + o + d * t).r);
+    }
+  }
+  return c;
+}
 void main() {
   vec2 uv = vTexSamplingCoord;
   vec2 t = uTexel;
-  float p0 = texture2D(uPrevSmall, uv + vec2(-t.x, -t.y)).r;
-  float p1 = texture2D(uPrevSmall, uv + vec2(0.0, -t.y)).r;
-  float p2 = texture2D(uPrevSmall, uv + vec2(t.x, -t.y)).r;
-  float p3 = texture2D(uPrevSmall, uv + vec2(-t.x, 0.0)).r;
-  float p4 = texture2D(uPrevSmall, uv).r;
-  float p5 = texture2D(uPrevSmall, uv + vec2(t.x, 0.0)).r;
-  float p6 = texture2D(uPrevSmall, uv + vec2(-t.x, t.y)).r;
-  float p7 = texture2D(uPrevSmall, uv + vec2(0.0, t.y)).r;
-  float p8 = texture2D(uPrevSmall, uv + vec2(t.x, t.y)).r;
   float best = 1.0e9;
   vec2 bestD = vec2(0.0);
   for (int j = -6; j <= 6; j++) {
     for (int i = -6; i <= 6; i++) {
       vec2 d = vec2(float(i), float(j));
-      vec2 q = uv + d * t;
-      float cost = abs(p0 - cur(q + vec2(-t.x, -t.y))) + abs(p1 - cur(q + vec2(0.0, -t.y))) + abs(p2 - cur(q + vec2(t.x, -t.y)))
-        + abs(p3 - cur(q + vec2(-t.x, 0.0))) + abs(p4 - cur(q)) + abs(p5 - cur(q + vec2(t.x, 0.0)))
-        + abs(p6 - cur(q + vec2(-t.x, t.y))) + abs(p7 - cur(q + vec2(0.0, t.y))) + abs(p8 - cur(q + vec2(t.x, t.y)));
       // A slight preference for less movement keeps still areas still.
-      cost += 0.01 * length(d);
-      if (cost < best) {
-        best = cost;
+      float c = cost(uv, d, t) + 0.01 * length(d);
+      if (c < best) {
+        best = c;
         bestD = d;
       }
     }
   }
-  float mean = (p0 + p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8) / 9.0;
-  float detail = abs(p0 - mean) + abs(p1 - mean) + abs(p2 - mean) + abs(p3 - mean) + abs(p4 - mean)
-    + abs(p5 - mean) + abs(p6 - mean) + abs(p7 - mean) + abs(p8 - mean);
-  float confidence = clamp(detail * 6.0, 0.0, 1.0) * (1.0 - smoothstep(0.08, 0.35, best));
-  gl_FragColor = vec4(bestD / 6.0 * 0.5 + 0.5, confidence, 1.0);
+  float c0 = cost(uv, bestD, t);
+  float cl = cost(uv, bestD - vec2(1.0, 0.0), t);
+  float cr = cost(uv, bestD + vec2(1.0, 0.0), t);
+  float cd = cost(uv, bestD - vec2(0.0, 1.0), t);
+  float cu = cost(uv, bestD + vec2(0.0, 1.0), t);
+  float dx = cl - 2.0 * c0 + cr;
+  float dy = cd - 2.0 * c0 + cu;
+  vec2 sub = vec2(dx > 1.0e-4 ? 0.5 * (cl - cr) / dx : 0.0, dy > 1.0e-4 ? 0.5 * (cd - cu) / dy : 0.0);
+  vec2 motion = bestD + clamp(sub, -0.5, 0.5);
+  float mean = 0.0;
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      mean += texture2D(uPrevSmall, uv + vec2(float(i), float(j)) * t).r;
+    }
+  }
+  mean /= 9.0;
+  float detail = 0.0;
+  for (int j = -1; j <= 1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      detail += abs(texture2D(uPrevSmall, uv + vec2(float(i), float(j)) * t).r - mean);
+    }
+  }
+  float textured = clamp(detail * 6.0, 0.0, 1.0);
+  float quality = 1.0 - smoothstep(0.08, 0.35, best);
+  gl_FragColor = vec4(motion / 7.0 * 0.5 + 0.5, textured, quality);
 }
 """
 
-        /** 3x3 average of the flow, weighted by confidence, so lone wrong matches fade out. */
+        /**
+         * 5x5 average of the flow weighted by how textured and well matched each patch is, so the
+         * motion found at an object's edges also moves its flat inside, and lone wrong matches
+         * fade out. a = the match quality around, which decides how much to trust the motion.
+         */
         const val SMOOTH_FLOW_SHADER = """precision highp float;
 uniform sampler2D uFlow;
 uniform vec2 uTexel;
@@ -335,17 +358,17 @@ varying vec2 vTexSamplingCoord;
 void main() {
   vec2 sum = vec2(0.0);
   float weights = 0.0;
-  float confidence = 0.0;
-  for (int j = -1; j <= 1; j++) {
-    for (int i = -1; i <= 1; i++) {
+  float quality = 0.0;
+  for (int j = -2; j <= 2; j++) {
+    for (int i = -2; i <= 2; i++) {
       vec4 f = texture2D(uFlow, vTexSamplingCoord + vec2(float(i), float(j)) * uTexel);
-      float w = f.b + 0.02;
+      float w = (f.b + 0.01) * (f.a + 0.01);
       sum += f.rg * w;
       weights += w;
-      confidence += f.b;
+      quality += f.a;
     }
   }
-  gl_FragColor = vec4(sum / weights, confidence / 9.0, 1.0);
+  gl_FragColor = vec4(sum / weights, 1.0, quality / 25.0);
 }
 """
 
@@ -379,7 +402,7 @@ void main() {
   vec2 d = (f.rg * 2.0 - 1.0) * uFlowRange;
   vec4 a = texture2D(uPrev, clamp(uv - d * uAlpha, 0.0, 1.0));
   vec4 b = texture2D(uCur, clamp(uv + d * (1.0 - uAlpha), 0.0, 1.0));
-  gl_FragColor = mix(blended, mix(a, b, uAlpha), f.b);
+  gl_FragColor = mix(blended, mix(a, b, uAlpha), smoothstep(0.2, 0.7, f.a));
 }
 """
     }
