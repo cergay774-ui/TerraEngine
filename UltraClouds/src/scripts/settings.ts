@@ -284,7 +284,9 @@ export function toProperties(s: Settings, ws: WorldState): Record<string, number
     wspeed: (s.speed / 100) * 12,
     wdir: s.direction,
     dist: (perf ? Math.min(s.drawDistance, 60) : s.drawDistance) / 100,
-    depth: Math.round(s.skyDepth * 16 * 0.8),
+    // the farthest clouds (cirrus) project to 1.19 x depth = 0.86 of the sky
+    // depth, in front of the vanilla distance fog (it starts at 0.92)
+    depth: Math.round(s.skyDepth * 16 * 0.72),
     contrast: s.contrast / 100,
     soft: s.softness,
     shadow: s.shadows / 100,

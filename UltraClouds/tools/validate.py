@@ -172,8 +172,16 @@ def check_rp():
         seen.add(b["name"])
     # scripts
     scripts = desc["scripts"]
+    for i, e in enumerate(scripts.get("initialize", [])):
+        analyse(e, f"initialize[{i}]")
     for i, e in enumerate(scripts.get("pre_animation", [])):
         analyse(e, f"pre_animation[{i}]")
+    # 1.0 shipped entries up to 12 578 characters; never go past what is
+    # known to run in the game
+    for kind in ("initialize", "pre_animation"):
+        for i, e in enumerate(scripts.get(kind, [])):
+            if len(e) > 12578:
+                err(f"{kind}[{i}] is {len(e)} characters long (limit 12578)")
     for entry in scripts.get("animate", []):
         for name, cond in entry.items():
             if name not in desc["animations"]:

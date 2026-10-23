@@ -216,6 +216,11 @@ class Env:
         self.vars = {}
         self.queries = queries or {}
         self.ops = 0
+        # Bedrock stops an expression with a content error when it reads an
+        # entity variable that was never set (unless guarded by ??).  In
+        # strict mode such reads are recorded instead of silently giving 0.
+        self.strict = False
+        self.undefined = set()
 
     def run(self, prog):
         self.temps = {}
@@ -266,6 +271,8 @@ class Env:
             try:
                 return self.lookup(n[1])
             except Missing:
+                if self.strict:
+                    self.undefined.add(normalize_name(n[1]))
                 return 0.0
         if k == "assign":
             name = normalize_name(n[1])

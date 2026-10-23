@@ -405,21 +405,38 @@ def _blob_mask(noise, X, Y, off, rx, ry, rough=0.45, freq=1.6):
 
 
 def stratus_sprite(noise, rng):
-    """Piece of a stratocumulus / overcast deck: broad, lumpy, low contrast."""
+    """Piece of a stratocumulus deck: a wide, flat sheet made of soft,
+    elongated rolls with gently darker bases.  The inside stays filled (no
+    holes); gaps between rolls open only towards the ragged border."""
     Y, X = coords2()
     off = rng.uniform(0, 100, 4)
-    w1 = noise.fbm2(X * 1.2 + off[0], Y * 1.2 + off[1], octaves=5) - 0.5
-    w2 = noise.fbm2(X * 3.0 + off[1], Y * 3.0 + off[2], octaves=4) - 0.5
-    r = np.sqrt((X / 0.95) ** 2 + (Y / 0.6) ** 2) + 0.75 * w1 + 0.25 * w2
-    mask = 1.0 - smoothstep(0.35, 0.95, r)
-    rolls = noise.fbm2(X * 2.1 + w1 * 0.8 + off[2], Y * 3.4 + off[3], octaves=5, billow=True)
+    w1 = noise.fbm2(X * 1.3 + off[0], Y * 1.3 + off[1], octaves=5) - 0.5
+    w2 = noise.fbm2(X * 3.4 + off[1], Y * 3.4 + off[2], octaves=4) - 0.5
+    r = np.sqrt((X / 0.95) ** 2 + (Y / 0.6) ** 2) + 0.45 * w1 + 0.18 * w2
+    mask = 1.0 - smoothstep(0.6, 0.98, r)
+    wx = X + 0.06 * (noise.fbm2(X * 4 + off[2], Y * 4, octaves=3) - 0.5)
+    wy = Y + 0.06 * (noise.fbm2(X * 4, Y * 4 + off[3], octaves=3) - 0.5)
+    field = np.zeros_like(X)
+    rows = np.linspace(-0.5, 0.5, 5)
+    for ry0 in rows:
+        x = -1.05 + rng.uniform(0, 0.2)
+        while x < 1.05:
+            rx = rng.uniform(0.2, 0.32)
+            ry = rng.uniform(0.11, 0.16)
+            cy = ry0 + rng.uniform(-0.06, 0.06)
+            d2 = ((wx - x) / rx) ** 2 + ((wy - cy) / ry) ** 2
+            field += rng.uniform(0.75, 1.0) * np.exp(-d2 * 1.4)
+            x += rx * rng.uniform(1.1, 1.5)
+    field = np.clip(field, 0, 1.2)
+    ero = noise.fbm2(X * 8 + off[1], Y * 8 + off[0], octaves=3)
+    edge = smoothstep(0.25, 0.85, r)                    # 0 inside, 1 at the border
+    thick = mask * (0.62 * (1 - edge) + field * (0.55 + 0.5 * edge)) * (0.9 + 0.25 * (ero - 0.5))
+    thick = gaussian_blur(thick, 1.4)
+    alpha = np.clip(1.0 - np.exp(-thick * 4.2), 0, 1)
+    shade = _relief_shade(gaussian_blur(field * mask, 2.2), 1.9)
     big = noise.fbm2(X * 1.1 + off[1], Y * 1.6 + off[0], octaves=3)
-    thick = np.clip(mask * (0.25 + 0.75 * rolls) * (0.55 + 0.7 * big), 0, None)
-    thick = gaussian_blur(thick, 1.5)
-    alpha = 1.0 - np.exp(-thick * 3.6)
-    shade = _relief_shade(gaussian_blur(thick, 2.5), 2.0)
-    tone = 0.64 + 0.32 * shade + 0.05 * (big - 0.5)
-    tone -= 0.12 * smoothstep(-0.3, 0.7, Y)            # darker underside
+    tone = 0.66 + 0.34 * shade + 0.06 * (big - 0.5)
+    tone -= 0.08 * smoothstep(-0.2, 0.7, Y)            # darker underside of the deck
     rgb = np.stack([tone * 0.975, tone * 0.99, tone * 1.03], -1)
     return np.clip(rgb, 0, 1), np.clip(alpha * 0.97, 0, 1)
 
@@ -590,6 +607,9 @@ def render_cell(job, seed=20261020):
     elif kind == "base":
         rgb, a = render_volume(cloud_base_density(noise, rng), sigma_view=10.0,
                                sigma_light=5.5, ambient=0.85, side=0.15)
+        # skylight and light scattered from the ground: a base seen from
+        # below is grey, not as dark as the self-shadowed volume renders it
+        rgb = 0.18 + 0.82 * rgb
     elif kind == "tower":
         rgb, a = render_volume(cumulus_density(noise, rng, "tower"), sigma_view=13.0,
                                sigma_light=7.0, ambient=0.6, side=0.3)

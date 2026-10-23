@@ -262,9 +262,10 @@ def add_sprites(rng, cl):
                 S.append(Sprite(L, "cu", cl, 3, cw, (1 if j else -1) * rng.uniform(0.55, 0.7),
                                 rng.uniform(0.05, 0.22), rng.uniform(-0.35, 0.35), hw))
     elif L == "st":
-        c0 = rng.choice(SHEETS)
+        # regular stratus uses the rolled stratocumulus sheet only; the flat
+        # slab is reserved for the overcast ceiling
+        c0 = c1 = SHEETS[0]
         S.append(Sprite(L, "st", cl, 0, c0, 0.0, 0.0, 0.0, 1.0 / ASPECT[c0]))
-        c1 = SHEETS[1] if c0 == SHEETS[0] else SHEETS[0]
         S.append(Sprite(L, "st", cl, 1, c1, rng.uniform(-0.5, 0.5), rng.uniform(-2, 2) / cl.size,
                         rng.uniform(-0.5, 0.5), 0.8 / ASPECT[c1]))
         S.append(Sprite(L, "st", cl, 2, c0, rng.uniform(-0.45, 0.45), rng.uniform(-2, 2) / cl.size,
@@ -316,7 +317,9 @@ LAYER_BINS = {"ac": (3, 1.4)}
 # distance for depth: every cirrus sprite owns a fixed depth slot in a band
 # behind all other clouds, strictly decreasing in draw order.  Slots are
 # ~2.3% apart, so even a 16-bit depth buffer never lets one cirrus quad cut
-# another.  (Lower clouds never project deeper than ~0.84 zfar.)
+# another.  (Lower clouds never project deeper than ~0.84 zfar.)  The band
+# ends at 1.19 zfar and the script sets zfar to 0.72 of the sky depth, so
+# even cirrus stay at 0.86 of it, in front of the vanilla fog (from 0.92).
 CI_BAND = (0.87, 1.19)
 LOW_BINS = 6
 LOW_LZ = (0.10, 0.68)          # ~120 .. ~950 blocks
@@ -410,6 +413,28 @@ def section(statements):
     return " ".join(statements)
 
 
+# Longest pre_animation entry 1.0 shipped (and the game is known to run).
+# Bigger guarded blocks are split into several entries below this size.
+ENTRY_LIMIT = 12000
+
+
+def guarded(cond, items, limit=ENTRY_LIMIT):
+    """Pre_animation entries `(cond) ? { items };`, split so that no entry
+    exceeds `limit` characters.  Every item must be self-contained (it sets
+    the temp variables it reads), so it can start a new entry."""
+    out, cur = [], []
+    size = 0
+    for it in items:
+        if cur and size + len(it) + 1 > limit - len(cond) - 16:
+            out.append(f"({cond}) ? {{ " + " ".join(cur) + " };")
+            cur, size = [], 0
+        cur.append(it)
+        size += len(it) + 1
+    if cur:
+        out.append(f"({cond}) ? {{ " + " ".join(cur) + " };")
+    return out
+
+
 # Depth map: true distance 80..4000 blocks -> view depth zmin..zfar (log).
 # Nearer clouds always get a smaller depth (about 1% of depth per 7% of
 # distance, coarser than a 16-bit depth buffer resolves at these depths),
@@ -465,9 +490,15 @@ def pre_animation(clusters, groups, total):
     s.append(f"v.p_wdir = math.lerprotate(v.p_wdir ?? {prop('wdir')}, {prop('wdir')}, math.clamp(v.dt * 1.5, 0, 1));")
     out.append(section(s))
     # ---- adaptive quality (client side frame-time measurement) -----------
+    # Clouds are a small part of the frame, so this only reacts to real
+    # trouble: one step down while the average is below ~20 FPS (never below
+    # the Medium cloud count, nothing during the first 20 s after loading),
+    # then no change for 90 s; one step back up whenever it runs at ~30 FPS
+    # or better (phones locked to 30 FPS recover too).
     s = ["v.ft = (v.ft ?? 0.016) * 0.97 + math.clamp(q.delta_time, 0, 0.25) * 0.03;",
          "v.aq_t = (v.aq_t ?? 0) + v.dt;",
-         "(v.p_autoq && v.aq_t > 4) ? { v.aq_t = 0; (v.ft > 0.036) ? { v.aq_cap = math.max(0, (v.aq_cap ?? 3) - 1); }; (v.ft < 0.019) ? { v.aq_cap = math.min(3, (v.aq_cap ?? 3) + 1); }; };",
+         "v.aq_hold = math.max((v.aq_hold ?? 20) - v.dt, 0);",
+         "(v.p_autoq && v.aq_t > 5) ? { v.aq_t = 0; (v.aq_hold <= 0 && v.ft > 0.05) ? { v.aq_cap = math.max(1, (v.aq_cap ?? 3) - 1); v.aq_hold = 90; }; (v.aq_hold <= 0 && v.ft < 0.036) ? { v.aq_cap = math.min(3, (v.aq_cap ?? 3) + 1); }; };",
          "v.tq = v.p_autoq ? math.min(v.p_tier, v.aq_cap ?? 3) : v.p_tier;",
          "v.dq = v.p_autoq ? math.min(v.p_detail, (v.aq_cap ?? 3) + 1) : v.p_detail;"]
     for t in range(4):
@@ -557,15 +588,17 @@ def pre_animation(clusters, groups, total):
             body = []
             for cl in cls:
                 vv = cl.var
-                body.append(f"t.x = {fmt(cl.bx)} + v.ox_{L}; t.x = t.x - {P} * math.floor(t.x / {P} + 0.5);")
-                body.append(f"t.z = {fmt(cl.bz)} + v.oz_{L}; t.z = t.z - {P} * math.floor(t.z / {P} + 0.5);")
-                body.append(f"{vv}_y = v.oy_{L} + {fmt(cl.yoff)};")
-                body.append("t.dh = t.x * t.x + t.z * t.z;")
+                item = []
+                body.append(item)
+                item.append(f"t.x = {fmt(cl.bx)} + v.ox_{L}; t.x = t.x - {P} * math.floor(t.x / {P} + 0.5);")
+                item.append(f"t.z = {fmt(cl.bz)} + v.oz_{L}; t.z = t.z - {P} * math.floor(t.z / {P} + 0.5);")
+                item.append(f"{vv}_y = v.oy_{L} + {fmt(cl.yoff)};")
+                item.append("t.dh = t.x * t.x + t.z * t.z;")
                 # life cycle: the visibility threshold breathes slowly, so
                 # clouds form and dissolve over a few minutes
-                body.append(f"{vv}_g = math.clamp((v.d_{L} - {fmt(cl.rank)} - 0.06 * math.sin(v.age * {fmt(cl.omega)} + {fmt(cl.phase)})) * 14, 0, 1)"
+                item.append(f"{vv}_g = math.clamp((v.d_{L} - {fmt(cl.rank)} - 0.06 * math.sin(v.age * {fmt(cl.omega)} + {fmt(cl.phase)})) * 14, 0, 1)"
                             f" * math.clamp((v.R_{L} - math.sqrt(t.dh)) * v.Ri_{L}, 0, 1) * {fmt(cl.size)} * v.sz_{L};")
-                body.append(f"v.bin_{L}{cl.k} = -1;")
+                item.append(f"v.bin_{L}{cl.k} = -1;")
                 vis = [f"{vv}_x = t.x; {vv}_z = t.z;",
                        f"{vv}_f = t.x * v.fx + {vv}_y * v.fy + t.z * v.fz;",
                        f"{vv}_m = 0.12 * math.sqrt(t.dh + {vv}_y * {vv}_y);",
@@ -592,8 +625,8 @@ def pre_animation(clusters, groups, total):
                     # distance bin of the halo pass (far bins drawn first)
                     nb, span = LAYER_BINS[L]
                     vis.append(f"v.bin_{L}{cl.k} = math.min(math.floor(math.clamp(math.ln(math.max({vv}_m, 0.001) / math.max(0.12 * math.abs({vv}_y), 0.001)) / {fmt(span)}, 0, 1) * {nb}), {nb - 1});")
-                body.append(f"({vv}_g > 0.5) ? {{ " + " ".join(vis) + " };")
-            out.append(f"(v.g{tier}0) ? {{ " + " ".join(body) + " };")
+                item.append(f"({vv}_g > 0.5) ? {{ " + " ".join(vis) + " };")
+            out += guarded(f"v.g{tier}0", [" ".join(it) for it in body])
             # quality tier switched off: its clusters leave the render lists
             out.append(f"(!v.g{tier}0) ? {{ " + " ".join(f"v.bin_{L}{cl.k} = -1;" for cl in cls) + " };")
             for rank in range(4):
@@ -626,7 +659,7 @@ def pre_animation(clusters, groups, total):
                         reset = f"{sv}_s = 0;" + (f" {sv}_sy = 0;" if L != "cu" else "")
                         body.append(f"{reset} ({vv}_g > 0.5) ? {{ " + " ".join(calc) + " };")
                 if body:
-                    out.append(f"(v.g{tier}{rank}) ? {{ " + " ".join(body) + " };")
+                    out += guarded(f"v.g{tier}{rank}", body)
     # ---- overcast ceiling -------------------------------------------------
     ov = [c for c in clusters if c.layer == "ov"][0]
     body = ["v.ov_y = v.oy_st;",
@@ -635,10 +668,11 @@ def pre_animation(clusters, groups, total):
     # all ceiling sprites share the zenith depth plus a clear step per draw
     # slot (far rings drawn first), large enough for 16-bit depth buffers
     low = min(sp.el for sp in ov.sprites)
-    calc = [f"v.ov_d = {log_depth(f'0.12 * v.ov_y * {fmt(1 / math.sin(math.radians(low)))}')};"]
+    items = [f"v.ov_d = {log_depth(f'0.12 * v.ov_y * {fmt(1 / math.sin(math.radians(low)))}')};"]
     for sp in ov.sprites:
         sv = f"v.s{sp.name}"
         body.append(f"{sv}_s = 0; {sv}_sy = 0;")
+        calc = []
         cot = math.cos(math.radians(sp.el)) / math.sin(math.radians(sp.el))
         q = min(1.0, max(0.3, 1.6 * math.sin(math.radians(sp.el))))
         calc.append(f"t.a = {fmt(sp.az)} + v.ov_phi; t.hd = v.ov_y * {fmt(cot)};")
@@ -649,7 +683,9 @@ def pre_animation(clusters, groups, total):
         calc.append(f"{sv}_s = math.min(t.k * v.ov_y * {sp.height * GEO_SCALE / 16:.6f} * v.ov_vis, v.zf3);")
         calc.append(f"{sv}_sy = math.min({sv}_s * {fmt(q)}, t.k * v.hcap * v.ov_y);")
         calc.append(f"{sv}_px = {sv}_vx * t.k; {sv}_py = {sv}_vy * t.k; {sv}_pz = -{sv}_vz * t.k;")
-    out.append(section(body) + " (v.g00 && v.ov_vis > 0.01 && v.ov_y > 5) ? { " + " ".join(calc) + " };")
+        items.append(" ".join(calc))
+    out.append(section(body))
+    out += guarded("v.g00 && v.ov_vis > 0.01 && v.ov_y > 5", items)
     return out
 
 
@@ -684,7 +720,7 @@ def lighting_sections():
             e = f"math.lerp({e}, {fmt(gold[i])} * (0.75 + 0.25 * v.day_{L}), v.gold_{L} * v.warmw)"
             e = f"math.lerp({e}, {fmt(dusk[i])}, v.dusk_{L} * v.warmw * 0.85)"
             if under is not None:
-                e = f"(v.lq >= 2) ? math.lerp({e}, {fmt(under[i])}, v.gold_{L} * v.warmw * 0.45 * (1 - v.dark)) : ({e})"
+                e = f"(v.lq >= 2) ? math.lerp({e}, {fmt(under[i])}, v.gold_{L} * v.warmw * 0.8 * (1 - v.dark)) : ({e})"
             e = f"({e}) * (1 - {storm_mul} * v.dark) * math.lerp(1, v.fa_{ch}, v.p_fantasy * 0.5) * v.p_bright"
             out.append(f"v.{name}_{ch} = {e};")
         return out
@@ -692,9 +728,10 @@ def lighting_sections():
     # cumulus tops: lit faces
     s += tint("tu", "lo", (1.0, 1.0, 1.0), (1.0, 0.74, 0.5), (0.78, 0.5, 0.64))
     # cumulus bases: shadow side, warm glow from the low sun at High lighting
-    s.append("v.shf = (v.lq >= 1) ? math.lerp(1.0, 0.72, v.p_shadow) : 1.0;")
+    # the low sun of the golden hour lights the bases from the side: less shadow
+    s.append("v.shf = (v.lq >= 1) ? math.lerp(1.0, 0.72, v.p_shadow * (1 - 0.7 * v.gold_lo * v.warmw)) : 1.0;")
     s += tint("tb", "lo", (0.95, 0.96, 1.0), (0.95, 0.62, 0.48), (0.62, 0.42, 0.58),
-              under=(1.0, 0.58, 0.4), storm_mul=0.62)
+              under=(1.3, 0.78, 0.55), storm_mul=0.62)
     s.append("v.tb_r = v.tb_r * v.shf; v.tb_g = v.tb_g * v.shf; v.tb_b = v.tb_b * v.shf;")
     # stratus deck: grey, darkest in storms
     s += tint("ts", "lo", (0.93, 0.94, 0.97), (0.96, 0.72, 0.56), (0.7, 0.5, 0.62), storm_mul=0.6)
@@ -704,14 +741,15 @@ def lighting_sections():
     s += tint("ti", "ci", (1.0, 1.0, 1.0), (1.0, 0.68, 0.55), (0.95, 0.55, 0.75), storm_mul=0.35)
     # lighting quality Low: one shared tint for every layer (cheapest look)
     s.append("(v.lq < 1) ? { v.tb_r = v.tu_r; v.tb_g = v.tu_g; v.tb_b = v.tu_b; v.ta_r = v.tu_r; v.ta_g = v.tu_g; v.ta_b = v.tu_b; v.ti_r = v.tu_r; v.ti_g = v.tu_g; v.ti_b = v.tu_b; };")
-    # split every tint into a material colour (never above 1, so the shader
-    # cannot clamp it; carries all darkening) and the part of the brightness
-    # above 1, which goes through light_color_multiplier together with the
-    # compensation of the actor shader's directional shading (that shading is
-    # what made the first version look grey).  If an engine ignored the
-    # multiplier, colours and night/storm darkness would still be right.
+    # split every tint into a hue (material colour, brightest channel = 1,
+    # so the shader cannot clamp it) and a brightness that goes through
+    # light_color_multiplier together with the compensation of the actor
+    # shader's directional shading (that shading made 1.0 look grey).  All
+    # darkening (night, storm) is in the brightness: the render controller
+    # colour is reported to be ignored for non-warden entities
+    # (MCPE-183985), light_color_multiplier is not.
     for X in RC_TINT.values():
-        s.append(f"v.{X}_l = math.max(math.max(v.{X}_r, v.{X}_g), math.max(v.{X}_b, 1));")
+        s.append(f"v.{X}_l = math.max(math.max(v.{X}_r, v.{X}_g), math.max(v.{X}_b, 0.001));")
         s.append(f"v.{X}_hr = v.{X}_r / v.{X}_l; v.{X}_hg = v.{X}_g / v.{X}_l; v.{X}_hb = v.{X}_b / v.{X}_l;")
     # contrast / haze: overlay towards the layer's mean tone
     s.append("v.oa = math.clamp((1 - v.p_contrast) * 0.34 + v.wet * 0.12 + ((v.p_soft == 0) ? -0.08 : 0), 0, 0.6);")
@@ -855,7 +893,44 @@ def build_animations(clusters, groups):
     return {"format_version": "1.8.0", "animations": anims}, names
 
 
+def initialize_script(pre):
+    """Molang run once when the entity is created: gives every entity
+    variable a value before any frame reads it.  Bedrock stops an expression
+    with a content error when it reads a variable that was never set, and
+    1.1 did exactly that for clouds that had not been visible yet (only a
+    few clouds survived).  Variables read through '??' keep their 'not set
+    yet' meaning and are left alone."""
+    import molang
+
+    written, guarded = [], set()
+
+    def walk(node):
+        if not isinstance(node, tuple):
+            return
+        if node[0] == "assign":
+            name = molang.normalize_name(node[1])
+            if name.startswith("v.") and name not in seen:
+                seen.add(name)
+                written.append(name)
+        if node[0] == "bin" and node[1] == "??" and node[2][0] == "var":
+            guarded.add(molang.normalize_name(node[2][1]))
+        for child in node[1:]:
+            if isinstance(child, tuple):
+                walk(child)
+            elif isinstance(child, list):
+                for c in child:
+                    walk(c)
+
+    seen = set()
+    for expr in pre:
+        walk(molang.parse(expr))
+    names = [n for n in written if n not in guarded]
+    stmts = [f"{n} = {'-1' if n.startswith('v.bin_') else '0'};" for n in names]
+    return [" ".join(stmts[i:i + 250]) for i in range(0, len(stmts), 250)]
+
+
 def build_client_entity(clusters, groups, total, anim_names, rc_order):
+    pre = pre_animation(clusters, groups, total)
     animate = [{"root": "v.on"}]
     for key in sorted(k for k in anim_names if k != "root"):
         t, r = int(key[1]), int(key[3])
@@ -873,9 +948,10 @@ def build_client_entity(clusters, groups, total, anim_names, rc_order):
                 "geometry": {"default": "geometry.ultra_clouds.sky"},
                 "animations": anim_names,
                 "scripts": {
+                    "initialize": initialize_script(pre),
                     "should_update_bones_and_effects_offscreen": True,
                     "should_update_effects_offscreen": True,
-                    "pre_animation": pre_animation(clusters, groups, total),
+                    "pre_animation": pre,
                     "animate": animate,
                 },
                 "render_controllers": rc_order,

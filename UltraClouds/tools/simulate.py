@@ -124,6 +124,7 @@ class Pack:
         self.bone_by_name = {b["name"]: b for b in self.bones}
         self.anims = json.load(open(os.path.join(RP, "animations", "ultra_clouds_sky.animation.json")))["animations"]
         self.rcs = json.load(open(os.path.join(RP, "render_controllers", "ultra_clouds_sky.render_controllers.json")))["render_controllers"]
+        self.init = [molang.parse(e) for e in self.desc["scripts"].get("initialize", [])]
         self.pre = [molang.parse(e) for e in self.desc["scripts"]["pre_animation"]]
         self.animate = [(list(e.keys())[0], molang.parse(list(e.values())[0])) for e in self.desc["scripts"]["animate"]]
         self.channels = {}
@@ -167,8 +168,11 @@ class Sim:
         self.convention = convention       # +1: rotation_to_camera aims at camera, -1: opposite
         self.graphics = graphics
         self.env = molang.Env()
+        self.env.strict = True          # record reads of never-set variables
         self.time_of_day = 0.5
         self.moon = 1.0
+        for prog in pack.init:          # scripts.initialize: once, at creation
+            self.env.run(prog)
 
     def queries(self, cam, rig_pos):
         d = cam.pos - rig_pos
@@ -679,6 +683,21 @@ def run_checks(pack, clusters):
         cost[name] = {"molang_nodes_per_frame": s4.last_ops, "animated_bones": len(tr),
                       "draw_calls_estimate": sum(math.ceil(sum(1 for b in pack.bones[1:] if visible(r[1], b["name"])) / 8) for r in rcs)}
     results["cost"] = cost
+    # 6. reads of entity variables that were never set (a content error that
+    #    stops the expression in Bedrock): many settings, weather and views
+    undefined = set()
+    for over in (dict(tier=0, detail=0, cu=0.3, st=0.0, ac=0.0, ci=0.2),
+                 dict(tier=1, detail=1, cu=0.55, st=0.08, ac=0.3, ci=0.4),
+                 dict(tier=3, detail=3, cu=1.0, st=0.95, ac=0.8, ci=0.9, rain=1, thunder=1, storm=1),
+                 dict(tier=2, detail=2, cu=0.6, st=0.4, ac=0.4, ci=0.5, soft=0)):
+        s5 = Sim(pack, default_props(autoq=1, **over))
+        for i, (pitch, yaw, y) in enumerate([(-20, 30, 72), (-80, 200, 72), (10, 90, 330), (-35, 300, 72)] * 4):
+            cam = Camera(base + [0, y - 72 + 1.62, 0], pitch, yaw)
+            s5.frame(cam, base + [0, y - 72 - 16, 0], dt=1 / 20)
+        undefined |= s5.env.undefined
+    for s_ in (sim, s3):
+        undefined |= s_.env.undefined
+    results["undefined_variable_reads"] = sorted(undefined)
     return results
 
 
@@ -778,6 +797,9 @@ def main():
             print(f"FAIL: rig lag visible with {k}"); ok = False
     if results["motion"]["jumps_over_40px"]:
         print("FAIL: clouds jump while moving"); ok = False
+    if results["undefined_variable_reads"]:
+        print(f"FAIL: {len(results['undefined_variable_reads'])} variables read before being set, e.g. "
+              f"{results['undefined_variable_reads'][:5]}"); ok = False
     if "--no-preview" not in sys.argv:
         results["previews_artefacts"] = previews(pack, clusters)
     if "--no-robust" not in sys.argv:
