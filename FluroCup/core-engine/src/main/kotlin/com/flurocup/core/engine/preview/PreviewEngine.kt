@@ -21,8 +21,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * source frame rate with synced audio.
  *
  * One player is kept and given each new composition (Media3 1.9+ allows that), so edits don't
- * tear the preview down. Only switching between a plain and a layered (multi-input) project
- * needs a new player. Use from the main thread only.
+ * tear the preview down. A new player is made when switching between a plain and a layered
+ * (multi-input) project, and after a playback error, so one failure never leaves the preview
+ * dead. Use from the main thread only.
  */
 @OptIn(UnstableApi::class, ExperimentalApi::class)
 class PreviewEngine(private val context: Context) {
@@ -42,6 +43,7 @@ class PreviewEngine(private val context: Context) {
 
     private var current: CompositionPlayer? = null
     private var currentLayered = false
+    private var failed = false
     private val handler = Handler(Looper.getMainLooper())
     private var refreshPending = false
 
@@ -55,7 +57,8 @@ class PreviewEngine(private val context: Context) {
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            Log.w(TAG, "Preview failed", error)
+            Log.e(TAG, "Preview failed: ${describe(error)}", error)
+            failed = true
             _error.value = error
         }
     }
@@ -73,7 +76,7 @@ class PreviewEngine(private val context: Context) {
             releasePlayer()
             return
         }
-        val player = current?.takeIf { layered == currentLayered } ?: createPlayer(layered)
+        val player = current?.takeIf { layered == currentLayered && !failed } ?: createPlayer(layered)
         player.setComposition(composition, startUs.coerceAtLeast(0L) / 1000)
         if (player.playbackState == Player.STATE_IDLE) player.prepare()
     }
@@ -81,18 +84,12 @@ class PreviewEngine(private val context: Context) {
     private fun createPlayer(layered: Boolean): CompositionPlayer {
         releasePlayer()
         val player = CompositionPlayer.Builder(context)
-            .apply {
-                if (layered) {
-                    setVideoGraphFactory(MultipleInputVideoGraph.Factory())
-                } else {
-                    // Keeps the last frame so a look change can be redrawn without seeking.
-                    experimentalSetEnableReplayableCache(true)
-                }
-            }
+            .apply { if (layered) setVideoGraphFactory(MultipleInputVideoGraph.Factory()) }
             .build()
         player.addListener(listener)
         current = player
         currentLayered = layered
+        failed = false
         _player.value = player
         return player
     }
@@ -108,6 +105,8 @@ class PreviewEngine(private val context: Context) {
 
     fun play() {
         val player = current ?: return
+        // After an error the player is idle; preparing again retries.
+        if (player.playbackState == Player.STATE_IDLE) player.prepare()
         if (player.playbackState == Player.STATE_ENDED) player.seekTo(0)
         player.play()
     }
@@ -148,13 +147,8 @@ class PreviewEngine(private val context: Context) {
     private fun redrawNow() {
         val player = current ?: return
         if (player.isPlaying) return
-        if (currentLayered) {
-            // The redraw cache covers one input only; layered previews re-render by seeking.
-            player.seekTo(player.currentPosition)
-        } else {
-            runCatching { player.experimentalRedrawLastFrame() }
-                .onFailure { player.seekTo(player.currentPosition) }
-        }
+        // Seeking to where the player is renders that frame again with the new values.
+        player.seekTo(player.currentPosition)
     }
 
     fun release() {
@@ -162,9 +156,23 @@ class PreviewEngine(private val context: Context) {
         releasePlayer()
     }
 
-    private companion object {
-        const val TAG = "PreviewEngine"
-        const val REFRESH_MS = 16L
-        const val LAYERED_REFRESH_MS = 40L
+    companion object {
+        private const val TAG = "PreviewEngine"
+
+        /** "ERROR_CODE_…: cause: root cause", for logs and for the user to report. */
+        fun describe(error: PlaybackException): String = buildString {
+            append(error.errorCodeName)
+            var cause: Throwable? = error.cause
+            var depth = 0
+            while (cause != null && depth < 4) {
+                append(": ").append(cause.javaClass.simpleName)
+                cause.message?.takeIf { it.isNotBlank() }?.let { append(" (").append(it.take(160)).append(')') }
+                cause = cause.cause
+                depth++
+            }
+        }
+
+        private const val REFRESH_MS = 30L
+        private const val LAYERED_REFRESH_MS = 40L
     }
 }

@@ -42,7 +42,7 @@
     <string name="editor_tool_format">Формат</string>
     <string name="editor_format_title">Соотношение сторон</string>
     <string name="editor_cannot_split">Поставьте плейхед внутрь клипа, чтобы разделить его</string>
-    <string name="editor_preview_error">Не удалось воспроизвести превью. Попробуйте режим «Оригинал» или «Прокси».</string>
+    <string name="editor_preview_error">Ошибка превью: %1$s</string>
     <string name="editor_timeline_hint">Долгое нажатие на клип — перестановка, края выделенного клипа — обрезка</string>
     <string name="editor_tool_overlay">Наложение</string>
     <string name="editor_tool_transform">Трансформ</string>

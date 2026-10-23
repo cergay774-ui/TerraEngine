@@ -2,6 +2,7 @@ package com.flurocup.core.engine.effects
 
 import android.content.Context
 import android.opengl.GLES20
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.VideoFrameProcessingException
 import androidx.media3.common.util.GlProgram
@@ -56,15 +57,16 @@ abstract class ShaderEffect : GlEffect {
     ) : BaseGlShaderProgram(useHdr, /* texturePoolCapacity= */ 1) {
 
         private val program: GlProgram = try {
-            GlProgram(VERTEX_SHADER, fragmentShader).apply {
-                setBufferAttribute(
-                    "aFramePosition",
-                    GlUtil.getNormalizedCoordinateBounds(),
-                    GlUtil.HOMOGENEOUS_COORDINATE_VECTOR_SIZE,
-                )
-            }
+            createProgram(fragmentShader)
         } catch (e: GlUtil.GlException) {
-            throw VideoFrameProcessingException(e)
+            // A shader this GPU can't compile must not take the whole preview or export down:
+            // the effect is skipped and the frame passes through.
+            Log.e(TAG, "Effect shader failed to compile; passing frames through", e)
+            try {
+                createProgram(PASSTHROUGH_SHADER)
+            } catch (e2: GlUtil.GlException) {
+                throw VideoFrameProcessingException(e2)
+            }
         }
         private val setter = UniformSetter(program)
         private var width = 0
@@ -102,6 +104,24 @@ abstract class ShaderEffect : GlEffect {
     }
 
     companion object {
+        private const val TAG = "ShaderEffect"
+
+        private fun createProgram(fragmentShader: String) = GlProgram(VERTEX_SHADER, fragmentShader).apply {
+            setBufferAttribute(
+                "aFramePosition",
+                GlUtil.getNormalizedCoordinateBounds(),
+                GlUtil.HOMOGENEOUS_COORDINATE_VECTOR_SIZE,
+            )
+        }
+
+        const val PASSTHROUGH_SHADER = """precision mediump float;
+uniform sampler2D uTexSampler;
+varying vec2 vTexSamplingCoord;
+void main() {
+  gl_FragColor = texture2D(uTexSampler, vTexSamplingCoord);
+}
+"""
+
         const val VERTEX_SHADER = """
 attribute vec4 aFramePosition;
 varying vec2 vTexSamplingCoord;

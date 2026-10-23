@@ -57,6 +57,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -87,6 +88,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import com.flurocup.core.engine.media.MediaImportException
 import com.flurocup.core.engine.media.MediaPermissions
+import com.flurocup.core.engine.preview.PreviewEngine
 import com.flurocup.core.model.ChromaKey
 import com.flurocup.core.model.ClipLook
 import com.flurocup.core.model.CropRect
@@ -232,13 +234,18 @@ fun EditorScreen(
                 EditorMessage.CannotSplit -> context.getString(R.string.editor_cannot_split)
                 EditorMessage.NoRoom -> context.getString(R.string.editor_no_room)
                 EditorMessage.NoPersonFound -> context.getString(R.string.editor_no_person)
+                is EditorMessage.PreviewFailed -> context.getString(R.string.editor_preview_error, message.detail)
             }
             snackbar.showSnackbar(text)
         }
     }
-    val previewErrorText = stringResource(R.string.editor_preview_error)
     LaunchedEffect(previewError) {
-        if (previewError != null) snackbar.showSnackbar(previewErrorText)
+        val error = previewError ?: return@LaunchedEffect
+        snackbar.showSnackbar(
+            message = context.getString(R.string.editor_preview_error, PreviewEngine.describe(error)),
+            withDismissAction = true,
+            duration = SnackbarDuration.Long,
+        )
     }
 
     if (fullscreen) {

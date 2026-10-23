@@ -44,7 +44,7 @@ class ClipLookEffect(private val look: AtomicReference<ClipLook>) : ShaderEffect
         program.color("uBorderColor", current.border.colorArgb)
     }
 
-    private companion object {
+    internal companion object {
         val MASK_CODES = mapOf(
             MaskShape.LINEAR to 1f,
             MaskShape.MIRROR to 2f,

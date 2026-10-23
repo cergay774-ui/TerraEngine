@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.SystemClock
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -144,6 +145,9 @@ sealed interface EditorMessage {
     data object NoRoom : EditorMessage
 
     data object NoPersonFound : EditorMessage
+
+    /** The preview could not be built; [detail] says why, for a bug report. */
+    data class PreviewFailed(val detail: String) : EditorMessage
 }
 
 @HiltViewModel
@@ -189,6 +193,7 @@ class EditorViewModel @Inject constructor(
     /** What the preview currently plays, to skip rebuilding it when nothing it shows changed. */
     private var previewKey: List<Any?>? = null
     private var previewRebuildPending = false
+    private var failedKey: List<Any?>? = null
     private var lastSeekAt = 0L
 
     /** A clip whose look sheet is open: it keeps the look shader so changes show live. */
@@ -210,6 +215,17 @@ class EditorViewModel @Inject constructor(
         }
         viewModelScope.launch {
             proxies.states.collect { onProxyStates() }
+        }
+        viewModelScope.launch {
+            // After a playback error, rebuild once on a fresh player; a second failure of the
+            // same composition is left on screen as an error.
+            preview.error.collect { error ->
+                if (error != null && previewKey != null && previewKey != failedKey) {
+                    failedKey = previewKey
+                    previewKey = null
+                    rebuildPreview()
+                }
+            }
         }
         viewModelScope.launch {
             // A proxy that finishes during playback is switched to once playback stops.
@@ -781,8 +797,21 @@ class EditorViewModel @Inject constructor(
             effectParamsFor = effectParams::forId,
         )
         val start = preview.positionUs.coerceAtMost((state.durationUs - 1).coerceAtLeast(0L))
-        val composition = runCatching { compositions.video(project, spec) }.getOrNull()
-        preview.setComposition(composition, start, layered = layered)
+        val composition = try {
+            compositions.video(project, spec)
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not build the preview", e)
+            previewKey = null
+            _messages.trySend(EditorMessage.PreviewFailed("${e.javaClass.simpleName}: ${e.message.orEmpty().take(200)}"))
+            return
+        }
+        try {
+            preview.setComposition(composition, start, layered = layered)
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not start the preview", e)
+            previewKey = null
+            _messages.trySend(EditorMessage.PreviewFailed("${e.javaClass.simpleName}: ${e.message.orEmpty().take(200)}"))
+        }
     }
 
     private suspend fun makeProjectThumbnail(project: Project) {
@@ -796,6 +825,7 @@ class EditorViewModel @Inject constructor(
 
     companion object {
         const val PROJECT_ID_KEY = "projectId"
+        private const val TAG = "EditorViewModel"
         private const val SEEK_INTERVAL_MS = 50L
         private const val FRAME_SIZE_PX = 160
         private const val PREVIEW_SHORT_SIDE = 1080
