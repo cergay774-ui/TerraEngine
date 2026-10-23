@@ -18,6 +18,7 @@ import com.flurocup.core.model.MediaKind
 import com.flurocup.core.model.Project
 import com.flurocup.core.model.edit.MainTrackEdits
 import com.flurocup.core.model.export.BitrateMode
+import com.flurocup.core.model.export.ExportFrameRates
 import com.flurocup.core.model.export.ExportMath
 import com.flurocup.core.model.export.ExportResolution
 import com.flurocup.core.model.export.ExportSettings
@@ -52,7 +53,12 @@ data class ExportUiState(
     val sourceHdr: HdrType = HdrType.NONE,
     val hdrSupported: Boolean = false,
     val hasAudio: Boolean = false,
+    /** Highest frame rate among the clips, 0 for photos only. */
+    val sourceFps: Float = 0f,
 ) {
+    /** The chosen rate is above the source's, so frames are made and smoothing can be chosen. */
+    val makesFrames: Boolean get() = ExportMath.makesFrames(settings.frameRate, sourceFps)
+
     val outputSize: Pair<Int, Int> get() = ExportMath.outputSize(aspect, settings.resolution.shortSide)
     val durationUs: Long get() = project?.durationUs ?: 0L
     val estimatedBytes: Long get() = outputSize.let { (w, h) -> ExportMath.estimatedBytes(settings, w, h, durationUs) }
@@ -100,10 +106,11 @@ class ExportViewModel @Inject constructor(
             val clips = MainTrackEdits.clips(project)
             val allClips = project.timeline.allClips
             val firstVideo = clips.firstOrNull { it.source.kind == MediaKind.VIDEO }?.source?.info
-            val sourceFps = allClips.mapNotNull { it.source.info?.frameRate?.takeIf { fps -> fps > 0f } }.maxOrNull() ?: 30f
+            val videoFps = allClips.mapNotNull { it.source.info?.frameRate?.takeIf { fps -> fps > 0f } }.maxOrNull()
+            val sourceFps = videoFps ?: 30f
             val sourceShort = firstVideo?.let { min(it.displayWidth, it.displayHeight) } ?: 1080
             val sourceHdr = allClips.firstNotNullOfOrNull { it.source.info?.hdr?.takeIf { hdr -> hdr != HdrType.NONE } } ?: HdrType.NONE
-            val frameRates = ExportMath.frameRatesUpTo(sourceFps)
+            val frameRates = ExportFrameRates
             val codecs = withContext(Dispatchers.Default) { encoders.availableCodecs() }.ifEmpty { listOf(VideoCodec.H264) }
             val codec = when {
                 sourceHdr != HdrType.NONE && VideoCodec.HEVC in codecs -> VideoCodec.HEVC
@@ -122,6 +129,7 @@ class ExportViewModel @Inject constructor(
                     aspect = project.outputAspect(),
                     codecs = codecs,
                     frameRates = frameRates,
+                    sourceFps = videoFps ?: 0f,
                     sourceHdr = sourceHdr,
                     hasAudio = allClips.any { clip -> clip.source.kind == MediaKind.VIDEO && (clip.source.info?.audioTrackCount ?: 1) > 0 },
                 )
@@ -142,6 +150,8 @@ class ExportViewModel @Inject constructor(
     fun setCustomBitrate(mbps: Int) = change { it.copy(customBitrateMbps = mbps.coerceIn(1, 200)) }
 
     fun setKeepHdr(keep: Boolean) = change { it.copy(keepHdr = keep) }
+
+    fun setSmoothMotion(smooth: Boolean) = change { it.copy(smoothMotion = smooth) }
 
     fun exportVideo() {
         val state = _uiState.value

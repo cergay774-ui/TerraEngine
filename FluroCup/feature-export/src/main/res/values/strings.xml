@@ -4,7 +4,10 @@
     <string name="export_back">Назад</string>
     <string name="export_resolution">Разрешение</string>
     <string name="export_frame_rate">Частота кадров</string>
-    <string name="export_frame_rate_hint">Не выше, чем у исходника: кадры можно убрать, но не досочинить</string>
+    <string name="export_frame_rate_hint">Выше, чем у исходника, — недостающие кадры создаются</string>
+    <string name="export_smooth">Плавность (оптический поток)</string>
+    <string name="export_smooth_on">Кадры между исходными (%1$d → %2$d fps) строятся по движению в кадре. Экспорт идёт дольше.</string>
+    <string name="export_smooth_off">Исходные кадры повторяются до %2$d fps — без добавления плавности.</string>
     <string name="export_codec">Кодек</string>
     <string name="export_bitrate">Битрейт</string>
     <string name="export_bitrate_auto">Авто</string>

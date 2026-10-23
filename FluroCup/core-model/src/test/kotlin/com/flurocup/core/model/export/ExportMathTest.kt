@@ -1,6 +1,7 @@
 package com.flurocup.core.model.export
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -51,10 +52,13 @@ class ExportMathTest {
     }
 
     @Test
-    fun frameRatesNeverExceedTheSource() {
-        assertEquals(listOf(24, 25, 30), ExportMath.frameRatesUpTo(29.97f))
-        assertEquals(listOf(24, 25, 30, 50, 60), ExportMath.frameRatesUpTo(59.94f))
-        assertEquals(30, ExportMath.nearestFrameRate(29.97f, ExportMath.frameRatesUpTo(29.97f)))
-        assertEquals(listOf(24), ExportMath.frameRatesUpTo(15f))
+    fun highRatesMakeFramesOnlyAboveTheSource() {
+        assertTrue(ExportMath.makesFrames(120, 29.97f))
+        assertTrue(ExportMath.makesFrames(60, 30f))
+        assertFalse(ExportMath.makesFrames(30, 29.97f))
+        assertFalse(ExportMath.makesFrames(24, 30f))
+        assertFalse(ExportMath.makesFrames(144, 0f))
+        assertEquals(30, ExportMath.nearestFrameRate(29.97f, ExportFrameRates))
+        assertEquals(60, ExportMath.nearestFrameRate(59.94f, ExportFrameRates))
     }
 }

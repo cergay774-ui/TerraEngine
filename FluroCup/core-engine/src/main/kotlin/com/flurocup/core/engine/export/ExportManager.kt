@@ -13,6 +13,7 @@ import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.VideoEncoderSettings
 import com.flurocup.core.engine.composition.CompositionBuilder
 import com.flurocup.core.engine.composition.RenderSpec
+import com.flurocup.core.engine.effects.FrameInterpolationEffect
 import com.flurocup.core.engine.media.runTransformer
 import com.flurocup.core.model.Project
 import com.flurocup.core.model.export.ExportMath
@@ -83,15 +84,19 @@ class ExportManager @Inject constructor(
         val (width, height) = ExportMath.outputSize(project.outputAspect(), settings.resolution.shortSide)
         val clips = project.timeline.allClips
         val sourceFps = clips.mapNotNull { it.source.info?.frameRate?.takeIf { fps -> fps > 0f } }.maxOrNull()
+        val makesFrames = sourceFps != null && ExportMath.makesFrames(settings.frameRate, sourceFps)
         val effects = buildList<Effect> {
             if (sourceFps != null && settings.frameRate < sourceFps - 0.5f) {
                 add(FrameDropEffect.createDefaultFrameDropEffect(settings.frameRate.toFloat()))
             }
+            if (makesFrames) add(FrameInterpolationEffect(settings.frameRate.toFloat(), smooth = settings.smoothMotion))
         }
         val spec = RenderSpec(
             width = width,
             height = height,
-            frameRate = settings.frameRate.toFloat(),
+            // Above the source's rate, the whole project is rendered at that rate and the extra
+            // frames are made at the end, so photos and layers get them too.
+            frameRate = if (makesFrames) sourceFps!! else settings.frameRate.toFloat(),
             uriFor = { it.source.uri },
             lookFor = { AtomicReference(it.look) },
         )

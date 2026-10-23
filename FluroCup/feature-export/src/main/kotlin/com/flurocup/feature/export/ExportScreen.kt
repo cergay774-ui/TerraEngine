@@ -23,6 +23,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -247,6 +251,34 @@ private fun SettingsView(
         }
         Section(stringResource(R.string.export_frame_rate), hint = stringResource(R.string.export_frame_rate_hint)) {
             ChipRow(state.frameRates, settings.frameRate, { "$it" }, viewModel::setFrameRate)
+            AnimatedVisibility(
+                visible = state.makesFrames,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { viewModel.setSmoothMotion(!settings.smoothMotion) }
+                        .padding(vertical = 4.dp),
+                ) {
+                    Checkbox(checked = settings.smoothMotion, onCheckedChange = viewModel::setSmoothMotion)
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.export_smooth), style = MaterialTheme.typography.labelLarge)
+                        Text(
+                            text = stringResource(
+                                if (settings.smoothMotion) R.string.export_smooth_on else R.string.export_smooth_off,
+                                state.sourceFps.roundToInt(),
+                                settings.frameRate,
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
         Section(stringResource(R.string.export_codec)) {
             ChipRow(state.codecs, settings.codec, { it.label }, viewModel::setCodec)

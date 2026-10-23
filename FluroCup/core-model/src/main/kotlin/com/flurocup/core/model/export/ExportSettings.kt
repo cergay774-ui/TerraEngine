@@ -22,7 +22,7 @@ enum class ExportResolution(val shortSide: Int, val label: String) {
     UHD_4320(4320, "8K"),
 }
 
-val ExportFrameRates = listOf(24, 25, 30, 50, 60, 120)
+val ExportFrameRates = listOf(24, 25, 30, 50, 60, 90, 120, 144)
 
 data class ExportSettings(
     val resolution: ExportResolution = ExportResolution.FULL_HD_1080,
@@ -31,6 +31,8 @@ data class ExportSettings(
     val bitrateMode: BitrateMode = BitrateMode.RECOMMENDED,
     val customBitrateMbps: Int = 20,
     val keepHdr: Boolean = false,
+    /** Above the source's rate, make the new frames by motion interpolation rather than repeats. */
+    val smoothMotion: Boolean = true,
 )
 
 /** Sizes and bitrates for an export; kept apart from the encoder so it can be tested. */
@@ -68,12 +70,11 @@ object ExportMath {
         return ((video + AUDIO_BITRATE) * seconds / 8).roundToLong()
     }
 
-    /** The frame rates worth offering: up to the source's rate, since frames are dropped, never made up. */
-    fun frameRatesUpTo(sourceFps: Float): List<Int> {
-        val limit = if (sourceFps > 0f) sourceFps.roundToInt() else 30
-        val options = ExportFrameRates.filter { it <= limit + 1 }
-        return options.ifEmpty { listOf(ExportFrameRates.first()) }
-    }
+    /**
+     * True if exporting at [frameRate] needs frames the source doesn't have: they are then made
+     * between the source frames (see [ExportSettings.smoothMotion]). Lower rates drop frames.
+     */
+    fun makesFrames(frameRate: Int, sourceFps: Float): Boolean = sourceFps > 0f && frameRate > sourceFps + 0.5f
 
     /** The standard rate closest to the source's, the default choice. */
     fun nearestFrameRate(sourceFps: Float, options: List<Int>): Int {
