@@ -3,17 +3,18 @@ package com.flurocup.feature.editor
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.SystemClock
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.flurocup.core.data.project.PendingImports
 import com.flurocup.core.data.project.ProjectRepository
+import com.flurocup.core.engine.composition.CompositionFactory
 import com.flurocup.core.engine.media.AnalyzedMedia
 import com.flurocup.core.engine.media.MediaAnalyzer
 import com.flurocup.core.engine.media.MediaImportException
 import com.flurocup.core.engine.media.ThumbnailCache
-import com.flurocup.core.engine.preview.PreviewClip
-import com.flurocup.core.engine.preview.PreviewPlayer
+import com.flurocup.core.engine.preview.PreviewEngine
 import com.flurocup.core.engine.proxy.ProxyManager
 import com.flurocup.core.engine.proxy.ProxyState
 import com.flurocup.core.model.AspectRatio
@@ -22,9 +23,10 @@ import com.flurocup.core.model.MediaKind
 import com.flurocup.core.model.MediaSource
 import com.flurocup.core.model.Project
 import com.flurocup.core.model.ProxyPolicy
-import com.flurocup.core.model.Timeline
-import com.flurocup.core.model.Track
-import com.flurocup.core.model.TrackKind
+import com.flurocup.core.model.edit.EditCommand
+import com.flurocup.core.model.edit.EditHistory
+import com.flurocup.core.model.edit.MainTrackEdits
+import com.flurocup.feature.editor.timeline.FrameKey
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -49,6 +51,8 @@ data class ClipUi(
     val clip: MediaClip,
     val needsProxy: Boolean,
     val proxy: ProxyState?,
+    /** File the timeline reads its filmstrip frames from: the proxy when there is one. */
+    val frameUri: String,
 )
 
 data class EditorUiState(
@@ -58,12 +62,18 @@ data class EditorUiState(
     val clips: List<ClipUi> = emptyList(),
     val importing: ImportProgress? = null,
     val previewSource: PreviewSource = PreviewSource.PROXY,
+    val selectedClipId: String? = null,
+    val canUndo: Boolean = false,
+    val canRedo: Boolean = false,
 ) {
+    val selectedClip: ClipUi? get() = clips.firstOrNull { it.clip.id == selectedClipId }
+
+    val durationUs: Long get() = clips.lastOrNull()?.clip?.endUs ?: 0L
+
     /** Width / height of the preview frame: the chosen ratio, or the first clip's. */
     val previewAspect: Float
         get() {
-            val settings = project?.settings
-            val ratio = settings?.aspectRatio ?: AspectRatio.ORIGINAL
+            val ratio = project?.settings?.aspectRatio ?: AspectRatio.ORIGINAL
             if (ratio.widthRatio > 0 && ratio.heightRatio > 0) return ratio.widthRatio.toFloat() / ratio.heightRatio
             val info = project?.firstMediaClip?.source?.info
             if (info != null && info.displayWidth > 0 && info.displayHeight > 0) {
@@ -76,6 +86,9 @@ data class EditorUiState(
 sealed interface EditorMessage {
     /** Files that could not be imported, with the reason for each. */
     data class ImportFailed(val failures: List<MediaImportException>) : EditorMessage
+
+    /** The playhead is not inside a clip, or too close to its edge, to split there. */
+    data object CannotSplit : EditorMessage
 }
 
 @HiltViewModel
@@ -98,10 +111,17 @@ class EditorViewModel @Inject constructor(
     private val _messages = Channel<EditorMessage>(Channel.BUFFERED)
     val messages: Flow<EditorMessage> = _messages.receiveAsFlow()
 
-    val preview = PreviewPlayer(context)
+    val preview = PreviewEngine(context)
 
-    /** Imports, proxy updates and setting changes all edit the project; one at a time, so none is lost. */
+    private val history = EditHistory()
+
+    /** Edits, undo and proxy updates all change the project; one at a time, so none is lost. */
     private val edits = Mutex()
+
+    /** What the preview currently plays, to skip rebuilding it when nothing it shows changed. */
+    private var previewKey: List<Any?>? = null
+    private var previewRebuildPending = false
+    private var lastSeekAt = 0L
 
     init {
         viewModelScope.launch {
@@ -110,161 +130,274 @@ class EditorViewModel @Inject constructor(
                 _uiState.update { it.copy(loading = false, notFound = true) }
                 return@launch
             }
-            setProject(project, save = false)
+            edits.withLock { setProject(project, save = false) }
             _uiState.update { it.copy(loading = false) }
-            mainClips(project).forEach { requestProxyIfNeeded(it) }
+            MainTrackEdits.clips(project).forEach { requestProxyIfNeeded(it) }
             val pending = pendingImports.take(projectId)
             if (pending.isNotEmpty()) import(pending.map(Uri::parse))
         }
         viewModelScope.launch {
-            proxies.states.collect { onProxyStates(it) }
+            proxies.states.collect { onProxyStates() }
+        }
+        viewModelScope.launch {
+            // A proxy that finishes during playback is switched to once playback stops.
+            preview.isPlaying.collect { playing ->
+                if (!playing && previewRebuildPending) rebuildPreview()
+            }
+        }
+    }
+
+    // region Playback
+
+    val positionUs: Long get() = preview.positionUs
+
+    fun togglePlay() = preview.togglePlay()
+
+    fun pause() = preview.pause()
+
+    /** Seeks while the timeline is dragged; [final] forces the last position through. */
+    fun seekTo(timelineUs: Long, final: Boolean = false) {
+        val now = SystemClock.uptimeMillis()
+        if (!final && now - lastSeekAt < SEEK_INTERVAL_MS) return
+        lastSeekAt = now
+        preview.seekTo(timelineUs)
+    }
+
+    fun setPreviewSource(source: PreviewSource) {
+        _uiState.update { it.copy(previewSource = source) }
+        rebuildPreview()
+    }
+
+    // endregion
+
+    // region Editing
+
+    fun select(clipId: String?) {
+        _uiState.update { it.copy(selectedClipId = clipId) }
+    }
+
+    /** Splits the selected clip, or the clip under the playhead, at [atUs]. */
+    fun split(atUs: Long) {
+        val state = _uiState.value
+        val project = state.project ?: return
+        val clip = state.selectedClip?.clip?.takeIf { atUs > it.startUs && atUs < it.endUs }
+            ?: MainTrackEdits.clipAt(project, atUs)
+        viewModelScope.launch {
+            val done = clip != null && execute(EditCommand.Split(clip.id, atUs, newId()))
+            if (!done) _messages.send(EditorMessage.CannotSplit)
+        }
+    }
+
+    fun deleteSelected() {
+        val id = _uiState.value.selectedClipId ?: return
+        viewModelScope.launch {
+            if (execute(EditCommand.Delete(id))) select(null)
+        }
+    }
+
+    fun duplicateSelected() {
+        val id = _uiState.value.selectedClipId ?: return
+        val copyId = newId()
+        viewModelScope.launch {
+            if (execute(EditCommand.Duplicate(id, copyId))) select(copyId)
+        }
+    }
+
+    fun trim(clipId: String, trimStartUs: Long, trimEndUs: Long) {
+        viewModelScope.launch { execute(EditCommand.Trim(clipId, trimStartUs, trimEndUs)) }
+    }
+
+    fun move(clipId: String, toIndex: Int) {
+        viewModelScope.launch { execute(EditCommand.Move(clipId, toIndex)) }
+    }
+
+    fun setAspectRatio(ratio: AspectRatio) {
+        viewModelScope.launch { execute(EditCommand.SetAspectRatio(ratio)) }
+    }
+
+    fun replaceSelected(uri: Uri) {
+        val id = _uiState.value.selectedClipId ?: return
+        viewModelScope.launch {
+            val media = analyzeAll(listOf(uri)).singleOrNull() ?: return@launch
+            val source = sourceOf(media)
+            if (execute(EditCommand.Replace(id, source))) requestProxyIfNeeded(source)
         }
     }
 
     fun import(uris: List<Uri>) {
         if (uris.isEmpty()) return
         viewModelScope.launch {
-            _uiState.update { it.copy(importing = ImportProgress(0, uris.size)) }
-            val analyzed = mutableListOf<AnalyzedMedia>()
-            val failures = mutableListOf<MediaImportException>()
-            uris.forEachIndexed { index, uri ->
-                try {
-                    val media = analyzer.analyze(uri)
-                    if (media.kind == MediaKind.AUDIO) {
-                        failures += MediaImportException(MediaImportException.Reason.UNSUPPORTED_TYPE, media.displayName)
-                    } else if (media.info.durationUs <= 0) {
-                        failures += MediaImportException(MediaImportException.Reason.CORRUPT, media.displayName)
-                    } else {
-                        analyzed += media
-                    }
-                } catch (e: MediaImportException) {
-                    failures += e
-                }
-                _uiState.update { it.copy(importing = ImportProgress(index + 1, uris.size)) }
+            val media = analyzeAll(uris)
+            if (media.isEmpty()) return@launch
+            val clips = media.map { m ->
+                MediaClip(id = newId(), startUs = 0, source = sourceOf(m), trimStartUs = 0, trimEndUs = m.info.durationUs)
             }
-            if (analyzed.isNotEmpty()) {
-                val updated = edit { appendToMainTrack(it, analyzed) }
-                if (updated != null) {
-                    mainClips(updated).forEach { requestProxyIfNeeded(it) }
-                    if (!repository.hasThumbnail(updated.id)) makeProjectThumbnail(updated)
-                }
+            if (execute(EditCommand.AddClips(clips))) {
+                clips.forEach { requestProxyIfNeeded(it) }
+                _uiState.value.project?.let { if (!repository.hasThumbnail(it.id)) makeProjectThumbnail(it) }
             }
-            _uiState.update { it.copy(importing = null) }
-            if (failures.isNotEmpty()) _messages.send(EditorMessage.ImportFailed(failures))
         }
     }
 
-    fun setAspectRatio(ratio: AspectRatio) {
+    fun undo() {
         viewModelScope.launch {
-            edit { project ->
-                if (project.settings.aspectRatio == ratio) null
-                else project.copy(settings = project.settings.copy(aspectRatio = ratio))
+            edits.withLock {
+                val restored = history.undo() ?: return@withLock
+                preview.pause()
+                setProject(restored, save = true)
             }
         }
     }
 
-    fun setPreviewSource(source: PreviewSource) {
-        _uiState.update { it.copy(previewSource = source) }
-        refreshPreview()
+    fun redo() {
+        viewModelScope.launch {
+            edits.withLock {
+                val current = _uiState.value.project ?: return@withLock
+                val redone = history.redo(current)
+                preview.pause()
+                if (redone != null) setProject(redone, save = true) else refreshHistoryFlags()
+            }
+        }
     }
 
-    fun togglePlay() = preview.togglePlay()
+    // endregion
 
-    suspend fun clipThumbnail(clip: MediaClip): Bitmap? =
-        thumbnails.thumbnail(Uri.parse(clip.source.uri), clip.source.kind, clip.trimStartUs)
+    /** A filmstrip frame for the timeline. */
+    suspend fun frame(key: FrameKey): Bitmap? =
+        thumbnails.thumbnail(Uri.parse(key.uri), key.kind, key.timeUs, maxSizePx = FRAME_SIZE_PX)
 
     override fun onCleared() {
         preview.release()
     }
 
-    /** Applies [change] to the current project and saves it; [change] returns null for "no change". */
-    private suspend fun edit(change: (Project) -> Project?): Project? = edits.withLock {
-        val current = _uiState.value.project ?: return@withLock null
-        val updated = change(current) ?: return@withLock null
+    private suspend fun execute(command: EditCommand): Boolean = edits.withLock {
+        val current = _uiState.value.project ?: return@withLock false
+        val updated = history.execute(current, command) ?: return@withLock false
+        preview.pause()
         setProject(updated, save = true)
-        _uiState.value.project
+        true
     }
 
+    private suspend fun analyzeAll(uris: List<Uri>): List<AnalyzedMedia> {
+        _uiState.update { it.copy(importing = ImportProgress(0, uris.size)) }
+        val analyzed = mutableListOf<AnalyzedMedia>()
+        val failures = mutableListOf<MediaImportException>()
+        uris.forEachIndexed { index, uri ->
+            try {
+                val media = analyzer.analyze(uri)
+                when {
+                    media.kind == MediaKind.AUDIO ->
+                        failures += MediaImportException(MediaImportException.Reason.UNSUPPORTED_TYPE, media.displayName)
+                    media.info.durationUs <= 0 ->
+                        failures += MediaImportException(MediaImportException.Reason.CORRUPT, media.displayName)
+                    else -> analyzed += media
+                }
+            } catch (e: MediaImportException) {
+                failures += e
+            }
+            _uiState.update { it.copy(importing = ImportProgress(index + 1, uris.size)) }
+        }
+        _uiState.update { it.copy(importing = null) }
+        if (failures.isNotEmpty()) _messages.send(EditorMessage.ImportFailed(failures))
+        return analyzed
+    }
+
+    private fun sourceOf(media: AnalyzedMedia) =
+        MediaSource(uri = media.uri.toString(), kind = media.kind, info = media.info)
+
+    /**
+     * Shows [project] with any finished proxies filled in, saves it if asked, and updates the
+     * preview. Callers hold [edits].
+     */
     private suspend fun setProject(project: Project, save: Boolean) {
-        val saved = if (save) project.copy(modifiedAt = System.currentTimeMillis()) else project
+        val withProxies = withProxyPaths(project)
+        val saved = if (save) withProxies.copy(modifiedAt = System.currentTimeMillis()) else withProxies
         if (save) repository.save(saved)
         val states = proxies.states.value
         _uiState.update { state ->
+            val clips = MainTrackEdits.clips(saved).map { clip ->
+                val info = clip.source.info
+                ClipUi(
+                    clip = clip,
+                    needsProxy = clip.source.kind == MediaKind.VIDEO && info != null && ProxyPolicy.needsProxy(info),
+                    proxy = states[clip.source.uri],
+                    frameUri = proxyUri(clip) ?: clip.source.uri,
+                )
+            }
             state.copy(
                 project = saved,
-                clips = mainClips(saved).map { clip ->
-                    val info = clip.source.info
-                    ClipUi(
-                        clip = clip,
-                        needsProxy = clip.source.kind == MediaKind.VIDEO && info != null && ProxyPolicy.needsProxy(info),
-                        proxy = states[clip.source.uri],
-                    )
+                clips = clips,
+                selectedClipId = state.selectedClipId?.takeIf { id -> clips.any { it.clip.id == id } },
+                canUndo = history.canUndo,
+                canRedo = history.canRedo,
+            )
+        }
+        rebuildPreview()
+    }
+
+    private fun refreshHistoryFlags() {
+        _uiState.update { it.copy(canUndo = history.canUndo, canRedo = history.canRedo) }
+    }
+
+    private fun withProxyPaths(project: Project): Project {
+        val states = proxies.states.value
+        var changed = false
+        val tracks = project.timeline.tracks.map { track ->
+            track.copy(
+                items = track.items.map { item ->
+                    val ready = (item as? MediaClip)?.let { states[it.source.uri] as? ProxyState.Ready }
+                    if (item is MediaClip && ready != null && item.source.proxyPath != ready.path) {
+                        changed = true
+                        item.copy(source = item.source.copy(proxyPath = ready.path))
+                    } else {
+                        item
+                    }
                 },
             )
         }
-        refreshPreview()
+        return if (changed) project.copy(timeline = project.timeline.copy(tracks = tracks)) else project
     }
 
-    private fun appendToMainTrack(project: Project, media: List<AnalyzedMedia>): Project {
-        val main = project.timeline.mainTrack ?: Track(Timeline.MAIN_TRACK_ID, TrackKind.MAIN)
-        var start = main.endUs
-        val newClips = media.map { m ->
-            MediaClip(
-                id = UUID.randomUUID().toString(),
-                startUs = start,
-                source = MediaSource(uri = m.uri.toString(), kind = m.kind, info = m.info),
-                trimStartUs = 0L,
-                trimEndUs = m.info.durationUs,
-            ).also { start = it.endUs }
-        }
-        val updatedMain = main.copy(items = main.items + newClips)
-        val others = project.timeline.tracks.filter { it.kind != TrackKind.MAIN }
-        return project.copy(timeline = project.timeline.copy(tracks = listOf(updatedMain) + others))
-    }
-
-    private fun requestProxyIfNeeded(clip: MediaClip) {
-        val info = clip.source.info ?: return
-        if (clip.source.kind == MediaKind.VIDEO && ProxyPolicy.needsProxy(info)) proxies.request(clip.source.uri, info)
-    }
-
-    /** Records finished proxies in the project and switches the preview to them. */
-    private suspend fun onProxyStates(states: Map<String, ProxyState>) {
-        _uiState.update { s -> s.copy(clips = s.clips.map { it.copy(proxy = states[it.clip.source.uri]) }) }
-        edit { project ->
-            var changed = false
-            val tracks = project.timeline.tracks.map { track ->
-                track.copy(
-                    items = track.items.map { item ->
-                        val ready = (item as? MediaClip)?.let { states[it.source.uri] as? ProxyState.Ready }
-                        if (item is MediaClip && ready != null && item.source.proxyPath != ready.path) {
-                            changed = true
-                            item.copy(source = item.source.copy(proxyPath = ready.path))
-                        } else {
-                            item
-                        }
-                    },
-                )
-            }
-            if (changed) project.copy(timeline = project.timeline.copy(tracks = tracks)) else null
+    private suspend fun onProxyStates() {
+        edits.withLock {
+            val project = _uiState.value.project ?: return@withLock
+            val updated = withProxyPaths(project)
+            setProject(updated, save = updated != project)
         }
     }
 
-    private fun refreshPreview() {
+    private fun requestProxyIfNeeded(clip: MediaClip) = requestProxyIfNeeded(clip.source)
+
+    private fun requestProxyIfNeeded(source: MediaSource) {
+        val info = source.info ?: return
+        if (source.kind == MediaKind.VIDEO && ProxyPolicy.needsProxy(info)) proxies.request(source.uri, info)
+    }
+
+    private fun proxyUri(clip: MediaClip): String? =
+        clip.source.proxyPath?.let(::File)?.takeIf { it.isFile }?.let { Uri.fromFile(it).toString() }
+
+    private fun rebuildPreview() {
         val state = _uiState.value
+        val project = state.project ?: return
         val useProxy = state.previewSource == PreviewSource.PROXY
-        preview.setClips(
-            state.clips.map { ui ->
-                val clip = ui.clip
-                val proxy = clip.source.proxyPath?.takeIf { useProxy && File(it).isFile }
-                PreviewClip(
-                    id = clip.id,
-                    uri = proxy?.let { Uri.fromFile(File(it)).toString() } ?: clip.source.uri,
-                    isImage = clip.source.kind == MediaKind.IMAGE,
-                    trimStartUs = clip.trimStartUs,
-                    trimEndUs = clip.trimEndUs,
-                )
-            },
-        )
+        val clips = state.clips.map { it.clip }
+        fun uriFor(clip: MediaClip) = (if (useProxy) proxyUri(clip) else null) ?: clip.source.uri
+        val key = clips.map { listOf(it.id, it.trimStartUs, it.trimEndUs, it.speed, uriFor(it)) }
+        if (key == previewKey) {
+            previewRebuildPending = false
+            return
+        }
+        if (preview.isPlaying.value) {
+            previewRebuildPending = true
+            return
+        }
+        previewRebuildPending = false
+        previewKey = key
+        val fps = project.settings.frameRate.takeIf { it > 0f }
+            ?: project.firstMediaClip?.source?.info?.frameRate?.takeIf { it > 0f } ?: 30f
+        val duration = state.durationUs
+        val start = preview.positionUs.coerceAtMost((duration - 1).coerceAtLeast(0L))
+        preview.setComposition(CompositionFactory.mainTrack(clips, ::uriFor, fps), start)
     }
 
     private suspend fun makeProjectThumbnail(project: Project) {
@@ -274,10 +407,11 @@ class EditorViewModel @Inject constructor(
         runCatching { repository.saveThumbnail(project, bitmap) }
     }
 
-    private fun mainClips(project: Project): List<MediaClip> =
-        project.timeline.mainTrack?.items?.filterIsInstance<MediaClip>()?.sortedBy { it.startUs }.orEmpty()
+    private fun newId() = UUID.randomUUID().toString()
 
     companion object {
         const val PROJECT_ID_KEY = "projectId"
+        private const val SEEK_INTERVAL_MS = 50L
+        private const val FRAME_SIZE_PX = 160
     }
 }

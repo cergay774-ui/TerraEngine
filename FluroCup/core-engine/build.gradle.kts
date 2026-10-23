@@ -30,7 +30,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     api(libs.androidx.media3.common)
     api(libs.androidx.media3.exoplayer)
-    implementation(libs.androidx.media3.transformer)
+    api(libs.androidx.media3.transformer)
     implementation(libs.androidx.media3.effect)
     implementation(libs.androidx.exifinterface)
     implementation(libs.hilt.android)

@@ -1,21 +1,23 @@
 package com.flurocup.feature.editor
 
-import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
 import androidx.annotation.OptIn
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,30 +29,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -58,32 +55,26 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import com.flurocup.core.engine.preview.PreviewPlayer
 import com.flurocup.core.engine.proxy.ProxyState
 import com.flurocup.core.model.AspectRatio
 import com.flurocup.core.model.HdrType
-import com.flurocup.core.model.MediaClip
 import com.flurocup.core.model.MediaKind
-import com.flurocup.core.model.formatDuration
 import com.flurocup.core.model.frameRateLabel
 import com.flurocup.core.model.resolutionLabel
-import com.flurocup.core.ui.components.GradientIconSurface
-import com.flurocup.core.ui.theme.FluroColors
-import kotlinx.coroutines.delay
 
 /** The project frame with the player inside; it springs to a new shape when the aspect ratio changes. */
 @OptIn(UnstableApi::class)
 @Composable
-internal fun PreviewSurface(player: Player, aspectRatio: Float) {
+internal fun PreviewSurface(player: Player?, aspectRatio: Float, modifier: Modifier = Modifier) {
     val ratio by animateFloatAsState(
         targetValue = aspectRatio,
         animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "previewAspect",
     )
     Box(
-        modifier = Modifier
+        modifier = modifier
             .aspectRatio(ratio)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(Color.Black),
     ) {
         AndroidView(
@@ -104,52 +95,9 @@ internal fun PreviewSurface(player: Player, aspectRatio: Float) {
 }
 
 @Composable
-internal fun PlaybackBar(
-    isPlaying: Boolean,
-    preview: PreviewPlayer,
-    onTogglePlay: () -> Unit,
-) {
-    var positionUs by remember { mutableLongStateOf(0L) }
-    var durationUs by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(isPlaying, preview) {
-        while (true) {
-            positionUs = preview.positionUs
-            durationUs = preview.durationUs
-            if (!isPlaying) {
-                // Paused: refresh rarely, to pick up imports and seeks.
-                delay(400)
-            } else {
-                delay(50)
-            }
-        }
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "${formatDuration(positionUs)} / ${formatDuration(durationUs)}",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-        )
-        GradientIconSurface(onClick = onTogglePlay, modifier = Modifier.size(52.dp)) {
-            Icon(
-                imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                contentDescription = stringResource(if (isPlaying) R.string.editor_pause else R.string.editor_play),
-                modifier = Modifier.size(30.dp),
-            )
-        }
-        Spacer(Modifier.weight(1f))
-    }
-}
-
-@Composable
 internal fun AspectRatioRow(selected: AspectRatio?, onSelect: (AspectRatio) -> Unit) {
     LazyRow(
-        contentPadding = PaddingValues(horizontal = 12.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(AspectRatio.entries) { ratio ->
@@ -171,161 +119,103 @@ internal fun AspectRatioRow(selected: AspectRatio?, onSelect: (AspectRatio) -> U
     }
 }
 
+/** One tool of the bottom panel. */
+internal data class EditorTool(
+    val icon: ImageVector,
+    val label: String,
+    val enabled: Boolean = true,
+    val destructive: Boolean = false,
+    val onClick: () -> Unit,
+)
+
+/** The bottom tool panel; its set of tools slides over when the selection changes. */
 @Composable
-internal fun ClipStrip(
-    clips: List<ClipUi>,
-    loadThumbnail: suspend (MediaClip) -> Bitmap?,
-    onAdd: () -> Unit,
+internal fun ToolPanel(
+    panelKey: Any,
+    tools: List<EditorTool>,
     modifier: Modifier = Modifier,
 ) {
-    LazyRow(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        contentPadding = PaddingValues(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        items(clips, key = { it.clip.id }) { clip ->
-            ClipTile(clip, loadThumbnail, Modifier.animateItem())
-        }
-        item(key = "add") {
-            AddTile(onAdd, Modifier.animateItem())
+    AnimatedContent(
+        targetState = panelKey to tools,
+        contentKey = { it.first },
+        transitionSpec = {
+            (slideInVertically(spring(stiffness = Spring.StiffnessMediumLow)) { it / 2 } + fadeIn())
+                .togetherWith(slideOutVertically(spring(stiffness = Spring.StiffnessMedium)) { it / 2 } + fadeOut())
+        },
+        label = "toolPanel",
+        modifier = modifier,
+    ) { (_, current) ->
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            items(current, key = { it.label }) { tool -> ToolButton(tool) }
         }
     }
 }
 
 @Composable
-private fun ClipTile(ui: ClipUi, loadThumbnail: suspend (MediaClip) -> Bitmap?, modifier: Modifier = Modifier) {
-    val clip = ui.clip
-    val info = clip.source.info
-    val thumbnail by produceState<Bitmap?>(null, clip.source.uri, clip.trimStartUs) {
-        value = loadThumbnail(clip)
+private fun ToolButton(tool: EditorTool) {
+    val haptics = LocalHapticFeedback.current
+    val color = when {
+        !tool.enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+        tool.destructive -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurface
     }
-    Column(modifier.width(TILE_WIDTH)) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 10f)
-                .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-        ) {
-            thumbnail?.let {
-                Image(
-                    bitmap = it.asImageBitmap(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+    Column(
+        modifier = Modifier
+            .width(68.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(),
+                enabled = tool.enabled,
+                role = Role.Button,
             ) {
-                hdrLabel(info?.hdr)?.let { Badge(it, FluroColors.Orchid) }
-                if (info?.isVariableFrameRate == true) Badge(stringResource(R.string.editor_vfr), FluroColors.Aqua)
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                tool.onClick()
             }
-            Badge(
-                text = formatDuration(clip.durationUs),
-                color = Color.White,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(4.dp),
-            )
-        }
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(tool.icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
         Spacer(Modifier.height(4.dp))
         Text(
-            text = clipFormatLabel(ui),
-            style = MaterialTheme.typography.labelMedium,
+            text = tool.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
         )
-        codecLabel(info?.videoMimeType)?.let {
-            Text(
-                text = it,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
-        }
-        ProxyStatus(ui)
     }
 }
 
+/** "4K · 60 fps · HEVC · HDR10 · VFR · Прокси 42%" for the selected clip. */
 @Composable
-private fun clipFormatLabel(ui: ClipUi): String {
+internal fun clipInfoLine(ui: ClipUi): String {
     val info = ui.clip.source.info
+    val parts = mutableListOf<String>()
     if (ui.clip.source.kind == MediaKind.IMAGE) {
-        val size = info?.let { " · ${it.displayWidth}×${it.displayHeight}" }.orEmpty()
-        return stringResource(R.string.editor_photo) + size
+        parts += stringResource(R.string.editor_photo)
+        if (info != null) parts += "${info.displayWidth}×${info.displayHeight}"
+    } else if (info != null && info.width > 0) {
+        val resolution = resolutionLabel(info.displayWidth, info.displayHeight)
+        parts += if (info.frameRate > 0f) "$resolution · ${frameRateLabel(info.frameRate)} fps" else resolution
+        codecLabel(info.videoMimeType)?.let { parts += it }
+        hdrLabel(info.hdr)?.let { parts += it }
+        if (info.isVariableFrameRate) parts += stringResource(R.string.editor_vfr)
     }
-    if (info == null || info.width <= 0) return ""
-    val resolution = resolutionLabel(info.displayWidth, info.displayHeight)
-    return if (info.frameRate > 0f) "$resolution · ${frameRateLabel(info.frameRate)} fps" else resolution
-}
-
-@Composable
-private fun ProxyStatus(ui: ClipUi) {
-    val canPlay = ui.clip.source.info?.canDecodeInRealTime != false
     when (val proxy = ui.proxy) {
-        null -> if (!canPlay) StatusText(stringResource(R.string.editor_no_realtime), MaterialTheme.colorScheme.tertiary)
-        ProxyState.Queued -> StatusText(stringResource(R.string.editor_proxy_queued), MaterialTheme.colorScheme.onSurfaceVariant)
-        is ProxyState.Running -> Column {
-            StatusText(
-                stringResource(R.string.editor_proxy_running, (proxy.progress * 100).toInt()),
-                MaterialTheme.colorScheme.primary,
-            )
-            LinearProgressIndicator(
-                progress = { proxy.progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 2.dp),
-            )
-        }
-        is ProxyState.Ready -> StatusText(stringResource(R.string.editor_proxy_ready), MaterialTheme.colorScheme.primary)
-        is ProxyState.Failed -> StatusText(stringResource(R.string.editor_proxy_failed), MaterialTheme.colorScheme.error)
+        ProxyState.Queued -> parts += stringResource(R.string.editor_proxy_queued)
+        is ProxyState.Running -> parts += stringResource(R.string.editor_proxy_running, (proxy.progress * 100).toInt())
+        is ProxyState.Ready -> parts += stringResource(R.string.editor_proxy_ready)
+        is ProxyState.Failed -> parts += stringResource(R.string.editor_proxy_failed)
+        null -> if (info?.canDecodeInRealTime == false) parts += stringResource(R.string.editor_no_realtime)
     }
+    return parts.joinToString(" · ")
 }
-
-@Composable
-private fun StatusText(text: String, color: Color) {
-    Text(text = text, style = MaterialTheme.typography.labelSmall, color = color, maxLines = 1)
-}
-
-@Composable
-private fun Badge(text: String, color: Color, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelSmall,
-        color = color,
-        modifier = modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(Color.Black.copy(alpha = 0.6f))
-            .padding(horizontal = 4.dp, vertical = 1.dp),
-    )
-}
-
-@Composable
-private fun AddTile(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier.width(TILE_WIDTH)) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 10f)
-                .clip(RoundedCornerShape(10.dp))
-                .border(BorderStroke(1.5.dp, FluroColors.Teal.copy(alpha = 0.6f)), RoundedCornerShape(10.dp))
-                .clickable(onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Rounded.Add, contentDescription = null, tint = FluroColors.Teal)
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(stringResource(R.string.editor_add_media), style = MaterialTheme.typography.labelMedium)
-    }
-}
-
-private val TILE_WIDTH = 120.dp
 
 private fun hdrLabel(hdr: HdrType?): String? = when (hdr) {
     HdrType.HDR10 -> "HDR10"

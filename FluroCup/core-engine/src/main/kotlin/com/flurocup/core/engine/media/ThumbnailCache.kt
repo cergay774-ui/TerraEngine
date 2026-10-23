@@ -15,6 +15,8 @@ import java.io.File
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Semaphore
@@ -57,18 +59,60 @@ class ThumbnailCache @Inject constructor(
     }.getOrNull()
 
     private fun decodeVideoFrame(uri: Uri, timeUs: Long, maxSize: Int): Bitmap? {
+        val pooled = retrieverFor(uri) ?: return null
+        return pooled.lock.withLock {
+            if (pooled.released) return null
+            val option = MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                pooled.retriever.getScaledFrameAtTime(timeUs, option, maxSize, maxSize)
+            } else {
+                pooled.retriever.getFrameAtTime(timeUs, option)?.let { scaleDown(it, maxSize) }
+            }
+        }
+    }
+
+    /** Opening a file is the slow part of grabbing a frame, so the last few files stay open. */
+    private class PooledRetriever(val retriever: MediaMetadataRetriever) {
+        val lock = ReentrantLock()
+        var released = false
+    }
+
+    private val retrievers = LinkedHashMap<String, PooledRetriever>(8, 0.75f, true)
+
+    private fun retrieverFor(uri: Uri): PooledRetriever? {
+        val key = uri.toString()
+        synchronized(retrievers) { retrievers[key] }?.let { return it }
         val retriever = MediaMetadataRetriever()
         try {
             retriever.setDataSource(context, uri)
-            val option = MediaMetadataRetriever.OPTION_CLOSEST_SYNC
-            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                retriever.getScaledFrameAtTime(timeUs, option, maxSize, maxSize)
-            } else {
-                retriever.getFrameAtTime(timeUs, option)?.let { scaleDown(it, maxSize) }
-            }
-        } finally {
+        } catch (e: Exception) {
             runCatching { retriever.release() }
+            return null
         }
+        val pooled = PooledRetriever(retriever)
+        val evicted = mutableListOf<PooledRetriever>()
+        val winner = synchronized(retrievers) {
+            val existing = retrievers[key]
+            if (existing != null) {
+                evicted += pooled
+                existing
+            } else {
+                retrievers[key] = pooled
+                val iterator = retrievers.entries.iterator()
+                while (retrievers.size > OPEN_FILES && iterator.hasNext()) {
+                    evicted += iterator.next().value
+                    iterator.remove()
+                }
+                pooled
+            }
+        }
+        evicted.forEach { old ->
+            old.lock.withLock {
+                old.released = true
+                runCatching { old.retriever.release() }
+            }
+        }
+        return winner
     }
 
     private fun decodeImage(uri: Uri, maxSize: Int): Bitmap? {
@@ -105,7 +149,8 @@ class ThumbnailCache @Inject constructor(
     private fun key(uri: Uri, timeUs: Long, size: Int): String = sha1("$uri|$timeUs|$size")
 
     private companion object {
-        const val MEMORY_BYTES = 24 * 1024 * 1024
+        const val MEMORY_BYTES = 32 * 1024 * 1024
+        const val OPEN_FILES = 3
     }
 }
 

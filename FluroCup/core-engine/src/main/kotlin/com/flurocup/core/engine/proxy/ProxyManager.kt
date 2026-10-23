@@ -148,7 +148,7 @@ class ProxyManager @Inject constructor(
         val item = EditedMediaItem.Builder(MediaItem.fromUri(request.sourceUri))
             .setEffects(Effects(emptyList(), listOf(Presentation.createForWidthAndHeight(width, height, Presentation.LAYOUT_SCALE_TO_FIT))))
             .build()
-        val composition = Composition.Builder(listOf(EditedMediaItemSequence(listOf(item))))
+        val composition = Composition.Builder(EditedMediaItemSequence.Builder(item).build())
             .apply {
                 if (info.hdr != HdrType.NONE) setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
             }

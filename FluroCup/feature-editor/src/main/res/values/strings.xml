@@ -29,4 +29,18 @@
     <string name="editor_reason_unreadable">нет доступа к файлу</string>
     <string name="editor_reason_corrupt">файл повреждён или не читается</string>
     <string name="editor_unknown_file">файл</string>
+    <string name="editor_undo">Отменить</string>
+    <string name="editor_redo">Повторить</string>
+    <string name="editor_fullscreen">Во весь экран</string>
+    <string name="editor_exit_fullscreen">Свернуть</string>
+    <string name="editor_tool_add">Добавить</string>
+    <string name="editor_tool_split">Разделить</string>
+    <string name="editor_tool_delete">Удалить</string>
+    <string name="editor_tool_duplicate">Дублировать</string>
+    <string name="editor_tool_replace">Заменить</string>
+    <string name="editor_tool_format">Формат</string>
+    <string name="editor_format_title">Соотношение сторон</string>
+    <string name="editor_cannot_split">Поставьте плейхед внутрь клипа, чтобы разделить его</string>
+    <string name="editor_preview_error">Не удалось воспроизвести превью. Попробуйте режим «Оригинал» или «Прокси».</string>
+    <string name="editor_timeline_hint">Долгое нажатие на клип — перестановка, края выделенного клипа — обрезка</string>
 </resources>
