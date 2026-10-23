@@ -1,0 +1,7 @@
+{
+  "format_version": "1.16.100",
+  "minecraft:texture_set": {
+    "color": "led_green",
+    "metalness_emissive_roughness": "led_green_mer"
+  }
+}

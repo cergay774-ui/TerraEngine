@@ -1,0 +1,651 @@
+{
+  "format_version": "1.21.0",
+  "minecraft:geometry": [
+    {
+      "description": {
+        "identifier": "geometry.techcore.copper_wire",
+        "texture_width": 16,
+        "texture_height": 16,
+        "visible_bounds_width": 3,
+        "visible_bounds_height": 3,
+        "visible_bounds_offset": [
+          0,
+          0.75,
+          0
+        ]
+      },
+      "bones": [
+        {
+          "name": "core",
+          "pivot": [
+            0,
+            0,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -1,
+                7,
+                -1
+              ],
+              "size": [
+                2,
+                2,
+                2
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    4,
+                    4
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "south": {
+                  "uv": [
+                    4,
+                    4
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "east": {
+                  "uv": [
+                    4,
+                    4
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "west": {
+                  "uv": [
+                    4,
+                    4
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "up": {
+                  "uv": [
+                    4,
+                    4
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "down": {
+                  "uv": [
+                    4,
+                    4
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "arm_n",
+          "pivot": [
+            0,
+            0,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -1,
+                7,
+                -8
+              ],
+              "size": [
+                2,
+                2,
+                7
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    14,
+                    11
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "south": {
+                  "uv": [
+                    14,
+                    11
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "east": {
+                  "uv": [
+                    4,
+                    11
+                  ],
+                  "uv_size": [
+                    7,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "west": {
+                  "uv": [
+                    4,
+                    11
+                  ],
+                  "uv_size": [
+                    7,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "up": {
+                  "uv": [
+                    14,
+                    1
+                  ],
+                  "uv_size": [
+                    2,
+                    7
+                  ],
+                  "material_instance": "wire"
+                },
+                "down": {
+                  "uv": [
+                    14,
+                    1
+                  ],
+                  "uv_size": [
+                    2,
+                    7
+                  ],
+                  "material_instance": "wire"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "arm_s",
+          "pivot": [
+            0,
+            0,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -1,
+                7,
+                1
+              ],
+              "size": [
+                2,
+                2,
+                7
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    14,
+                    7
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "south": {
+                  "uv": [
+                    14,
+                    7
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "east": {
+                  "uv": [
+                    9,
+                    7
+                  ],
+                  "uv_size": [
+                    7,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "west": {
+                  "uv": [
+                    9,
+                    7
+                  ],
+                  "uv_size": [
+                    7,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "up": {
+                  "uv": [
+                    14,
+                    2
+                  ],
+                  "uv_size": [
+                    2,
+                    7
+                  ],
+                  "material_instance": "wire"
+                },
+                "down": {
+                  "uv": [
+                    14,
+                    2
+                  ],
+                  "uv_size": [
+                    2,
+                    7
+                  ],
+                  "material_instance": "wire"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "arm_e",
+          "pivot": [
+            0,
+            0,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                1,
+                7,
+                -1
+              ],
+              "size": [
+                7,
+                2,
+                2
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    3,
+                    8
+                  ],
+                  "uv_size": [
+                    7,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "south": {
+                  "uv": [
+                    3,
+                    8
+                  ],
+                  "uv_size": [
+                    7,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "east": {
+                  "uv": [
+                    3,
+                    8
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "west": {
+                  "uv": [
+                    3,
+                    8
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "up": {
+                  "uv": [
+                    3,
+                    8
+                  ],
+                  "uv_size": [
+                    7,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "down": {
+                  "uv": [
+                    3,
+                    8
+                  ],
+                  "uv_size": [
+                    7,
+                    2
+                  ],
+                  "material_instance": "wire"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "arm_w",
+          "pivot": [
+            0,
+            0,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -8,
+                7,
+                -1
+              ],
+              "size": [
+                7,
+                2,
+                2
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    0,
+                    7
+                  ],
+                  "uv_size": [
+                    7,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "south": {
+                  "uv": [
+                    0,
+                    7
+                  ],
+                  "uv_size": [
+                    7,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "east": {
+                  "uv": [
+                    0,
+                    7
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "west": {
+                  "uv": [
+                    0,
+                    7
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "up": {
+                  "uv": [
+                    0,
+                    7
+                  ],
+                  "uv_size": [
+                    7,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "down": {
+                  "uv": [
+                    0,
+                    7
+                  ],
+                  "uv_size": [
+                    7,
+                    2
+                  ],
+                  "material_instance": "wire"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "arm_u",
+          "pivot": [
+            0,
+            0,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -1,
+                9,
+                -1
+              ],
+              "size": [
+                2,
+                7,
+                2
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    0,
+                    6
+                  ],
+                  "uv_size": [
+                    2,
+                    7
+                  ],
+                  "material_instance": "wire"
+                },
+                "south": {
+                  "uv": [
+                    0,
+                    6
+                  ],
+                  "uv_size": [
+                    2,
+                    7
+                  ],
+                  "material_instance": "wire"
+                },
+                "east": {
+                  "uv": [
+                    0,
+                    6
+                  ],
+                  "uv_size": [
+                    2,
+                    7
+                  ],
+                  "material_instance": "wire"
+                },
+                "west": {
+                  "uv": [
+                    0,
+                    6
+                  ],
+                  "uv_size": [
+                    2,
+                    7
+                  ],
+                  "material_instance": "wire"
+                },
+                "up": {
+                  "uv": [
+                    0,
+                    11
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "down": {
+                  "uv": [
+                    0,
+                    11
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "arm_d",
+          "pivot": [
+            0,
+            0,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -1,
+                0,
+                -1
+              ],
+              "size": [
+                2,
+                7,
+                2
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    12,
+                    3
+                  ],
+                  "uv_size": [
+                    2,
+                    7
+                  ],
+                  "material_instance": "wire"
+                },
+                "south": {
+                  "uv": [
+                    12,
+                    3
+                  ],
+                  "uv_size": [
+                    2,
+                    7
+                  ],
+                  "material_instance": "wire"
+                },
+                "east": {
+                  "uv": [
+                    12,
+                    3
+                  ],
+                  "uv_size": [
+                    2,
+                    7
+                  ],
+                  "material_instance": "wire"
+                },
+                "west": {
+                  "uv": [
+                    12,
+                    3
+                  ],
+                  "uv_size": [
+                    2,
+                    7
+                  ],
+                  "material_instance": "wire"
+                },
+                "up": {
+                  "uv": [
+                    12,
+                    3
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                },
+                "down": {
+                  "uv": [
+                    12,
+                    3
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "wire"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

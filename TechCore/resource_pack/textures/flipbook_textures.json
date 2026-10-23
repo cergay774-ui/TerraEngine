@@ -1,0 +1,128 @@
+[
+  {
+    "flipbook_texture": "textures/techcore/blocks/fire_anim",
+    "atlas_tile": "tc_fire_anim",
+    "ticks_per_frame": 3,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/glow_anim",
+    "atlas_tile": "tc_glow_anim",
+    "ticks_per_frame": 4,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/roller_anim",
+    "atlas_tile": "tc_roller_anim",
+    "ticks_per_frame": 2,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/chuck_anim",
+    "atlas_tile": "tc_chuck_anim",
+    "ticks_per_frame": 1,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/drill_anim",
+    "atlas_tile": "tc_drill_anim",
+    "ticks_per_frame": 1,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/belt_anim",
+    "atlas_tile": "tc_belt_anim",
+    "ticks_per_frame": 3,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/rotor1_anim",
+    "atlas_tile": "tc_rotor1_slow",
+    "ticks_per_frame": 4,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/rotor1_anim",
+    "atlas_tile": "tc_rotor1_med",
+    "ticks_per_frame": 2,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/rotor1_anim",
+    "atlas_tile": "tc_rotor1_fast",
+    "ticks_per_frame": 1,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/rotor2_anim",
+    "atlas_tile": "tc_rotor2_slow",
+    "ticks_per_frame": 4,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/rotor2_anim",
+    "atlas_tile": "tc_rotor2_med",
+    "ticks_per_frame": 2,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/rotor2_anim",
+    "atlas_tile": "tc_rotor2_fast",
+    "ticks_per_frame": 1,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/rotor3_anim",
+    "atlas_tile": "tc_rotor3_slow",
+    "ticks_per_frame": 4,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/rotor3_anim",
+    "atlas_tile": "tc_rotor3_med",
+    "ticks_per_frame": 2,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/rotor3_anim",
+    "atlas_tile": "tc_rotor3_fast",
+    "ticks_per_frame": 1,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/rotor4_anim",
+    "atlas_tile": "tc_rotor4_slow",
+    "ticks_per_frame": 4,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/rotor4_anim",
+    "atlas_tile": "tc_rotor4_med",
+    "ticks_per_frame": 2,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/rotor4_anim",
+    "atlas_tile": "tc_rotor4_fast",
+    "ticks_per_frame": 1,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/rotor5_anim",
+    "atlas_tile": "tc_rotor5_slow",
+    "ticks_per_frame": 4,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/rotor5_anim",
+    "atlas_tile": "tc_rotor5_med",
+    "ticks_per_frame": 2,
+    "blend_frames": false
+  },
+  {
+    "flipbook_texture": "textures/techcore/blocks/rotor5_anim",
+    "atlas_tile": "tc_rotor5_fast",
+    "ticks_per_frame": 1,
+    "blend_frames": false
+  }
+]

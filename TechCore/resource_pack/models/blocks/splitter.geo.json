@@ -1,0 +1,861 @@
+{
+  "format_version": "1.21.0",
+  "minecraft:geometry": [
+    {
+      "description": {
+        "identifier": "geometry.techcore.splitter",
+        "texture_width": 16,
+        "texture_height": 16,
+        "visible_bounds_width": 3,
+        "visible_bounds_height": 3,
+        "visible_bounds_offset": [
+          0,
+          0.75,
+          0
+        ]
+      },
+      "bones": [
+        {
+          "name": "body",
+          "pivot": [
+            0,
+            0,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -8,
+                0,
+                -8
+              ],
+              "size": [
+                16,
+                3,
+                16
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    0,
+                    10
+                  ],
+                  "uv_size": [
+                    16,
+                    3
+                  ],
+                  "material_instance": "frame"
+                },
+                "south": {
+                  "uv": [
+                    0,
+                    10
+                  ],
+                  "uv_size": [
+                    16,
+                    3
+                  ],
+                  "material_instance": "frame"
+                },
+                "east": {
+                  "uv": [
+                    0,
+                    10
+                  ],
+                  "uv_size": [
+                    16,
+                    3
+                  ],
+                  "material_instance": "frame"
+                },
+                "west": {
+                  "uv": [
+                    0,
+                    10
+                  ],
+                  "uv_size": [
+                    16,
+                    3
+                  ],
+                  "material_instance": "frame"
+                },
+                "up": {
+                  "uv": [
+                    0,
+                    0
+                  ],
+                  "uv_size": [
+                    16,
+                    16
+                  ],
+                  "material_instance": "belt"
+                },
+                "down": {
+                  "uv": [
+                    0,
+                    0
+                  ],
+                  "uv_size": [
+                    16,
+                    16
+                  ],
+                  "material_instance": "frame"
+                }
+              }
+            },
+            {
+              "origin": [
+                -8,
+                3,
+                -8
+              ],
+              "size": [
+                5,
+                2,
+                5
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    6,
+                    13
+                  ],
+                  "uv_size": [
+                    5,
+                    2
+                  ],
+                  "material_instance": "steel"
+                },
+                "south": {
+                  "uv": [
+                    6,
+                    13
+                  ],
+                  "uv_size": [
+                    5,
+                    2
+                  ],
+                  "material_instance": "steel"
+                },
+                "east": {
+                  "uv": [
+                    6,
+                    13
+                  ],
+                  "uv_size": [
+                    5,
+                    2
+                  ],
+                  "material_instance": "steel"
+                },
+                "west": {
+                  "uv": [
+                    6,
+                    13
+                  ],
+                  "uv_size": [
+                    5,
+                    2
+                  ],
+                  "material_instance": "steel"
+                },
+                "up": {
+                  "uv": [
+                    6,
+                    1
+                  ],
+                  "uv_size": [
+                    5,
+                    5
+                  ],
+                  "material_instance": "steel"
+                },
+                "down": {
+                  "uv": [
+                    6,
+                    1
+                  ],
+                  "uv_size": [
+                    5,
+                    5
+                  ],
+                  "material_instance": "steel"
+                }
+              }
+            },
+            {
+              "origin": [
+                3,
+                3,
+                -8
+              ],
+              "size": [
+                5,
+                2,
+                5
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    2,
+                    6
+                  ],
+                  "uv_size": [
+                    5,
+                    2
+                  ],
+                  "material_instance": "steel"
+                },
+                "south": {
+                  "uv": [
+                    2,
+                    6
+                  ],
+                  "uv_size": [
+                    5,
+                    2
+                  ],
+                  "material_instance": "steel"
+                },
+                "east": {
+                  "uv": [
+                    2,
+                    6
+                  ],
+                  "uv_size": [
+                    5,
+                    2
+                  ],
+                  "material_instance": "steel"
+                },
+                "west": {
+                  "uv": [
+                    2,
+                    6
+                  ],
+                  "uv_size": [
+                    5,
+                    2
+                  ],
+                  "material_instance": "steel"
+                },
+                "up": {
+                  "uv": [
+                    2,
+                    6
+                  ],
+                  "uv_size": [
+                    5,
+                    5
+                  ],
+                  "material_instance": "steel"
+                },
+                "down": {
+                  "uv": [
+                    2,
+                    6
+                  ],
+                  "uv_size": [
+                    5,
+                    5
+                  ],
+                  "material_instance": "steel"
+                }
+              }
+            },
+            {
+              "origin": [
+                -8,
+                0,
+                6
+              ],
+              "size": [
+                16,
+                1,
+                2
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    0,
+                    4
+                  ],
+                  "uv_size": [
+                    16,
+                    1
+                  ],
+                  "material_instance": "hazard"
+                },
+                "south": {
+                  "uv": [
+                    0,
+                    4
+                  ],
+                  "uv_size": [
+                    16,
+                    1
+                  ],
+                  "material_instance": "hazard"
+                },
+                "east": {
+                  "uv": [
+                    2,
+                    4
+                  ],
+                  "uv_size": [
+                    2,
+                    1
+                  ],
+                  "material_instance": "hazard"
+                },
+                "west": {
+                  "uv": [
+                    2,
+                    4
+                  ],
+                  "uv_size": [
+                    2,
+                    1
+                  ],
+                  "material_instance": "hazard"
+                },
+                "up": {
+                  "uv": [
+                    0,
+                    4
+                  ],
+                  "uv_size": [
+                    16,
+                    2
+                  ],
+                  "material_instance": "hazard"
+                },
+                "down": {
+                  "uv": [
+                    0,
+                    4
+                  ],
+                  "uv_size": [
+                    16,
+                    2
+                  ],
+                  "material_instance": "hazard"
+                }
+              }
+            },
+            {
+              "origin": [
+                -8,
+                0.5,
+                -3
+              ],
+              "size": [
+                1,
+                1,
+                6
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    4,
+                    13
+                  ],
+                  "uv_size": [
+                    1,
+                    1
+                  ],
+                  "material_instance": "hazard"
+                },
+                "south": {
+                  "uv": [
+                    4,
+                    13
+                  ],
+                  "uv_size": [
+                    1,
+                    1
+                  ],
+                  "material_instance": "hazard"
+                },
+                "east": {
+                  "uv": [
+                    8,
+                    13
+                  ],
+                  "uv_size": [
+                    6,
+                    1
+                  ],
+                  "material_instance": "hazard"
+                },
+                "west": {
+                  "uv": [
+                    8,
+                    13
+                  ],
+                  "uv_size": [
+                    6,
+                    1
+                  ],
+                  "material_instance": "hazard"
+                },
+                "up": {
+                  "uv": [
+                    4,
+                    2
+                  ],
+                  "uv_size": [
+                    1,
+                    6
+                  ],
+                  "material_instance": "hazard"
+                },
+                "down": {
+                  "uv": [
+                    4,
+                    2
+                  ],
+                  "uv_size": [
+                    1,
+                    6
+                  ],
+                  "material_instance": "hazard"
+                }
+              }
+            },
+            {
+              "origin": [
+                7,
+                0.5,
+                -3
+              ],
+              "size": [
+                1,
+                1,
+                6
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    8,
+                    14
+                  ],
+                  "uv_size": [
+                    1,
+                    1
+                  ],
+                  "material_instance": "hazard"
+                },
+                "south": {
+                  "uv": [
+                    8,
+                    14
+                  ],
+                  "uv_size": [
+                    1,
+                    1
+                  ],
+                  "material_instance": "hazard"
+                },
+                "east": {
+                  "uv": [
+                    1,
+                    14
+                  ],
+                  "uv_size": [
+                    6,
+                    1
+                  ],
+                  "material_instance": "hazard"
+                },
+                "west": {
+                  "uv": [
+                    1,
+                    14
+                  ],
+                  "uv_size": [
+                    6,
+                    1
+                  ],
+                  "material_instance": "hazard"
+                },
+                "up": {
+                  "uv": [
+                    8,
+                    3
+                  ],
+                  "uv_size": [
+                    1,
+                    6
+                  ],
+                  "material_instance": "hazard"
+                },
+                "down": {
+                  "uv": [
+                    8,
+                    3
+                  ],
+                  "uv_size": [
+                    1,
+                    6
+                  ],
+                  "material_instance": "hazard"
+                }
+              }
+            },
+            {
+              "origin": [
+                -1,
+                3,
+                -1
+              ],
+              "size": [
+                2,
+                4,
+                2
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    0,
+                    11
+                  ],
+                  "uv_size": [
+                    2,
+                    4
+                  ],
+                  "material_instance": "steel"
+                },
+                "south": {
+                  "uv": [
+                    0,
+                    11
+                  ],
+                  "uv_size": [
+                    2,
+                    4
+                  ],
+                  "material_instance": "steel"
+                },
+                "east": {
+                  "uv": [
+                    0,
+                    11
+                  ],
+                  "uv_size": [
+                    2,
+                    4
+                  ],
+                  "material_instance": "steel"
+                },
+                "west": {
+                  "uv": [
+                    0,
+                    11
+                  ],
+                  "uv_size": [
+                    2,
+                    4
+                  ],
+                  "material_instance": "steel"
+                },
+                "up": {
+                  "uv": [
+                    0,
+                    11
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "steel"
+                },
+                "down": {
+                  "uv": [
+                    0,
+                    11
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "steel"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "vane_a",
+          "pivot": [
+            0,
+            0,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -3,
+                4,
+                -0.5
+              ],
+              "size": [
+                6,
+                2,
+                1
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    7,
+                    7
+                  ],
+                  "uv_size": [
+                    6,
+                    2
+                  ],
+                  "material_instance": "copper"
+                },
+                "south": {
+                  "uv": [
+                    7,
+                    7
+                  ],
+                  "uv_size": [
+                    6,
+                    2
+                  ],
+                  "material_instance": "copper"
+                },
+                "east": {
+                  "uv": [
+                    13,
+                    7
+                  ],
+                  "uv_size": [
+                    1,
+                    2
+                  ],
+                  "material_instance": "copper"
+                },
+                "west": {
+                  "uv": [
+                    13,
+                    7
+                  ],
+                  "uv_size": [
+                    1,
+                    2
+                  ],
+                  "material_instance": "copper"
+                },
+                "up": {
+                  "uv": [
+                    7,
+                    7
+                  ],
+                  "uv_size": [
+                    6,
+                    1
+                  ],
+                  "material_instance": "copper"
+                },
+                "down": {
+                  "uv": [
+                    7,
+                    7
+                  ],
+                  "uv_size": [
+                    6,
+                    1
+                  ],
+                  "material_instance": "copper"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "vane_b",
+          "pivot": [
+            0,
+            0,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -0.5,
+                4,
+                -3
+              ],
+              "size": [
+                1,
+                2,
+                6
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    2,
+                    8
+                  ],
+                  "uv_size": [
+                    1,
+                    2
+                  ],
+                  "material_instance": "copper"
+                },
+                "south": {
+                  "uv": [
+                    2,
+                    8
+                  ],
+                  "uv_size": [
+                    1,
+                    2
+                  ],
+                  "material_instance": "copper"
+                },
+                "east": {
+                  "uv": [
+                    1,
+                    8
+                  ],
+                  "uv_size": [
+                    6,
+                    2
+                  ],
+                  "material_instance": "copper"
+                },
+                "west": {
+                  "uv": [
+                    1,
+                    8
+                  ],
+                  "uv_size": [
+                    6,
+                    2
+                  ],
+                  "material_instance": "copper"
+                },
+                "up": {
+                  "uv": [
+                    2,
+                    8
+                  ],
+                  "uv_size": [
+                    1,
+                    6
+                  ],
+                  "material_instance": "copper"
+                },
+                "down": {
+                  "uv": [
+                    2,
+                    8
+                  ],
+                  "uv_size": [
+                    1,
+                    6
+                  ],
+                  "material_instance": "copper"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "cargo",
+          "pivot": [
+            0,
+            0,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -3,
+                3,
+                -3
+              ],
+              "size": [
+                6,
+                5,
+                6
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    3,
+                    0
+                  ],
+                  "uv_size": [
+                    6,
+                    5
+                  ],
+                  "material_instance": "cargo"
+                },
+                "south": {
+                  "uv": [
+                    3,
+                    0
+                  ],
+                  "uv_size": [
+                    6,
+                    5
+                  ],
+                  "material_instance": "cargo"
+                },
+                "east": {
+                  "uv": [
+                    3,
+                    0
+                  ],
+                  "uv_size": [
+                    6,
+                    5
+                  ],
+                  "material_instance": "cargo"
+                },
+                "west": {
+                  "uv": [
+                    3,
+                    0
+                  ],
+                  "uv_size": [
+                    6,
+                    5
+                  ],
+                  "material_instance": "cargo"
+                },
+                "up": {
+                  "uv": [
+                    3,
+                    0
+                  ],
+                  "uv_size": [
+                    6,
+                    6
+                  ],
+                  "material_instance": "cargo"
+                },
+                "down": {
+                  "uv": [
+                    3,
+                    0
+                  ],
+                  "uv_size": [
+                    6,
+                    6
+                  ],
+                  "material_instance": "cargo"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

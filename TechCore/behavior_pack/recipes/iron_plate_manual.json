@@ -1,0 +1,28 @@
+{
+  "format_version": "1.21.70",
+  "minecraft:recipe_shaped": {
+    "description": {
+      "identifier": "techcore:iron_plate_manual"
+    },
+    "tags": [
+      "crafting_table"
+    ],
+    "pattern": [
+      "II"
+    ],
+    "key": {
+      "I": {
+        "item": "minecraft:iron_ingot"
+      }
+    },
+    "unlock": [
+      {
+        "item": "minecraft:iron_ingot"
+      }
+    ],
+    "result": {
+      "item": "techcore:iron_plate",
+      "count": 1
+    }
+  }
+}

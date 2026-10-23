@@ -1,0 +1,18 @@
+{
+  "format_version": "1.26.50",
+  "minecraft:item": {
+    "description": {
+      "identifier": "techcore:fuel_tank_part",
+      "menu_category": {
+        "category": "items"
+      }
+    },
+    "components": {
+      "minecraft:icon": "techcore:fuel_tank_part",
+      "minecraft:display_name": {
+        "value": "item.techcore:fuel_tank_part"
+      },
+      "minecraft:max_stack_size": 64
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "format_version": "1.16.100",
+  "minecraft:texture_set": {
+    "color": "rotor5_anim",
+    "metalness_emissive_roughness": [
+      120,
+      0,
+      140
+    ]
+  }
+}

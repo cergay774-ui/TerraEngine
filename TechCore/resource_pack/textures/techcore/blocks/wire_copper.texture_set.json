@@ -1,0 +1,11 @@
+{
+  "format_version": "1.16.100",
+  "minecraft:texture_set": {
+    "color": "wire_copper",
+    "metalness_emissive_roughness": [
+      230,
+      0,
+      90
+    ]
+  }
+}

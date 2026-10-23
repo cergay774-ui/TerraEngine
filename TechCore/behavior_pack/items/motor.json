@@ -1,0 +1,18 @@
+{
+  "format_version": "1.26.50",
+  "minecraft:item": {
+    "description": {
+      "identifier": "techcore:motor",
+      "menu_category": {
+        "category": "items"
+      }
+    },
+    "components": {
+      "minecraft:icon": "techcore:motor",
+      "minecraft:display_name": {
+        "value": "item.techcore:motor"
+      },
+      "minecraft:max_stack_size": 64
+    }
+  }
+}

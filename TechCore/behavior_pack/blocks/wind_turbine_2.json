@@ -1,0 +1,364 @@
+{
+  "format_version": "1.26.50",
+  "minecraft:block": {
+    "description": {
+      "identifier": "techcore:wind_turbine_2",
+      "menu_category": {
+        "category": "items"
+      },
+      "states": {
+        "techcore:spin": {
+          "values": {
+            "min": 0,
+            "max": 3
+          }
+        }
+      },
+      "traits": {
+        "minecraft:placement_direction": {
+          "enabled_states": [
+            "minecraft:cardinal_direction"
+          ],
+          "y_rotation_offset": 180
+        },
+        "minecraft:multi_block": {
+          "enabled_states": [
+            "minecraft:multi_block_part"
+          ],
+          "direction": "up",
+          "parts": 2
+        }
+      }
+    },
+    "components": {
+      "minecraft:geometry": {
+        "identifier": "geometry.techcore.wind_turbine_2",
+        "bone_visibility": {
+          "foundation": "q.block_state('minecraft:multi_block_part') == 0",
+          "mast_mid": "q.block_state('minecraft:multi_block_part') > 0 && q.block_state('minecraft:multi_block_part') < 1",
+          "mast_top": "q.block_state('minecraft:multi_block_part') == 1",
+          "nacelle": "q.block_state('minecraft:multi_block_part') == 1",
+          "rotor": "q.block_state('minecraft:multi_block_part') == 1"
+        }
+      },
+      "minecraft:material_instances": {
+        "*": {
+          "texture": "tc_frame",
+          "render_method": "alpha_test"
+        },
+        "frame": {
+          "texture": "tc_frame",
+          "render_method": "alpha_test"
+        },
+        "hazard": {
+          "texture": "tc_hazard",
+          "render_method": "alpha_test"
+        },
+        "steel": {
+          "texture": "tc_steel",
+          "render_method": "alpha_test"
+        },
+        "panel": {
+          "texture": "tc_panel",
+          "render_method": "alpha_test"
+        },
+        "led": {
+          "texture": "tc_led_red",
+          "render_method": "alpha_test"
+        },
+        "rotor": {
+          "texture": "tc_rotor2",
+          "render_method": "alpha_test"
+        }
+      },
+      "minecraft:destructible_by_mining": {
+        "seconds_to_destroy": 2.5
+      },
+      "minecraft:destructible_by_explosion": {
+        "explosion_resistance": 15
+      },
+      "minecraft:light_dampening": 0,
+      "minecraft:map_color": "#dfe3e6",
+      "minecraft:movable": {
+        "movement_type": "immovable"
+      },
+      "minecraft:sound": {
+        "sound": "metal"
+      },
+      "techcore:machine": {},
+      "minecraft:item_visual": {
+        "geometry": "geometry.techcore.wind_turbine_2_item",
+        "material_instances": {
+          "*": {
+            "texture": "tc_frame",
+            "render_method": "alpha_test"
+          },
+          "frame": {
+            "texture": "tc_frame",
+            "render_method": "alpha_test"
+          },
+          "steel": {
+            "texture": "tc_steel",
+            "render_method": "alpha_test"
+          },
+          "panel": {
+            "texture": "tc_panel",
+            "render_method": "alpha_test"
+          },
+          "rotor": {
+            "texture": "tc_rotor2",
+            "render_method": "alpha_test"
+          }
+        }
+      }
+    },
+    "permutations": [
+      {
+        "condition": "q.block_state('minecraft:cardinal_direction') == 'south'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('minecraft:cardinal_direction') == 'east'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [
+              0,
+              90,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('minecraft:cardinal_direction') == 'north'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [
+              0,
+              180,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('minecraft:cardinal_direction') == 'west'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [
+              0,
+              -90,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('minecraft:multi_block_part') == 0",
+        "components": {
+          "minecraft:collision_box": {
+            "origin": [
+              -6,
+              0,
+              -6
+            ],
+            "size": [
+              12,
+              16,
+              12
+            ]
+          },
+          "minecraft:selection_box": {
+            "origin": [
+              -6,
+              0,
+              -6
+            ],
+            "size": [
+              12,
+              16,
+              12
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('minecraft:multi_block_part') > 0",
+        "components": {
+          "minecraft:collision_box": {
+            "origin": [
+              -3,
+              0,
+              -3
+            ],
+            "size": [
+              6,
+              16,
+              6
+            ]
+          },
+          "minecraft:selection_box": {
+            "origin": [
+              -3,
+              0,
+              -3
+            ],
+            "size": [
+              6,
+              16,
+              6
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:spin') == 0",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "alpha_test"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "alpha_test"
+            },
+            "hazard": {
+              "texture": "tc_hazard",
+              "render_method": "alpha_test"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "alpha_test"
+            },
+            "panel": {
+              "texture": "tc_panel",
+              "render_method": "alpha_test"
+            },
+            "led": {
+              "texture": "tc_led_red",
+              "render_method": "alpha_test"
+            },
+            "rotor": {
+              "texture": "tc_rotor2",
+              "render_method": "alpha_test"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:spin') == 1",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "alpha_test"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "alpha_test"
+            },
+            "hazard": {
+              "texture": "tc_hazard",
+              "render_method": "alpha_test"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "alpha_test"
+            },
+            "panel": {
+              "texture": "tc_panel",
+              "render_method": "alpha_test"
+            },
+            "led": {
+              "texture": "tc_led_red",
+              "render_method": "alpha_test"
+            },
+            "rotor": {
+              "texture": "tc_rotor2_slow",
+              "render_method": "alpha_test"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:spin') == 2",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "alpha_test"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "alpha_test"
+            },
+            "hazard": {
+              "texture": "tc_hazard",
+              "render_method": "alpha_test"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "alpha_test"
+            },
+            "panel": {
+              "texture": "tc_panel",
+              "render_method": "alpha_test"
+            },
+            "led": {
+              "texture": "tc_led_red",
+              "render_method": "alpha_test"
+            },
+            "rotor": {
+              "texture": "tc_rotor2_med",
+              "render_method": "alpha_test"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:spin') == 3",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "alpha_test"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "alpha_test"
+            },
+            "hazard": {
+              "texture": "tc_hazard",
+              "render_method": "alpha_test"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "alpha_test"
+            },
+            "panel": {
+              "texture": "tc_panel",
+              "render_method": "alpha_test"
+            },
+            "led": {
+              "texture": "tc_led_red",
+              "render_method": "alpha_test"
+            },
+            "rotor": {
+              "texture": "tc_rotor2_fast",
+              "render_method": "alpha_test"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

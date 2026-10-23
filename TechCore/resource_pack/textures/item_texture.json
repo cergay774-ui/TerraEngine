@@ -1,0 +1,156 @@
+{
+  "resource_pack_name": "techcore",
+  "texture_name": "atlas.items",
+  "texture_data": {
+    "techcore:iron_dust": {
+      "textures": "textures/techcore/items/iron_dust"
+    },
+    "techcore:gold_dust": {
+      "textures": "textures/techcore/items/gold_dust"
+    },
+    "techcore:copper_dust": {
+      "textures": "textures/techcore/items/copper_dust"
+    },
+    "techcore:coal_dust": {
+      "textures": "textures/techcore/items/coal_dust"
+    },
+    "techcore:diamond_dust": {
+      "textures": "textures/techcore/items/diamond_dust"
+    },
+    "techcore:quartz_dust": {
+      "textures": "textures/techcore/items/quartz_dust"
+    },
+    "techcore:ender_dust": {
+      "textures": "textures/techcore/items/ender_dust"
+    },
+    "techcore:biomass": {
+      "textures": "textures/techcore/items/biomass"
+    },
+    "techcore:bitumen": {
+      "textures": "textures/techcore/items/bitumen"
+    },
+    "techcore:steel_ingot": {
+      "textures": "textures/techcore/items/steel_ingot"
+    },
+    "techcore:silicon": {
+      "textures": "textures/techcore/items/silicon"
+    },
+    "techcore:carbon_composite": {
+      "textures": "textures/techcore/items/carbon_composite"
+    },
+    "techcore:superconductor_ingot": {
+      "textures": "textures/techcore/items/superconductor_ingot"
+    },
+    "techcore:iron_plate": {
+      "textures": "textures/techcore/items/iron_plate"
+    },
+    "techcore:copper_plate": {
+      "textures": "textures/techcore/items/copper_plate"
+    },
+    "techcore:gold_plate": {
+      "textures": "textures/techcore/items/gold_plate"
+    },
+    "techcore:steel_plate": {
+      "textures": "textures/techcore/items/steel_plate"
+    },
+    "techcore:iron_gear": {
+      "textures": "textures/techcore/items/iron_gear"
+    },
+    "techcore:steel_gear": {
+      "textures": "textures/techcore/items/steel_gear"
+    },
+    "techcore:steel_shaft": {
+      "textures": "textures/techcore/items/steel_shaft"
+    },
+    "techcore:copper_coil": {
+      "textures": "textures/techcore/items/copper_coil"
+    },
+    "techcore:bearing": {
+      "textures": "textures/techcore/items/bearing"
+    },
+    "techcore:machine_casing": {
+      "textures": "textures/techcore/items/machine_casing"
+    },
+    "techcore:steel_casing": {
+      "textures": "textures/techcore/items/steel_casing"
+    },
+    "techcore:motor": {
+      "textures": "textures/techcore/items/motor"
+    },
+    "techcore:engine": {
+      "textures": "textures/techcore/items/engine"
+    },
+    "techcore:fuel_tank_part": {
+      "textures": "textures/techcore/items/fuel_tank_part"
+    },
+    "techcore:radiator": {
+      "textures": "textures/techcore/items/radiator"
+    },
+    "techcore:turbine_blade": {
+      "textures": "textures/techcore/items/turbine_blade"
+    },
+    "techcore:composite_blade": {
+      "textures": "textures/techcore/items/composite_blade"
+    },
+    "techcore:battery_cell": {
+      "textures": "textures/techcore/items/battery_cell"
+    },
+    "techcore:circuit_basic": {
+      "textures": "textures/techcore/items/circuit_basic"
+    },
+    "techcore:circuit_advanced": {
+      "textures": "textures/techcore/items/circuit_advanced"
+    },
+    "techcore:processor": {
+      "textures": "textures/techcore/items/processor"
+    },
+    "techcore:control_module_1": {
+      "textures": "textures/techcore/items/control_module_1"
+    },
+    "techcore:control_module_2": {
+      "textures": "textures/techcore/items/control_module_2"
+    },
+    "techcore:control_module_3": {
+      "textures": "textures/techcore/items/control_module_3"
+    },
+    "techcore:control_module_4": {
+      "textures": "textures/techcore/items/control_module_4"
+    },
+    "techcore:control_module_5": {
+      "textures": "textures/techcore/items/control_module_5"
+    },
+    "techcore:canister": {
+      "textures": "textures/techcore/items/canister"
+    },
+    "techcore:canister_diesel": {
+      "textures": "textures/techcore/items/canister_diesel"
+    },
+    "techcore:canister_gasoline": {
+      "textures": "textures/techcore/items/canister_gasoline"
+    },
+    "techcore:canister_biofuel": {
+      "textures": "textures/techcore/items/canister_biofuel"
+    },
+    "techcore:engineer_goggles": {
+      "textures": "textures/techcore/items/engineer_goggles"
+    },
+    "techcore:wrench": {
+      "textures": "textures/techcore/items/wrench"
+    },
+    "techcore:assembler_packed_t1": {
+      "textures": "textures/techcore/items/assembler_packed_t1"
+    },
+    "techcore:assembler_packed_t2": {
+      "textures": "textures/techcore/items/assembler_packed_t2"
+    },
+    "techcore:assembler_packed_t3": {
+      "textures": "textures/techcore/items/assembler_packed_t3"
+    },
+    "techcore:assembler_packed_t4": {
+      "textures": "textures/techcore/items/assembler_packed_t4"
+    },
+    "techcore:assembler_packed_t5": {
+      "textures": "textures/techcore/items/assembler_packed_t5"
+    }
+  }
+}

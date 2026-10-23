@@ -1,0 +1,663 @@
+{
+  "format_version": "1.26.50",
+  "minecraft:block": {
+    "description": {
+      "identifier": "techcore:fuel_tank",
+      "menu_category": {
+        "category": "items"
+      },
+      "states": {
+        "techcore:fluid": {
+          "values": {
+            "min": 0,
+            "max": 3
+          }
+        },
+        "techcore:level": {
+          "values": {
+            "min": 0,
+            "max": 4
+          }
+        }
+      },
+      "traits": {
+        "minecraft:placement_direction": {
+          "enabled_states": [
+            "minecraft:cardinal_direction"
+          ],
+          "y_rotation_offset": 180
+        }
+      }
+    },
+    "components": {
+      "minecraft:geometry": "geometry.techcore.fuel_tank",
+      "minecraft:material_instances": {
+        "*": {
+          "texture": "tc_frame",
+          "render_method": "opaque"
+        },
+        "frame": {
+          "texture": "tc_frame",
+          "render_method": "opaque"
+        },
+        "tank_white": {
+          "texture": "tc_tank_white",
+          "render_method": "opaque"
+        },
+        "steel": {
+          "texture": "tc_steel",
+          "render_method": "opaque"
+        },
+        "window": {
+          "texture": "tc_tank_w_0",
+          "render_method": "opaque"
+        }
+      },
+      "minecraft:destructible_by_mining": {
+        "seconds_to_destroy": 2.5
+      },
+      "minecraft:destructible_by_explosion": {
+        "explosion_resistance": 15
+      },
+      "minecraft:light_dampening": 0,
+      "minecraft:map_color": "#dfe3e6",
+      "minecraft:movable": {
+        "movement_type": "immovable"
+      },
+      "minecraft:sound": {
+        "sound": "metal"
+      },
+      "techcore:machine": {}
+    },
+    "permutations": [
+      {
+        "condition": "q.block_state('minecraft:cardinal_direction') == 'south'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('minecraft:cardinal_direction') == 'east'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [
+              0,
+              90,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('minecraft:cardinal_direction') == 'north'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [
+              0,
+              180,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('minecraft:cardinal_direction') == 'west'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [
+              0,
+              -90,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 0 && q.block_state('techcore:level') == 0",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_0",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 0 && q.block_state('techcore:level') == 1",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_0",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 0 && q.block_state('techcore:level') == 2",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_0",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 0 && q.block_state('techcore:level') == 3",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_0",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 0 && q.block_state('techcore:level') == 4",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_0",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 1 && q.block_state('techcore:level') == 0",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_0",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 1 && q.block_state('techcore:level') == 1",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_1_1",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 1 && q.block_state('techcore:level') == 2",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_1_2",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 1 && q.block_state('techcore:level') == 3",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_1_3",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 1 && q.block_state('techcore:level') == 4",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_1_4",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 2 && q.block_state('techcore:level') == 0",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_0",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 2 && q.block_state('techcore:level') == 1",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_2_1",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 2 && q.block_state('techcore:level') == 2",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_2_2",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 2 && q.block_state('techcore:level') == 3",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_2_3",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 2 && q.block_state('techcore:level') == 4",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_2_4",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 3 && q.block_state('techcore:level') == 0",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_0",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 3 && q.block_state('techcore:level') == 1",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_3_1",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 3 && q.block_state('techcore:level') == 2",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_3_2",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 3 && q.block_state('techcore:level') == 3",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_3_3",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:fluid') == 3 && q.block_state('techcore:level') == 4",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "tank_white": {
+              "texture": "tc_tank_white",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "window": {
+              "texture": "tc_tank_w_3_4",
+              "render_method": "opaque"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

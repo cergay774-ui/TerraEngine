@@ -1,0 +1,45 @@
+{
+  "format_version": 3,
+  "header": {
+    "name": "pack.name",
+    "description": "pack.description",
+    "uuid": "2b9230b4-94f7-45ec-8aee-1f73342d4eb6",
+    "version": "1.0.0",
+    "min_engine_version": "1.26.50"
+  },
+  "modules": [
+    {
+      "type": "data",
+      "uuid": "0e910dc2-fa8c-44cf-bf5d-7b5909e38a6a",
+      "version": "1.0.0"
+    },
+    {
+      "type": "script",
+      "language": "javascript",
+      "entry": "scripts/main.js",
+      "uuid": "e7bbd6aa-fce5-4a6a-86eb-8bfdaf6ef1ed",
+      "version": "1.0.0"
+    }
+  ],
+  "dependencies": [
+    {
+      "uuid": "62ef15f6-98d8-45d9-b8a6-881614cb55cd",
+      "version": "1.0.0"
+    },
+    {
+      "module_name": "@minecraft/server",
+      "version": "2.10.0"
+    },
+    {
+      "module_name": "@minecraft/server-ui",
+      "version": "2.2.0"
+    }
+  ],
+  "metadata": {
+    "authors": [
+      "TechCore"
+    ],
+    "license": "MIT",
+    "product_type": "addon"
+  }
+}

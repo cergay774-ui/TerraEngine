@@ -1,0 +1,36 @@
+{
+  "format_version": "1.21.70",
+  "minecraft:recipe_shaped": {
+    "description": {
+      "identifier": "techcore:ultimate_assembler"
+    },
+    "tags": [
+      "crafting_table"
+    ],
+    "pattern": [
+      "DGD",
+      "IDI",
+      "DGD"
+    ],
+    "key": {
+      "D": {
+        "item": "minecraft:diamond"
+      },
+      "G": {
+        "item": "techcore:iron_gear"
+      },
+      "I": {
+        "item": "minecraft:gold_ingot"
+      }
+    },
+    "unlock": [
+      {
+        "item": "techcore:iron_gear"
+      }
+    ],
+    "result": {
+      "item": "techcore:ultimate_assembler",
+      "count": 1
+    }
+  }
+}

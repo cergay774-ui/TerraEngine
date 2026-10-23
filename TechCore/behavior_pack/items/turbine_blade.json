@@ -1,0 +1,18 @@
+{
+  "format_version": "1.26.50",
+  "minecraft:item": {
+    "description": {
+      "identifier": "techcore:turbine_blade",
+      "menu_category": {
+        "category": "items"
+      }
+    },
+    "components": {
+      "minecraft:icon": "techcore:turbine_blade",
+      "minecraft:display_name": {
+        "value": "item.techcore:turbine_blade"
+      },
+      "minecraft:max_stack_size": 64
+    }
+  }
+}

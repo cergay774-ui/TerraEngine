@@ -1,0 +1,18 @@
+{
+  "format_version": "1.26.50",
+  "minecraft:item": {
+    "description": {
+      "identifier": "techcore:canister",
+      "menu_category": {
+        "category": "items"
+      }
+    },
+    "components": {
+      "minecraft:icon": "techcore:canister",
+      "minecraft:display_name": {
+        "value": "item.techcore:canister"
+      },
+      "minecraft:max_stack_size": 16
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "format_version": "1.26.50",
+  "minecraft:item": {
+    "description": {
+      "identifier": "techcore:engineer_goggles",
+      "menu_category": {
+        "category": "equipment"
+      }
+    },
+    "components": {
+      "minecraft:icon": "techcore:engineer_goggles",
+      "minecraft:display_name": {
+        "value": "item.techcore:engineer_goggles"
+      },
+      "minecraft:max_stack_size": 1,
+      "minecraft:wearable": {
+        "slot": "slot.armor.head",
+        "protection": 1
+      },
+      "minecraft:allow_off_hand": true
+    }
+  }
+}

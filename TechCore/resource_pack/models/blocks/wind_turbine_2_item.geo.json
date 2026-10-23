@@ -1,0 +1,296 @@
+{
+  "format_version": "1.21.0",
+  "minecraft:geometry": [
+    {
+      "description": {
+        "identifier": "geometry.techcore.wind_turbine_2_item",
+        "texture_width": 16,
+        "texture_height": 16,
+        "visible_bounds_width": 3,
+        "visible_bounds_height": 3,
+        "visible_bounds_offset": [
+          0,
+          0.75,
+          0
+        ]
+      },
+      "bones": [
+        {
+          "name": "all",
+          "pivot": [
+            0,
+            0,
+            0
+          ],
+          "cubes": [
+            {
+              "origin": [
+                -3,
+                0,
+                -3
+              ],
+              "size": [
+                6,
+                1,
+                6
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    3,
+                    9
+                  ],
+                  "uv_size": [
+                    6,
+                    1
+                  ],
+                  "material_instance": "frame"
+                },
+                "south": {
+                  "uv": [
+                    3,
+                    9
+                  ],
+                  "uv_size": [
+                    6,
+                    1
+                  ],
+                  "material_instance": "frame"
+                },
+                "east": {
+                  "uv": [
+                    3,
+                    9
+                  ],
+                  "uv_size": [
+                    6,
+                    1
+                  ],
+                  "material_instance": "frame"
+                },
+                "west": {
+                  "uv": [
+                    3,
+                    9
+                  ],
+                  "uv_size": [
+                    6,
+                    1
+                  ],
+                  "material_instance": "frame"
+                },
+                "up": {
+                  "uv": [
+                    3,
+                    9
+                  ],
+                  "uv_size": [
+                    6,
+                    6
+                  ],
+                  "material_instance": "frame"
+                },
+                "down": {
+                  "uv": [
+                    3,
+                    9
+                  ],
+                  "uv_size": [
+                    6,
+                    6
+                  ],
+                  "material_instance": "frame"
+                }
+              }
+            },
+            {
+              "origin": [
+                -0.5,
+                1,
+                -0.5
+              ],
+              "size": [
+                1,
+                9,
+                1
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    10,
+                    2
+                  ],
+                  "uv_size": [
+                    1,
+                    9
+                  ],
+                  "material_instance": "steel"
+                },
+                "south": {
+                  "uv": [
+                    10,
+                    2
+                  ],
+                  "uv_size": [
+                    1,
+                    9
+                  ],
+                  "material_instance": "steel"
+                },
+                "east": {
+                  "uv": [
+                    10,
+                    2
+                  ],
+                  "uv_size": [
+                    1,
+                    9
+                  ],
+                  "material_instance": "steel"
+                },
+                "west": {
+                  "uv": [
+                    10,
+                    2
+                  ],
+                  "uv_size": [
+                    1,
+                    9
+                  ],
+                  "material_instance": "steel"
+                },
+                "up": {
+                  "uv": [
+                    10,
+                    2
+                  ],
+                  "uv_size": [
+                    1,
+                    1
+                  ],
+                  "material_instance": "steel"
+                },
+                "down": {
+                  "uv": [
+                    10,
+                    2
+                  ],
+                  "uv_size": [
+                    1,
+                    1
+                  ],
+                  "material_instance": "steel"
+                }
+              }
+            },
+            {
+              "origin": [
+                -1,
+                10,
+                -2.5
+              ],
+              "size": [
+                2,
+                2,
+                4.5
+              ],
+              "uv": {
+                "north": {
+                  "uv": [
+                    12,
+                    14
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "panel"
+                },
+                "south": {
+                  "uv": [
+                    12,
+                    14
+                  ],
+                  "uv_size": [
+                    2,
+                    2
+                  ],
+                  "material_instance": "panel"
+                },
+                "east": {
+                  "uv": [
+                    9,
+                    14
+                  ],
+                  "uv_size": [
+                    4.5,
+                    2
+                  ],
+                  "material_instance": "panel"
+                },
+                "west": {
+                  "uv": [
+                    9,
+                    14
+                  ],
+                  "uv_size": [
+                    4.5,
+                    2
+                  ],
+                  "material_instance": "panel"
+                },
+                "up": {
+                  "uv": [
+                    12,
+                    5
+                  ],
+                  "uv_size": [
+                    2,
+                    4.5
+                  ],
+                  "material_instance": "panel"
+                },
+                "down": {
+                  "uv": [
+                    12,
+                    5
+                  ],
+                  "uv_size": [
+                    2,
+                    4.5
+                  ],
+                  "material_instance": "panel"
+                }
+              }
+            },
+            {
+              "origin": [
+                -6,
+                5,
+                2.2
+              ],
+              "size": [
+                12,
+                12,
+                0
+              ],
+              "uv": {
+                "south": {
+                  "uv": [
+                    0,
+                    0
+                  ],
+                  "uv_size": [
+                    16,
+                    16
+                  ],
+                  "material_instance": "rotor"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

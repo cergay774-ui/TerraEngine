@@ -1,0 +1,266 @@
+{
+  "resource_pack_name": "techcore",
+  "texture_name": "atlas.terrain",
+  "padding": 8,
+  "num_mip_levels": 4,
+  "texture_data": {
+    "tc_frame": {
+      "textures": "textures/techcore/blocks/frame"
+    },
+    "tc_panel": {
+      "textures": "textures/techcore/blocks/panel"
+    },
+    "tc_vent": {
+      "textures": "textures/techcore/blocks/vent"
+    },
+    "tc_steel": {
+      "textures": "textures/techcore/blocks/steel"
+    },
+    "tc_copper": {
+      "textures": "textures/techcore/blocks/copper"
+    },
+    "tc_gold": {
+      "textures": "textures/techcore/blocks/gold"
+    },
+    "tc_hazard": {
+      "textures": "textures/techcore/blocks/hazard"
+    },
+    "tc_rubber": {
+      "textures": "textures/techcore/blocks/rubber"
+    },
+    "tc_insul": {
+      "textures": "textures/techcore/blocks/insul"
+    },
+    "tc_crate": {
+      "textures": "textures/techcore/blocks/crate"
+    },
+    "tc_cargo": {
+      "textures": "textures/techcore/blocks/cargo"
+    },
+    "tc_pipe": {
+      "textures": "textures/techcore/blocks/pipe"
+    },
+    "tc_tank_red": {
+      "textures": "textures/techcore/blocks/tank_red"
+    },
+    "tc_tank_white": {
+      "textures": "textures/techcore/blocks/tank_white"
+    },
+    "tc_glass_dark": {
+      "textures": "textures/techcore/blocks/glass_dark"
+    },
+    "tc_glass_green": {
+      "textures": "textures/techcore/blocks/glass_green"
+    },
+    "tc_glass_amber": {
+      "textures": "textures/techcore/blocks/glass_amber"
+    },
+    "tc_screen_idle": {
+      "textures": "textures/techcore/blocks/screen_idle"
+    },
+    "tc_screen_ok": {
+      "textures": "textures/techcore/blocks/screen_ok"
+    },
+    "tc_screen_warn": {
+      "textures": "textures/techcore/blocks/screen_warn"
+    },
+    "tc_screen_err": {
+      "textures": "textures/techcore/blocks/screen_err"
+    },
+    "tc_led_off": {
+      "textures": "textures/techcore/blocks/led_off"
+    },
+    "tc_led_green": {
+      "textures": "textures/techcore/blocks/led_green"
+    },
+    "tc_led_yellow": {
+      "textures": "textures/techcore/blocks/led_yellow"
+    },
+    "tc_led_red": {
+      "textures": "textures/techcore/blocks/led_red"
+    },
+    "tc_fire_off": {
+      "textures": "textures/techcore/blocks/fire_off"
+    },
+    "tc_fire_anim": {
+      "textures": "textures/techcore/blocks/fire_anim"
+    },
+    "tc_glow_off": {
+      "textures": "textures/techcore/blocks/glow_off"
+    },
+    "tc_glow_anim": {
+      "textures": "textures/techcore/blocks/glow_anim"
+    },
+    "tc_roller": {
+      "textures": "textures/techcore/blocks/roller"
+    },
+    "tc_roller_anim": {
+      "textures": "textures/techcore/blocks/roller_anim"
+    },
+    "tc_chuck": {
+      "textures": "textures/techcore/blocks/chuck"
+    },
+    "tc_chuck_anim": {
+      "textures": "textures/techcore/blocks/chuck_anim"
+    },
+    "tc_drill": {
+      "textures": "textures/techcore/blocks/drill"
+    },
+    "tc_drill_anim": {
+      "textures": "textures/techcore/blocks/drill_anim"
+    },
+    "tc_belt": {
+      "textures": "textures/techcore/blocks/belt"
+    },
+    "tc_belt_anim": {
+      "textures": "textures/techcore/blocks/belt_anim"
+    },
+    "tc_accent_t0": {
+      "textures": "textures/techcore/blocks/accent_t0"
+    },
+    "tc_accent_t1": {
+      "textures": "textures/techcore/blocks/accent_t1"
+    },
+    "tc_accent_t2": {
+      "textures": "textures/techcore/blocks/accent_t2"
+    },
+    "tc_accent_t3": {
+      "textures": "textures/techcore/blocks/accent_t3"
+    },
+    "tc_accent_t4": {
+      "textures": "textures/techcore/blocks/accent_t4"
+    },
+    "tc_accent_t5": {
+      "textures": "textures/techcore/blocks/accent_t5"
+    },
+    "tc_wire_copper": {
+      "textures": "textures/techcore/blocks/wire_copper"
+    },
+    "tc_wire_insulated": {
+      "textures": "textures/techcore/blocks/wire_insulated"
+    },
+    "tc_wire_reinforced": {
+      "textures": "textures/techcore/blocks/wire_reinforced"
+    },
+    "tc_wire_super": {
+      "textures": "textures/techcore/blocks/wire_super"
+    },
+    "tc_core": {
+      "textures": "textures/techcore/blocks/core"
+    },
+    "tc_tank_w_0": {
+      "textures": "textures/techcore/blocks/tank_w_0"
+    },
+    "tc_tank_w_1_1": {
+      "textures": "textures/techcore/blocks/tank_w_1_1"
+    },
+    "tc_tank_w_1_2": {
+      "textures": "textures/techcore/blocks/tank_w_1_2"
+    },
+    "tc_tank_w_1_3": {
+      "textures": "textures/techcore/blocks/tank_w_1_3"
+    },
+    "tc_tank_w_1_4": {
+      "textures": "textures/techcore/blocks/tank_w_1_4"
+    },
+    "tc_tank_w_2_1": {
+      "textures": "textures/techcore/blocks/tank_w_2_1"
+    },
+    "tc_tank_w_2_2": {
+      "textures": "textures/techcore/blocks/tank_w_2_2"
+    },
+    "tc_tank_w_2_3": {
+      "textures": "textures/techcore/blocks/tank_w_2_3"
+    },
+    "tc_tank_w_2_4": {
+      "textures": "textures/techcore/blocks/tank_w_2_4"
+    },
+    "tc_tank_w_3_1": {
+      "textures": "textures/techcore/blocks/tank_w_3_1"
+    },
+    "tc_tank_w_3_2": {
+      "textures": "textures/techcore/blocks/tank_w_3_2"
+    },
+    "tc_tank_w_3_3": {
+      "textures": "textures/techcore/blocks/tank_w_3_3"
+    },
+    "tc_tank_w_3_4": {
+      "textures": "textures/techcore/blocks/tank_w_3_4"
+    },
+    "tc_battery_0": {
+      "textures": "textures/techcore/blocks/battery_0"
+    },
+    "tc_battery_1": {
+      "textures": "textures/techcore/blocks/battery_1"
+    },
+    "tc_battery_2": {
+      "textures": "textures/techcore/blocks/battery_2"
+    },
+    "tc_battery_3": {
+      "textures": "textures/techcore/blocks/battery_3"
+    },
+    "tc_battery_4": {
+      "textures": "textures/techcore/blocks/battery_4"
+    },
+    "tc_rotor1": {
+      "textures": "textures/techcore/blocks/rotor1"
+    },
+    "tc_rotor1_slow": {
+      "textures": "textures/techcore/blocks/rotor1_anim"
+    },
+    "tc_rotor1_med": {
+      "textures": "textures/techcore/blocks/rotor1_anim"
+    },
+    "tc_rotor1_fast": {
+      "textures": "textures/techcore/blocks/rotor1_anim"
+    },
+    "tc_rotor2": {
+      "textures": "textures/techcore/blocks/rotor2"
+    },
+    "tc_rotor2_slow": {
+      "textures": "textures/techcore/blocks/rotor2_anim"
+    },
+    "tc_rotor2_med": {
+      "textures": "textures/techcore/blocks/rotor2_anim"
+    },
+    "tc_rotor2_fast": {
+      "textures": "textures/techcore/blocks/rotor2_anim"
+    },
+    "tc_rotor3": {
+      "textures": "textures/techcore/blocks/rotor3"
+    },
+    "tc_rotor3_slow": {
+      "textures": "textures/techcore/blocks/rotor3_anim"
+    },
+    "tc_rotor3_med": {
+      "textures": "textures/techcore/blocks/rotor3_anim"
+    },
+    "tc_rotor3_fast": {
+      "textures": "textures/techcore/blocks/rotor3_anim"
+    },
+    "tc_rotor4": {
+      "textures": "textures/techcore/blocks/rotor4"
+    },
+    "tc_rotor4_slow": {
+      "textures": "textures/techcore/blocks/rotor4_anim"
+    },
+    "tc_rotor4_med": {
+      "textures": "textures/techcore/blocks/rotor4_anim"
+    },
+    "tc_rotor4_fast": {
+      "textures": "textures/techcore/blocks/rotor4_anim"
+    },
+    "tc_rotor5": {
+      "textures": "textures/techcore/blocks/rotor5"
+    },
+    "tc_rotor5_slow": {
+      "textures": "textures/techcore/blocks/rotor5_anim"
+    },
+    "tc_rotor5_med": {
+      "textures": "textures/techcore/blocks/rotor5_anim"
+    },
+    "tc_rotor5_fast": {
+      "textures": "textures/techcore/blocks/rotor5_anim"
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "format_version": 3,
+  "header": {
+    "name": "pack.name",
+    "description": "pack.description",
+    "uuid": "62ef15f6-98d8-45d9-b8a6-881614cb55cd",
+    "version": "1.0.0",
+    "min_engine_version": "1.26.50",
+    "pack_scope": "world"
+  },
+  "modules": [
+    {
+      "type": "resources",
+      "uuid": "ee4d2f1d-366c-4ffe-852e-2a48d84c1c49",
+      "version": "1.0.0"
+    }
+  ],
+  "dependencies": [
+    {
+      "uuid": "2b9230b4-94f7-45ec-8aee-1f73342d4eb6",
+      "version": "1.0.0"
+    }
+  ],
+  "capabilities": [
+    "pbr"
+  ],
+  "metadata": {
+    "authors": [
+      "TechCore"
+    ],
+    "license": "MIT",
+    "product_type": "addon"
+  }
+}

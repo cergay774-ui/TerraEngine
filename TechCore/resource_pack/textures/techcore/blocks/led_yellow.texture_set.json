@@ -1,0 +1,7 @@
+{
+  "format_version": "1.16.100",
+  "minecraft:texture_set": {
+    "color": "led_yellow",
+    "metalness_emissive_roughness": "led_yellow_mer"
+  }
+}

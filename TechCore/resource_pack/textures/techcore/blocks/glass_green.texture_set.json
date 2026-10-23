@@ -1,0 +1,11 @@
+{
+  "format_version": "1.16.100",
+  "minecraft:texture_set": {
+    "color": "glass_green",
+    "metalness_emissive_roughness": [
+      20,
+      0,
+      40
+    ]
+  }
+}

@@ -1,0 +1,257 @@
+{
+  "format_version": "1.26.50",
+  "minecraft:block": {
+    "description": {
+      "identifier": "techcore:press",
+      "menu_category": {
+        "category": "items"
+      },
+      "states": {
+        "techcore:status": {
+          "values": {
+            "min": 0,
+            "max": 3
+          }
+        },
+        "techcore:phase": {
+          "values": {
+            "min": 0,
+            "max": 1
+          }
+        }
+      },
+      "traits": {
+        "minecraft:placement_direction": {
+          "enabled_states": [
+            "minecraft:cardinal_direction"
+          ],
+          "y_rotation_offset": 180
+        }
+      }
+    },
+    "components": {
+      "minecraft:geometry": {
+        "identifier": "geometry.techcore.press",
+        "bone_visibility": {
+          "head_up": "q.block_state('techcore:phase') == 0",
+          "head_down": "q.block_state('techcore:phase') == 1"
+        }
+      },
+      "minecraft:material_instances": {
+        "*": {
+          "texture": "tc_frame",
+          "render_method": "opaque"
+        },
+        "frame": {
+          "texture": "tc_frame",
+          "render_method": "opaque"
+        },
+        "steel": {
+          "texture": "tc_steel",
+          "render_method": "opaque"
+        },
+        "panel": {
+          "texture": "tc_panel",
+          "render_method": "opaque"
+        },
+        "hazard": {
+          "texture": "tc_hazard",
+          "render_method": "opaque"
+        },
+        "led": {
+          "texture": "tc_led_off",
+          "render_method": "opaque"
+        }
+      },
+      "minecraft:destructible_by_mining": {
+        "seconds_to_destroy": 2.5
+      },
+      "minecraft:destructible_by_explosion": {
+        "explosion_resistance": 15
+      },
+      "minecraft:light_dampening": 0,
+      "minecraft:map_color": "#4d535c",
+      "minecraft:movable": {
+        "movement_type": "immovable"
+      },
+      "minecraft:sound": {
+        "sound": "metal"
+      },
+      "techcore:machine": {}
+    },
+    "permutations": [
+      {
+        "condition": "q.block_state('minecraft:cardinal_direction') == 'south'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('minecraft:cardinal_direction') == 'east'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [
+              0,
+              90,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('minecraft:cardinal_direction') == 'north'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [
+              0,
+              180,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('minecraft:cardinal_direction') == 'west'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [
+              0,
+              -90,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:status') == 0",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "panel": {
+              "texture": "tc_panel",
+              "render_method": "opaque"
+            },
+            "hazard": {
+              "texture": "tc_hazard",
+              "render_method": "opaque"
+            },
+            "led": {
+              "texture": "tc_led_off",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:status') == 1",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "panel": {
+              "texture": "tc_panel",
+              "render_method": "opaque"
+            },
+            "hazard": {
+              "texture": "tc_hazard",
+              "render_method": "opaque"
+            },
+            "led": {
+              "texture": "tc_led_green",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:status') == 2",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "panel": {
+              "texture": "tc_panel",
+              "render_method": "opaque"
+            },
+            "hazard": {
+              "texture": "tc_hazard",
+              "render_method": "opaque"
+            },
+            "led": {
+              "texture": "tc_led_yellow",
+              "render_method": "opaque"
+            }
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:status') == 3",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "panel": {
+              "texture": "tc_panel",
+              "render_method": "opaque"
+            },
+            "hazard": {
+              "texture": "tc_hazard",
+              "render_method": "opaque"
+            },
+            "led": {
+              "texture": "tc_led_red",
+              "render_method": "opaque"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

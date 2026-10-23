@@ -1,0 +1,122 @@
+{
+  "format_version": "1.26.50",
+  "minecraft:block": {
+    "description": {
+      "identifier": "techcore:copper_wire",
+      "menu_category": {
+        "category": "items"
+      },
+      "states": {
+        "techcore:c_n": [
+          false,
+          true
+        ],
+        "techcore:c_s": [
+          false,
+          true
+        ],
+        "techcore:c_e": [
+          false,
+          true
+        ],
+        "techcore:c_w": [
+          false,
+          true
+        ],
+        "techcore:c_u": [
+          false,
+          true
+        ],
+        "techcore:c_d": [
+          false,
+          true
+        ]
+      }
+    },
+    "components": {
+      "minecraft:geometry": {
+        "identifier": "geometry.techcore.copper_wire",
+        "bone_visibility": {
+          "arm_n": "q.block_state('techcore:c_n')",
+          "arm_s": "q.block_state('techcore:c_s')",
+          "arm_e": "q.block_state('techcore:c_e')",
+          "arm_w": "q.block_state('techcore:c_w')",
+          "arm_u": "q.block_state('techcore:c_u')",
+          "arm_d": "q.block_state('techcore:c_d')"
+        }
+      },
+      "minecraft:material_instances": {
+        "*": {
+          "texture": "tc_frame",
+          "render_method": "opaque"
+        },
+        "wire": {
+          "texture": "tc_wire_copper",
+          "render_method": "opaque"
+        }
+      },
+      "minecraft:destructible_by_mining": {
+        "seconds_to_destroy": 0.8
+      },
+      "minecraft:destructible_by_explosion": {
+        "explosion_resistance": 15
+      },
+      "minecraft:light_dampening": 0,
+      "minecraft:map_color": "#b8673c",
+      "minecraft:movable": {
+        "movement_type": "immovable"
+      },
+      "minecraft:sound": {
+        "sound": "metal"
+      },
+      "techcore:connector": {},
+      "minecraft:collision_box": {
+        "origin": [
+          -3,
+          5,
+          -3
+        ],
+        "size": [
+          6,
+          6,
+          6
+        ]
+      },
+      "minecraft:selection_box": {
+        "origin": [
+          -4,
+          4,
+          -4
+        ],
+        "size": [
+          8,
+          8,
+          8
+        ]
+      },
+      "minecraft:item_visual": {
+        "geometry": {
+          "identifier": "geometry.techcore.copper_wire",
+          "bone_visibility": {
+            "arm_n": false,
+            "arm_s": false,
+            "arm_e": true,
+            "arm_w": true,
+            "arm_u": false,
+            "arm_d": false
+          }
+        },
+        "material_instances": {
+          "*": {
+            "texture": "tc_frame",
+            "render_method": "opaque"
+          },
+          "wire": {
+            "texture": "tc_wire_copper",
+            "render_method": "opaque"
+          }
+        }
+      }
+    }
+  }
+}

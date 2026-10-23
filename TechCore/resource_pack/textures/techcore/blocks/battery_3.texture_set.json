@@ -1,0 +1,7 @@
+{
+  "format_version": "1.16.100",
+  "minecraft:texture_set": {
+    "color": "battery_3",
+    "metalness_emissive_roughness": "battery_3_mer"
+  }
+}

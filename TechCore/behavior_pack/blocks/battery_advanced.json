@@ -1,0 +1,330 @@
+{
+  "format_version": "1.26.50",
+  "minecraft:block": {
+    "description": {
+      "identifier": "techcore:battery_advanced",
+      "menu_category": {
+        "category": "items"
+      },
+      "states": {
+        "techcore:level": {
+          "values": {
+            "min": 0,
+            "max": 4
+          }
+        }
+      },
+      "traits": {
+        "minecraft:placement_direction": {
+          "enabled_states": [
+            "minecraft:cardinal_direction"
+          ],
+          "y_rotation_offset": 180
+        }
+      }
+    },
+    "components": {
+      "minecraft:geometry": "geometry.techcore.battery_advanced",
+      "minecraft:material_instances": {
+        "*": {
+          "texture": "tc_frame",
+          "render_method": "opaque"
+        },
+        "frame": {
+          "texture": "tc_frame",
+          "render_method": "opaque"
+        },
+        "vent": {
+          "texture": "tc_vent",
+          "render_method": "opaque"
+        },
+        "steel": {
+          "texture": "tc_steel",
+          "render_method": "opaque"
+        },
+        "level": {
+          "texture": "tc_battery_0",
+          "render_method": "opaque"
+        },
+        "copper": {
+          "texture": "tc_copper",
+          "render_method": "opaque"
+        },
+        "accent": {
+          "texture": "tc_accent_t3",
+          "render_method": "opaque"
+        },
+        "core": {
+          "texture": "tc_core",
+          "render_method": "opaque"
+        }
+      },
+      "minecraft:destructible_by_mining": {
+        "seconds_to_destroy": 2.5
+      },
+      "minecraft:destructible_by_explosion": {
+        "explosion_resistance": 15
+      },
+      "minecraft:light_dampening": 0,
+      "minecraft:map_color": "#2fa39a",
+      "minecraft:movable": {
+        "movement_type": "immovable"
+      },
+      "minecraft:sound": {
+        "sound": "metal"
+      },
+      "techcore:machine": {},
+      "minecraft:light_emission": 4
+    },
+    "permutations": [
+      {
+        "condition": "q.block_state('minecraft:cardinal_direction') == 'south'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [
+              0,
+              0,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('minecraft:cardinal_direction') == 'east'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [
+              0,
+              90,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('minecraft:cardinal_direction') == 'north'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [
+              0,
+              180,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('minecraft:cardinal_direction') == 'west'",
+        "components": {
+          "minecraft:transformation": {
+            "rotation": [
+              0,
+              -90,
+              0
+            ]
+          }
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:level') == 0",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "vent": {
+              "texture": "tc_vent",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "level": {
+              "texture": "tc_battery_0",
+              "render_method": "opaque"
+            },
+            "copper": {
+              "texture": "tc_copper",
+              "render_method": "opaque"
+            },
+            "accent": {
+              "texture": "tc_accent_t3",
+              "render_method": "opaque"
+            },
+            "core": {
+              "texture": "tc_core",
+              "render_method": "opaque"
+            }
+          },
+          "minecraft:light_emission": 4
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:level') == 1",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "vent": {
+              "texture": "tc_vent",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "level": {
+              "texture": "tc_battery_1",
+              "render_method": "opaque"
+            },
+            "copper": {
+              "texture": "tc_copper",
+              "render_method": "opaque"
+            },
+            "accent": {
+              "texture": "tc_accent_t3",
+              "render_method": "opaque"
+            },
+            "core": {
+              "texture": "tc_core",
+              "render_method": "opaque"
+            }
+          },
+          "minecraft:light_emission": 4
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:level') == 2",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "vent": {
+              "texture": "tc_vent",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "level": {
+              "texture": "tc_battery_2",
+              "render_method": "opaque"
+            },
+            "copper": {
+              "texture": "tc_copper",
+              "render_method": "opaque"
+            },
+            "accent": {
+              "texture": "tc_accent_t3",
+              "render_method": "opaque"
+            },
+            "core": {
+              "texture": "tc_core",
+              "render_method": "opaque"
+            }
+          },
+          "minecraft:light_emission": 4
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:level') == 3",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "vent": {
+              "texture": "tc_vent",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "level": {
+              "texture": "tc_battery_3",
+              "render_method": "opaque"
+            },
+            "copper": {
+              "texture": "tc_copper",
+              "render_method": "opaque"
+            },
+            "accent": {
+              "texture": "tc_accent_t3",
+              "render_method": "opaque"
+            },
+            "core": {
+              "texture": "tc_core",
+              "render_method": "opaque"
+            }
+          },
+          "minecraft:light_emission": 4
+        }
+      },
+      {
+        "condition": "q.block_state('techcore:level') == 4",
+        "components": {
+          "minecraft:material_instances": {
+            "*": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "frame": {
+              "texture": "tc_frame",
+              "render_method": "opaque"
+            },
+            "vent": {
+              "texture": "tc_vent",
+              "render_method": "opaque"
+            },
+            "steel": {
+              "texture": "tc_steel",
+              "render_method": "opaque"
+            },
+            "level": {
+              "texture": "tc_battery_4",
+              "render_method": "opaque"
+            },
+            "copper": {
+              "texture": "tc_copper",
+              "render_method": "opaque"
+            },
+            "accent": {
+              "texture": "tc_accent_t3",
+              "render_method": "opaque"
+            },
+            "core": {
+              "texture": "tc_core",
+              "render_method": "opaque"
+            }
+          },
+          "minecraft:light_emission": 4
+        }
+      }
+    ]
+  }
+}

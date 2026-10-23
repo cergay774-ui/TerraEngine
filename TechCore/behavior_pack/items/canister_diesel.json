@@ -1,0 +1,18 @@
+{
+  "format_version": "1.26.50",
+  "minecraft:item": {
+    "description": {
+      "identifier": "techcore:canister_diesel",
+      "menu_category": {
+        "category": "items"
+      }
+    },
+    "components": {
+      "minecraft:icon": "techcore:canister_diesel",
+      "minecraft:display_name": {
+        "value": "item.techcore:canister_diesel"
+      },
+      "minecraft:max_stack_size": 1
+    }
+  }
+}

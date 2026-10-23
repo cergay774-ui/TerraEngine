@@ -1,0 +1,33 @@
+{
+  "format_version": "1.21.70",
+  "minecraft:recipe_shaped": {
+    "description": {
+      "identifier": "techcore:iron_gear"
+    },
+    "tags": [
+      "crafting_table"
+    ],
+    "pattern": [
+      " I ",
+      "INI",
+      " I "
+    ],
+    "key": {
+      "I": {
+        "item": "minecraft:iron_ingot"
+      },
+      "N": {
+        "item": "minecraft:iron_nugget"
+      }
+    },
+    "unlock": [
+      {
+        "item": "minecraft:iron_ingot"
+      }
+    ],
+    "result": {
+      "item": "techcore:iron_gear",
+      "count": 1
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "format_version": "1.16.100",
+  "minecraft:texture_set": {
+    "color": "wire_super",
+    "metalness_emissive_roughness": [
+      100,
+      200,
+      60
+    ]
+  }
+}
