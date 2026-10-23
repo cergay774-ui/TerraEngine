@@ -177,6 +177,31 @@ fun EditorScreen(
     LaunchedEffect(state.selectedClipId) { if (panel != null) closePanel() }
     BackHandler(enabled = panel != null) { closePanel() }
 
+    // Effect sheets also take the timeline's place.
+    var effectSheet by remember { mutableStateOf<EffectSheet?>(null) }
+    var sheetParams by remember { mutableStateOf<Map<String, Float>>(emptyMap()) }
+    fun openEffectParams(target: EffectTarget) {
+        val (effectId, _) = viewModel.effectOf(target) ?: return
+        sheetParams = viewModel.currentEffectParams(target)
+        effectSheet = EffectSheet.Params(target, effectId)
+    }
+    fun openEffects() {
+        val clip = state.selectedClip?.clip
+        effectSheet = when {
+            clip == null -> EffectSheet.Picker(clipId = null)
+            clip.effects.isEmpty() -> EffectSheet.Picker(clipId = clip.id)
+            else -> EffectSheet.ClipList(clip.id)
+        }
+    }
+    fun closeEffectParams(sheet: EffectSheet.Params) {
+        val target = sheet.target
+        effectSheet = if (target is EffectTarget.Clip) EffectSheet.ClipList(target.clipId) else null
+    }
+    BackHandler(enabled = effectSheet != null) {
+        val sheet = effectSheet
+        if (sheet is EffectSheet.Params) closeEffectParams(sheet) else effectSheet = null
+    }
+
     var fullscreen by rememberSaveable { mutableStateOf(false) }
     var showFormat by remember { mutableStateOf(false) }
     BackHandler(enabled = fullscreen) { fullscreen = false }
@@ -335,7 +360,7 @@ fun EditorScreen(
                     }
                     val selectedClip = state.selectedClip?.clip
                     AnimatedContent(
-                        targetState = panel,
+                        targetState = panel ?: effectSheet,
                         transitionSpec = {
                             (slideInVertically { it / 3 } + fadeIn()).togetherWith(slideOutVertically { it / 3 } + fadeOut())
                         },
@@ -343,12 +368,29 @@ fun EditorScreen(
                         modifier = Modifier.navigationBarsPadding(),
                     ) { shown ->
                         val look = panelLook
-                        if (shown == null || selectedClip == null || look == null) {
+                        if (shown is EffectSheet) {
+                            EffectSheetContent(
+                                sheet = shown,
+                                viewModel = viewModel,
+                                state = state,
+                                params = sheetParams,
+                                onParams = { sheetParams = it },
+                                onSheet = { effectSheet = it },
+                                onPicked = { target ->
+                                    sheetParams = emptyMap()
+                                    effectSheet = target
+                                },
+                                onOpenParams = ::openEffectParams,
+                                onCloseParams = ::closeEffectParams,
+                                positionUs = { timeline.positionUs },
+                            )
+                        } else if (shown !is EditorPanel || selectedClip == null || look == null) {
                             Column {
                                 Timeline(
                                     state = timeline,
                                     clips = state.clips,
                                     overlays = state.overlays,
+                                    effects = state.effects,
                                     selectedClipId = state.selectedClipId,
                                     frames = frames,
                                     onScrubStart = viewModel::startScrub,
@@ -359,6 +401,8 @@ fun EditorScreen(
                                     onMove = viewModel::move,
                                     onTrimOverlay = viewModel::trimOverlay,
                                     onMoveOverlay = viewModel::moveOverlay,
+                                    onTrimEffect = viewModel::trimEffect,
+                                    onMoveEffect = viewModel::moveEffect,
                                     onAdd = pickMedia,
                                 )
                                 Box(
@@ -368,16 +412,25 @@ fun EditorScreen(
                                         .padding(horizontal = 16.dp),
                                 ) {
                                     val selected = state.selectedClip
+                                    val selectedEffect = state.selectedEffect
+                                    val effectName = selectedEffect?.let { viewModel.effectDefinition(it.effectId)?.name ?: it.effectId }
                                     Text(
-                                        text = if (selected != null) clipInfoLine(selected) else stringResource(R.string.editor_timeline_hint),
+                                        text = when {
+                                            selectedEffect != null -> stringResource(R.string.editor_effect_info, effectName.orEmpty(), formatDuration(selectedEffect.durationUs))
+                                            selected != null -> clipInfoLine(selected)
+                                            else -> stringResource(R.string.editor_timeline_hint)
+                                        },
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = if (selected != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = if (selected != null || selectedEffect != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                 }
                                 ToolPanel(
-                                    panelKey = state.selectedClip?.let { if (it.isOverlay) "overlay" else "main" } ?: "none",
+                                    panelKey = when {
+                                        state.selectedEffect != null -> "effect"
+                                        else -> state.selectedClip?.let { if (it.isOverlay) "overlay" else "main" } ?: "none"
+                                    },
                                     tools = editorTools(
                                         state = state,
                                         onSplit = { viewModel.split(timeline.positionUs) },
@@ -390,6 +443,11 @@ fun EditorScreen(
                                         onAdd = pickMedia,
                                         onAddOverlay = { overlayPicker.launch(mediaRequest) },
                                         onFormat = { showFormat = true },
+                                        onEffects = ::openEffects,
+                                        onEffectParams = { state.selectedEffect?.let { openEffectParams(EffectTarget.Track(it.id)) } },
+                                        onEffectReplace = {
+                                            state.selectedEffect?.let { effectSheet = EffectSheet.Picker(null, replacing = EffectTarget.Track(it.id)) }
+                                        },
                                     ),
                                     modifier = Modifier.padding(bottom = 4.dp),
                                 )
@@ -640,3 +698,84 @@ private fun Message(title: String) {
         Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
     }
 }
+
+/** The effect picker, an effect's settings or a clip's effect list, in place of the timeline. */
+@Composable
+private fun EffectSheetContent(
+    sheet: EffectSheet,
+    viewModel: EditorViewModel,
+    state: EditorUiState,
+    params: Map<String, Float>,
+    onParams: (Map<String, Float>) -> Unit,
+    onSheet: (EffectSheet?) -> Unit,
+    onPicked: (EffectSheet.Params) -> Unit,
+    onOpenParams: (EffectTarget) -> Unit,
+    onCloseParams: (EffectSheet.Params) -> Unit,
+    positionUs: () -> Long,
+) {
+    when (sheet) {
+        is EffectSheet.Picker -> EffectPickerPanel(
+            catalog = viewModel.effectCatalog,
+            forClip = sheet.clipId != null || sheet.replacing is EffectTarget.Clip,
+            onPick = { definition ->
+                val replacing = sheet.replacing
+                if (replacing != null) {
+                    viewModel.replaceEffect(replacing, definition.id)
+                    onPicked(EffectSheet.Params(replacing, definition.id))
+                } else {
+                    val target = viewModel.addEffect(definition.id, sheet.clipId, positionUs())
+                    if (target != null) onPicked(EffectSheet.Params(target, definition.id))
+                }
+            },
+            onDone = { onSheet(sheet.clipId?.let { id -> EffectSheet.ClipList(id).takeIf { hasClipEffects(state, id) } }) },
+        )
+
+        is EffectSheet.Params -> {
+            val definition = viewModel.effectDefinition(sheet.effectId)
+            if (definition == null) {
+                // Gone (undone or deleted): close the sheet.
+                LaunchedEffect(sheet) { onSheet(null) }
+                return
+            }
+            val target = sheet.target
+            EffectParamsPanel(
+                definition = definition,
+                params = params,
+                onParams = {
+                    onParams(it)
+                    viewModel.previewEffectParams(target, it)
+                },
+                onParamsDone = { viewModel.commitEffectParams(target, it) },
+                onReplace = {
+                    val clipId = (target as? EffectTarget.Clip)?.clipId
+                    onSheet(EffectSheet.Picker(clipId, replacing = target))
+                },
+                onRemove = {
+                    viewModel.removeEffect(target)
+                    onSheet(null)
+                },
+                onDone = { onCloseParams(sheet) },
+            )
+        }
+
+        is EffectSheet.ClipList -> {
+            val clip = state.allClips.firstOrNull { it.clip.id == sheet.clipId }?.clip
+            if (clip == null) {
+                // Gone (undone or deleted): close the sheet.
+                LaunchedEffect(sheet) { onSheet(null) }
+                return
+            }
+            ClipEffectsPanel(
+                effects = clip.effects,
+                nameOf = { id -> viewModel.effectDefinition(id)?.name ?: id },
+                onOpen = { onOpenParams(EffectTarget.Clip(clip.id, it.id)) },
+                onRemove = { viewModel.removeEffect(EffectTarget.Clip(clip.id, it.id)) },
+                onAdd = { onSheet(EffectSheet.Picker(clip.id)) },
+                onDone = { onSheet(null) },
+            )
+        }
+    }
+}
+
+private fun hasClipEffects(state: EditorUiState, clipId: String): Boolean =
+    state.allClips.firstOrNull { it.clip.id == clipId }?.clip?.effects?.isNotEmpty() == true

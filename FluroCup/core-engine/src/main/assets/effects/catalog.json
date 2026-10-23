@@ -1,0 +1,2696 @@
+{
+ "categories": [
+  {
+   "id": "glitch",
+   "name": "Глитч"
+  },
+  {
+   "id": "light",
+   "name": "Свет"
+  },
+  {
+   "id": "flash",
+   "name": "Вспышки"
+  },
+  {
+   "id": "shake",
+   "name": "Тряска"
+  },
+  {
+   "id": "motion",
+   "name": "Движение"
+  },
+  {
+   "id": "blur",
+   "name": "Размытие"
+  },
+  {
+   "id": "distortion",
+   "name": "Искажения"
+  },
+  {
+   "id": "color",
+   "name": "Цвет"
+  },
+  {
+   "id": "retro",
+   "name": "Ретро"
+  },
+  {
+   "id": "stylize",
+   "name": "Стиль"
+  },
+  {
+   "id": "particles",
+   "name": "Частицы"
+  },
+  {
+   "id": "frames",
+   "name": "Рамки"
+  }
+ ],
+ "effects": [
+  {
+   "id": "digital_glitch",
+   "name": "Цифровой глитч",
+   "category": "glitch",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "rgb_shift",
+   "name": "RGB-сдвиг",
+   "category": "glitch",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сдвиг",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.4
+    },
+    {
+     "id": "angle",
+     "name": "Угол",
+     "min": 0.0,
+     "max": 360.0,
+     "default": 0.0
+    }
+   ]
+  },
+  {
+   "id": "chromatic_aberration",
+   "name": "Хроматическая аберрация",
+   "category": "glitch",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "vhs",
+   "name": "VHS",
+   "category": "glitch",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "broken_signal",
+   "name": "Сломанный сигнал",
+   "category": "glitch",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "pixel_sort",
+   "name": "Пиксельная сортировка",
+   "category": "glitch",
+   "params": [
+    {
+     "id": "threshold",
+     "name": "Порог",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.6
+    },
+    {
+     "id": "length",
+     "name": "Длина",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "block_artifacts",
+   "name": "Блочные артефакты",
+   "category": "glitch",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "scanlines",
+   "name": "Сканлайны",
+   "category": "glitch",
+   "params": [
+    {
+     "id": "strength",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "density",
+     "name": "Плотность",
+     "min": 1.0,
+     "max": 8.0,
+     "default": 3.0
+    }
+   ]
+  },
+  {
+   "id": "tv_static",
+   "name": "Помехи ТВ",
+   "category": "glitch",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "line_jitter",
+   "name": "Дрожание строк",
+   "category": "glitch",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "datamosh",
+   "name": "Датамош",
+   "category": "glitch",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "neon_glitch",
+   "name": "Неоновый глитч",
+   "category": "glitch",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 16722902.0
+    }
+   ]
+  },
+  {
+   "id": "light_leak",
+   "name": "Засвет плёнки: тёплый",
+   "category": "light",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 0.5
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 16742973.0
+    }
+   ]
+  },
+  {
+   "id": "light_leak_pink",
+   "name": "Засвет плёнки: розовый",
+   "category": "light",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 0.5
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 16732067.0
+    }
+   ],
+   "shader": "light_leak"
+  },
+  {
+   "id": "light_leak_blue",
+   "name": "Засвет плёнки: синий",
+   "category": "light",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 0.5
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 4033535.0
+    }
+   ],
+   "shader": "light_leak"
+  },
+  {
+   "id": "light_leak_gold",
+   "name": "Засвет плёнки: золотой",
+   "category": "light",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 0.5
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 16761405.0
+    }
+   ],
+   "shader": "light_leak"
+  },
+  {
+   "id": "lens_flare",
+   "name": "Блик линзы",
+   "category": "light",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "x",
+     "name": "Позиция X",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.75
+    },
+    {
+     "id": "y",
+     "name": "Позиция Y",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.75
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 16770736.0
+    }
+   ]
+  },
+  {
+   "id": "bloom",
+   "name": "Свечение (bloom)",
+   "category": "light",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "threshold",
+     "name": "Порог",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.65
+    },
+    {
+     "id": "radius",
+     "name": "Радиус",
+     "min": 1.0,
+     "max": 40.0,
+     "default": 14.0
+    }
+   ]
+  },
+  {
+   "id": "light_rays",
+   "name": "Лучи света",
+   "category": "light",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "x",
+     "name": "Источник X",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "y",
+     "name": "Источник Y",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.85
+    },
+    {
+     "id": "length",
+     "name": "Длина",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.6
+    }
+   ]
+  },
+  {
+   "id": "neon_edges",
+   "name": "Неоновые контуры",
+   "category": "light",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 3073750.0
+    }
+   ]
+  },
+  {
+   "id": "flicker",
+   "name": "Мерцание",
+   "category": "light",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "rainbow_flare",
+   "name": "Радужный блик",
+   "category": "light",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "x",
+     "name": "Позиция X",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.3
+    },
+    {
+     "id": "y",
+     "name": "Позиция Y",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "size",
+     "name": "Размер",
+     "min": 0.1,
+     "max": 1.0,
+     "default": 0.45
+    }
+   ]
+  },
+  {
+   "id": "sun_halo",
+   "name": "Солнечный ореол",
+   "category": "light",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "x",
+     "name": "Позиция X",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "y",
+     "name": "Позиция Y",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.8
+    },
+    {
+     "id": "size",
+     "name": "Размер",
+     "min": 0.1,
+     "max": 1.5,
+     "default": 0.6
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 16762219.0
+    }
+   ]
+  },
+  {
+   "id": "white_flash",
+   "name": "Белая вспышка",
+   "category": "flash",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.9
+    },
+    {
+     "id": "fade",
+     "name": "Затухание",
+     "min": 0.1,
+     "max": 1.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "color_flash",
+   "name": "Цветная вспышка",
+   "category": "flash",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.8
+    },
+    {
+     "id": "fade",
+     "name": "Затухание",
+     "min": 0.1,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 9133302.0
+    }
+   ]
+  },
+  {
+   "id": "strobe",
+   "name": "Стробоскоп",
+   "category": "flash",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.8
+    },
+    {
+     "id": "rate",
+     "name": "Частота, Гц",
+     "min": 1.0,
+     "max": 20.0,
+     "default": 8.0
+    }
+   ]
+  },
+  {
+   "id": "camera_flash",
+   "name": "Вспышка камеры",
+   "category": "flash",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.9
+    }
+   ]
+  },
+  {
+   "id": "beat_flash",
+   "name": "Вспышка в бит",
+   "category": "flash",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "bpm",
+     "name": "Темп, BPM",
+     "min": 60.0,
+     "max": 200.0,
+     "default": 120.0
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 16777215.0
+    }
+   ]
+  },
+  {
+   "id": "double_flash",
+   "name": "Двойная вспышка",
+   "category": "flash",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.9
+    }
+   ]
+  },
+  {
+   "id": "shake_light",
+   "name": "Лёгкая тряска",
+   "category": "shake",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "shake_strong",
+   "name": "Сильная тряска",
+   "category": "shake",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.8
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "earthquake",
+   "name": "Землетрясение",
+   "category": "shake",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.8
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "zoom_shake",
+   "name": "Тряска с зумом",
+   "category": "shake",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "beat_shake",
+   "name": "Тряска в бит",
+   "category": "shake",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "bpm",
+     "name": "Темп, BPM",
+     "min": 60.0,
+     "max": 200.0,
+     "default": 120.0
+    }
+   ]
+  },
+  {
+   "id": "hand_shake",
+   "name": "Дрожание рук",
+   "category": "shake",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 0.7
+    }
+   ]
+  },
+  {
+   "id": "impact",
+   "name": "Удар",
+   "category": "shake",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.9
+    }
+   ]
+  },
+  {
+   "id": "zoom_punch",
+   "name": "Зум-удар",
+   "category": "motion",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    }
+   ]
+  },
+  {
+   "id": "slow_zoom_in",
+   "name": "Плавный наезд",
+   "category": "motion",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.4
+    }
+   ]
+  },
+  {
+   "id": "pulse",
+   "name": "Пульсация",
+   "category": "motion",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.4
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "sway",
+   "name": "Качание",
+   "category": "motion",
+   "params": [
+    {
+     "id": "angle",
+     "name": "Угол",
+     "min": 0.0,
+     "max": 20.0,
+     "default": 5.0
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "spin",
+   "name": "Вращение",
+   "category": "motion",
+   "params": [
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "ken_burns",
+   "name": "Эффект Кена Бёрнса",
+   "category": "motion",
+   "params": [
+    {
+     "id": "zoom",
+     "name": "Наезд",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.35
+    },
+    {
+     "id": "pan_x",
+     "name": "Сдвиг X",
+     "min": -1.0,
+     "max": 1.0,
+     "default": 0.3
+    },
+    {
+     "id": "pan_y",
+     "name": "Сдвиг Y",
+     "min": -1.0,
+     "max": 1.0,
+     "default": 0.1
+    }
+   ]
+  },
+  {
+   "id": "bounce",
+   "name": "Отскок",
+   "category": "motion",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "gaussian_blur",
+   "name": "Размытие",
+   "category": "blur",
+   "params": [
+    {
+     "id": "radius",
+     "name": "Радиус",
+     "min": 0.0,
+     "max": 40.0,
+     "default": 12.0
+    }
+   ]
+  },
+  {
+   "id": "motion_blur",
+   "name": "Размытие движения",
+   "category": "blur",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.4
+    },
+    {
+     "id": "angle",
+     "name": "Угол",
+     "min": 0.0,
+     "max": 360.0,
+     "default": 0.0
+    }
+   ]
+  },
+  {
+   "id": "radial_blur",
+   "name": "Радиальное размытие",
+   "category": "blur",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.4
+    },
+    {
+     "id": "x",
+     "name": "Центр X",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "y",
+     "name": "Центр Y",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "zoom_blur",
+   "name": "Зум-размытие",
+   "category": "blur",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.4
+    },
+    {
+     "id": "x",
+     "name": "Центр X",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "y",
+     "name": "Центр Y",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "tilt_shift",
+   "name": "Тилт-шифт",
+   "category": "blur",
+   "params": [
+    {
+     "id": "focus",
+     "name": "Фокус",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "width",
+     "name": "Ширина",
+     "min": 0.05,
+     "max": 0.6,
+     "default": 0.2
+    },
+    {
+     "id": "radius",
+     "name": "Размытие",
+     "min": 0.0,
+     "max": 30.0,
+     "default": 14.0
+    }
+   ]
+  },
+  {
+   "id": "bokeh",
+   "name": "Боке",
+   "category": "blur",
+   "params": [
+    {
+     "id": "radius",
+     "name": "Радиус",
+     "min": 0.0,
+     "max": 40.0,
+     "default": 16.0
+    },
+    {
+     "id": "highlights",
+     "name": "Блики",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.6
+    }
+   ]
+  },
+  {
+   "id": "vignette_blur",
+   "name": "Размытие по краям",
+   "category": "blur",
+   "params": [
+    {
+     "id": "radius",
+     "name": "Размытие",
+     "min": 0.0,
+     "max": 30.0,
+     "default": 14.0
+    },
+    {
+     "id": "size",
+     "name": "Чёткая зона",
+     "min": 0.1,
+     "max": 1.0,
+     "default": 0.45
+    }
+   ]
+  },
+  {
+   "id": "soft_focus",
+   "name": "Мягкий фокус",
+   "category": "blur",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "frosted_glass",
+   "name": "Матовое стекло",
+   "category": "blur",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "wave",
+   "name": "Волна",
+   "category": "distortion",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.4
+    },
+    {
+     "id": "frequency",
+     "name": "Частота",
+     "min": 1.0,
+     "max": 30.0,
+     "default": 8.0
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "ripple",
+   "name": "Рябь",
+   "category": "distortion",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "x",
+     "name": "Центр X",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "y",
+     "name": "Центр Y",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "swirl",
+   "name": "Водоворот",
+   "category": "distortion",
+   "params": [
+    {
+     "id": "angle",
+     "name": "Закрутка",
+     "min": -10.0,
+     "max": 10.0,
+     "default": 3.0
+    },
+    {
+     "id": "radius",
+     "name": "Радиус",
+     "min": 0.1,
+     "max": 1.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "fisheye",
+   "name": "Рыбий глаз",
+   "category": "distortion",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "bulge",
+   "name": "Выпуклость",
+   "category": "distortion",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "radius",
+     "name": "Радиус",
+     "min": 0.1,
+     "max": 1.0,
+     "default": 0.4
+    },
+    {
+     "id": "x",
+     "name": "Центр X",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "y",
+     "name": "Центр Y",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "pinch",
+   "name": "Сжатие",
+   "category": "distortion",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "radius",
+     "name": "Радиус",
+     "min": 0.1,
+     "max": 1.0,
+     "default": 0.4
+    }
+   ]
+  },
+  {
+   "id": "liquid",
+   "name": "Жидкость",
+   "category": "distortion",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 0.6
+    }
+   ]
+  },
+  {
+   "id": "heat_haze",
+   "name": "Марево",
+   "category": "distortion",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.4
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "mirror",
+   "name": "Зеркало",
+   "category": "distortion",
+   "params": [
+    {
+     "id": "mode",
+     "name": "Режим",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 0.0
+    }
+   ]
+  },
+  {
+   "id": "kaleidoscope",
+   "name": "Калейдоскоп",
+   "category": "distortion",
+   "params": [
+    {
+     "id": "segments",
+     "name": "Сегменты",
+     "min": 2.0,
+     "max": 16.0,
+     "default": 6.0
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 0.3
+    }
+   ]
+  },
+  {
+   "id": "split_screen",
+   "name": "Мультиэкран",
+   "category": "distortion",
+   "params": [
+    {
+     "id": "count",
+     "name": "Копий в ряду",
+     "min": 2.0,
+     "max": 4.0,
+     "default": 2.0
+    }
+   ]
+  },
+  {
+   "id": "glass_tiles",
+   "name": "Стеклянная плитка",
+   "category": "distortion",
+   "params": [
+    {
+     "id": "size",
+     "name": "Размер",
+     "min": 10.0,
+     "max": 120.0,
+     "default": 40.0
+    },
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "twist_shake",
+   "name": "Вихрь",
+   "category": "distortion",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "vignette",
+   "name": "Виньетка",
+   "category": "color",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.6
+    },
+    {
+     "id": "size",
+     "name": "Размер",
+     "min": 0.2,
+     "max": 1.5,
+     "default": 0.75
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 0.0
+    }
+   ]
+  },
+  {
+   "id": "black_white",
+   "name": "Чёрно-белый",
+   "category": "color",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 1.0
+    },
+    {
+     "id": "contrast",
+     "name": "Контраст",
+     "min": 0.5,
+     "max": 2.0,
+     "default": 1.1
+    }
+   ]
+  },
+  {
+   "id": "sepia",
+   "name": "Сепия",
+   "category": "color",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.9
+    }
+   ]
+  },
+  {
+   "id": "invert",
+   "name": "Негатив",
+   "category": "color",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "hue_shift",
+   "name": "Сдвиг оттенка",
+   "category": "color",
+   "params": [
+    {
+     "id": "shift",
+     "name": "Сдвиг",
+     "min": 0.0,
+     "max": 360.0,
+     "default": 120.0
+    },
+    {
+     "id": "cycle",
+     "name": "Переливание",
+     "min": 0.0,
+     "max": 2.0,
+     "default": 0.0
+    }
+   ]
+  },
+  {
+   "id": "duotone",
+   "name": "Дуотон",
+   "category": "color",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 1.0
+    },
+    {
+     "id": "dark",
+     "name": "Тени",
+     "type": "COLOR",
+     "default": 2759516.0
+    },
+    {
+     "id": "light",
+     "name": "Света",
+     "type": "COLOR",
+     "default": 3007176.0
+    }
+   ]
+  },
+  {
+   "id": "posterize",
+   "name": "Постеризация",
+   "category": "color",
+   "params": [
+    {
+     "id": "levels",
+     "name": "Уровни",
+     "min": 2.0,
+     "max": 16.0,
+     "default": 5.0
+    }
+   ]
+  },
+  {
+   "id": "warm",
+   "name": "Тёплый",
+   "category": "color",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "cool",
+   "name": "Холодный",
+   "category": "color",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "fade",
+   "name": "Выцветание",
+   "category": "color",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "saturation_boost",
+   "name": "Насыщенность",
+   "category": "color",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Насыщенность",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.6
+    }
+   ]
+  },
+  {
+   "id": "teal_orange",
+   "name": "Бирюза и оранж",
+   "category": "color",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.6
+    }
+   ]
+  },
+  {
+   "id": "high_contrast",
+   "name": "Высокий контраст",
+   "category": "color",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Контраст",
+     "min": 1.0,
+     "max": 3.0,
+     "default": 1.6
+    }
+   ]
+  },
+  {
+   "id": "color_isolate",
+   "name": "Цветовой акцент",
+   "category": "color",
+   "params": [
+    {
+     "id": "color",
+     "name": "Оставить цвет",
+     "type": "COLOR",
+     "default": 15022389.0
+    },
+    {
+     "id": "range",
+     "name": "Диапазон",
+     "min": 0.02,
+     "max": 0.5,
+     "default": 0.12
+    }
+   ]
+  },
+  {
+   "id": "color_tint",
+   "name": "Тонирование",
+   "category": "color",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.4
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 9133302.0
+    }
+   ]
+  },
+  {
+   "id": "rainbow_wash",
+   "name": "Радужный перелив",
+   "category": "color",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.4
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "bleach_bypass",
+   "name": "Отбеливание",
+   "category": "color",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.6
+    }
+   ]
+  },
+  {
+   "id": "film_grain",
+   "name": "Зерно плёнки",
+   "category": "retro",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.4
+    },
+    {
+     "id": "size",
+     "name": "Размер",
+     "min": 1.0,
+     "max": 4.0,
+     "default": 1.5
+    }
+   ]
+  },
+  {
+   "id": "scratches",
+   "name": "Царапины",
+   "category": "retro",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.6
+    }
+   ]
+  },
+  {
+   "id": "dust",
+   "name": "Пыль и ворс",
+   "category": "retro",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.6
+    }
+   ]
+  },
+  {
+   "id": "film_8mm",
+   "name": "8 мм",
+   "category": "retro",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    }
+   ]
+  },
+  {
+   "id": "old_movie",
+   "name": "Старое кино",
+   "category": "retro",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.8
+    }
+   ]
+  },
+  {
+   "id": "vhs_date",
+   "name": "VHS с датой",
+   "category": "retro",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.6
+    },
+    {
+     "id": "day",
+     "name": "День",
+     "min": 1.0,
+     "max": 31.0,
+     "default": 14.0
+    },
+    {
+     "id": "month",
+     "name": "Месяц",
+     "min": 1.0,
+     "max": 12.0,
+     "default": 6.0
+    },
+    {
+     "id": "year",
+     "name": "Год",
+     "min": 80.0,
+     "max": 99.0,
+     "default": 97.0
+    }
+   ]
+  },
+  {
+   "id": "polaroid",
+   "name": "Полароид",
+   "category": "retro",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.8
+    }
+   ]
+  },
+  {
+   "id": "burnt_film",
+   "name": "Прожжённая плёнка",
+   "category": "retro",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.8
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "super8_frame",
+   "name": "Плёночный кадр",
+   "category": "retro",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.8
+    }
+   ]
+  },
+  {
+   "id": "cross_process",
+   "name": "Кросс-процесс",
+   "category": "retro",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    }
+   ]
+  },
+  {
+   "id": "pixelate",
+   "name": "Пикселизация",
+   "category": "stylize",
+   "params": [
+    {
+     "id": "size",
+     "name": "Размер пикселя",
+     "min": 2.0,
+     "max": 80.0,
+     "default": 16.0
+    }
+   ]
+  },
+  {
+   "id": "halftone",
+   "name": "Растр",
+   "category": "stylize",
+   "params": [
+    {
+     "id": "size",
+     "name": "Размер точки",
+     "min": 3.0,
+     "max": 30.0,
+     "default": 8.0
+    },
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "comic",
+   "name": "Комикс",
+   "category": "stylize",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "cartoon",
+   "name": "Мультяшный",
+   "category": "stylize",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 1.0
+    },
+    {
+     "id": "levels",
+     "name": "Уровни",
+     "min": 2.0,
+     "max": 10.0,
+     "default": 5.0
+    }
+   ]
+  },
+  {
+   "id": "edges",
+   "name": "Контуры",
+   "category": "stylize",
+   "params": [
+    {
+     "id": "strength",
+     "name": "Сила",
+     "min": 0.5,
+     "max": 4.0,
+     "default": 1.5
+    },
+    {
+     "id": "color",
+     "name": "Цвет линий",
+     "type": "COLOR",
+     "default": 3007176.0
+    }
+   ]
+  },
+  {
+   "id": "sketch",
+   "name": "Карандаш",
+   "category": "stylize",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "watercolor",
+   "name": "Акварель",
+   "category": "stylize",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "neon",
+   "name": "Неон",
+   "category": "stylize",
+   "params": [
+    {
+     "id": "glow",
+     "name": "Свечение",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.6
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "thermal",
+   "name": "Тепловизор",
+   "category": "stylize",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "night_vision",
+   "name": "Ночное видение",
+   "category": "stylize",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "matrix_rain",
+   "name": "Матрица",
+   "category": "stylize",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.8
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "mosaic_tiles",
+   "name": "Мозаика",
+   "category": "stylize",
+   "params": [
+    {
+     "id": "size",
+     "name": "Размер",
+     "min": 6.0,
+     "max": 60.0,
+     "default": 20.0
+    }
+   ]
+  },
+  {
+   "id": "emboss",
+   "name": "Тиснение",
+   "category": "stylize",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "oil_paint",
+   "name": "Масло",
+   "category": "stylize",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 1.0
+    },
+    {
+     "id": "radius",
+     "name": "Мазок",
+     "min": 2.0,
+     "max": 10.0,
+     "default": 5.0
+    }
+   ]
+  },
+  {
+   "id": "ascii_dots",
+   "name": "Точечная матрица",
+   "category": "stylize",
+   "params": [
+    {
+     "id": "size",
+     "name": "Размер",
+     "min": 4.0,
+     "max": 24.0,
+     "default": 10.0
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 3007176.0
+    }
+   ]
+  },
+  {
+   "id": "sparks",
+   "name": "Искры",
+   "category": "particles",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.8
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 16757575.0
+    }
+   ]
+  },
+  {
+   "id": "glitter",
+   "name": "Блёстки",
+   "category": "particles",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.8
+    },
+    {
+     "id": "density",
+     "name": "Плотность",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "snow",
+   "name": "Снег",
+   "category": "particles",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.8
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "rain",
+   "name": "Дождь",
+   "category": "particles",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.6
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "confetti",
+   "name": "Конфетти",
+   "category": "particles",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.9
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "dust_light",
+   "name": "Пылинки в свете",
+   "category": "particles",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 0.5
+    }
+   ]
+  },
+  {
+   "id": "hearts",
+   "name": "Сердечки",
+   "category": "particles",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.9
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 16735370.0
+    }
+   ]
+  },
+  {
+   "id": "stars",
+   "name": "Звёздочки",
+   "category": "particles",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.9
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 16769126.0
+    }
+   ]
+  },
+  {
+   "id": "bubbles",
+   "name": "Пузыри",
+   "category": "particles",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.8
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "fireflies",
+   "name": "Светлячки",
+   "category": "particles",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.8
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 0.6
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 13172587.0
+    }
+   ]
+  },
+  {
+   "id": "bokeh_lights",
+   "name": "Огни боке",
+   "category": "particles",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.7
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 0.4
+    }
+   ]
+  },
+  {
+   "id": "viewfinder",
+   "name": "Видоискатель",
+   "category": "frames",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 1.0
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 16777215.0
+    }
+   ]
+  },
+  {
+   "id": "rec_frame",
+   "name": "Запись REC",
+   "category": "frames",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 1.0
+    }
+   ]
+  },
+  {
+   "id": "letterbox",
+   "name": "Кинорамка",
+   "category": "frames",
+   "params": [
+    {
+     "id": "amount",
+     "name": "Полосы",
+     "min": 0.0,
+     "max": 0.4,
+     "default": 0.12
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 0.0
+    }
+   ]
+  },
+  {
+   "id": "grid",
+   "name": "Сетка",
+   "category": "frames",
+   "params": [
+    {
+     "id": "lines",
+     "name": "Линий",
+     "min": 2.0,
+     "max": 12.0,
+     "default": 3.0
+    },
+    {
+     "id": "opacity",
+     "name": "Прозрачность",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 16777215.0
+    }
+   ]
+  },
+  {
+   "id": "crosshair",
+   "name": "Прицел",
+   "category": "frames",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 1.0
+    },
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 16726843.0
+    },
+    {
+     "id": "size",
+     "name": "Размер",
+     "min": 0.05,
+     "max": 0.5,
+     "default": 0.15
+    }
+   ]
+  },
+  {
+   "id": "rounded_frame",
+   "name": "Скруглённая рамка",
+   "category": "frames",
+   "params": [
+    {
+     "id": "radius",
+     "name": "Скругление",
+     "min": 0.0,
+     "max": 0.3,
+     "default": 0.08
+    },
+    {
+     "id": "inset",
+     "name": "Отступ",
+     "min": 0.0,
+     "max": 0.2,
+     "default": 0.04
+    },
+    {
+     "id": "color",
+     "name": "Цвет фона",
+     "type": "COLOR",
+     "default": 1053720.0
+    }
+   ]
+  },
+  {
+   "id": "polaroid_frame",
+   "name": "Рамка полароида",
+   "category": "frames",
+   "params": [
+    {
+     "id": "color",
+     "name": "Цвет",
+     "type": "COLOR",
+     "default": 16118506.0
+    }
+   ]
+  },
+  {
+   "id": "film_strip",
+   "name": "Кинолента",
+   "category": "frames",
+   "params": [
+    {
+     "id": "color",
+     "name": "Цвет ленты",
+     "type": "COLOR",
+     "default": 1118481.0
+    }
+   ]
+  },
+  {
+   "id": "spotlight",
+   "name": "Прожектор",
+   "category": "frames",
+   "params": [
+    {
+     "id": "intensity",
+     "name": "Сила",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.8
+    },
+    {
+     "id": "x",
+     "name": "Центр X",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "y",
+     "name": "Центр Y",
+     "min": 0.0,
+     "max": 1.0,
+     "default": 0.5
+    },
+    {
+     "id": "size",
+     "name": "Размер",
+     "min": 0.1,
+     "max": 1.0,
+     "default": 0.35
+    }
+   ]
+  },
+  {
+   "id": "color_border",
+   "name": "Цветная рамка",
+   "category": "frames",
+   "params": [
+    {
+     "id": "width",
+     "name": "Толщина",
+     "min": 0.0,
+     "max": 0.15,
+     "default": 0.03
+    },
+    {
+     "id": "speed",
+     "name": "Скорость",
+     "min": 0.0,
+     "max": 3.0,
+     "default": 0.5
+    }
+   ]
+  }
+ ]
+}

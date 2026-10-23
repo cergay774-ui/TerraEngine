@@ -4,6 +4,7 @@ import com.flurocup.core.model.AspectRatio
 import com.flurocup.core.model.MediaClip
 import com.flurocup.core.model.MediaSource
 import com.flurocup.core.model.Project
+import com.flurocup.core.model.EffectItem
 
 /**
  * One undoable edit. Commands carry everything they need, including ids of clips they create, so
@@ -62,6 +63,22 @@ sealed interface EditCommand {
     /** Moves an overlay track one layer up (+1) or down (-1). */
     data class MoveTrack(val trackId: String, val delta: Int) : EditCommand {
         override fun apply(project: Project) = OverlayEdits.moveTrack(project, trackId, delta)
+    }
+
+    data class AddEffect(val item: EffectItem, val newTrackId: String) : EditCommand {
+        override fun apply(project: Project) = EffectEdits.add(project, item, newTrackId)
+    }
+
+    data class MoveEffect(val id: String, val startUs: Long, val trackIndex: Int, val newTrackId: String) : EditCommand {
+        override fun apply(project: Project) = EffectEdits.move(project, id, startUs, trackIndex, newTrackId)
+    }
+
+    data class TrimEffect(val id: String, val startUs: Long, val durationUs: Long) : EditCommand {
+        override fun apply(project: Project) = EffectEdits.trim(project, id, startUs, durationUs)
+    }
+
+    data class UpdateEffect(val item: EffectItem) : EditCommand {
+        override fun apply(project: Project) = EffectEdits.update(project, item)
     }
 
     /** Several commands as one undo step; null if none of them changes anything. */

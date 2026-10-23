@@ -163,21 +163,30 @@ object OverlayEdits {
         project.copy(timeline = project.timeline.copy(tracks = project.timeline.tracks + track))
 }
 
-/** Edits that work on whichever track the clip is on. */
+/** Edits that work on whichever track the item is on. */
 object TimelineEdits {
     fun isOnMainTrack(project: Project, clipId: String): Boolean =
         project.timeline.findClip(clipId)?.first?.kind == TrackKind.MAIN
 
-    fun split(project: Project, clipId: String, atUs: Long, newId: String): Project? =
-        if (isOnMainTrack(project, clipId)) MainTrackEdits.split(project, clipId, atUs, newId)
-        else OverlayEdits.split(project, clipId, atUs, newId)
+    private fun isEffect(project: Project, id: String) = EffectEdits.find(project, id) != null
 
-    fun delete(project: Project, clipId: String): Project? =
-        if (isOnMainTrack(project, clipId)) MainTrackEdits.delete(project, clipId) else OverlayEdits.delete(project, clipId)
+    fun split(project: Project, clipId: String, atUs: Long, newId: String): Project? = when {
+        isEffect(project, clipId) -> EffectEdits.split(project, clipId, atUs, newId)
+        isOnMainTrack(project, clipId) -> MainTrackEdits.split(project, clipId, atUs, newId)
+        else -> OverlayEdits.split(project, clipId, atUs, newId)
+    }
 
-    fun duplicate(project: Project, clipId: String, newId: String, newTrackId: String): Project? =
-        if (isOnMainTrack(project, clipId)) MainTrackEdits.duplicate(project, clipId, newId)
-        else OverlayEdits.duplicate(project, clipId, newId, newTrackId)
+    fun delete(project: Project, clipId: String): Project? = when {
+        isEffect(project, clipId) -> EffectEdits.delete(project, clipId)
+        isOnMainTrack(project, clipId) -> MainTrackEdits.delete(project, clipId)
+        else -> OverlayEdits.delete(project, clipId)
+    }
+
+    fun duplicate(project: Project, clipId: String, newId: String, newTrackId: String): Project? = when {
+        isEffect(project, clipId) -> EffectEdits.duplicate(project, clipId, newId, newTrackId)
+        isOnMainTrack(project, clipId) -> MainTrackEdits.duplicate(project, clipId, newId)
+        else -> OverlayEdits.duplicate(project, clipId, newId, newTrackId)
+    }
 
     fun replace(project: Project, clipId: String, source: MediaSource): Project? =
         if (isOnMainTrack(project, clipId)) MainTrackEdits.replace(project, clipId, source)

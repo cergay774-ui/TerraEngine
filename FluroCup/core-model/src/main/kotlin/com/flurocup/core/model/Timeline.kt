@@ -21,10 +21,14 @@ data class Timeline(
         return null
     }
 
+    /** Effect tracks from the bottom up. */
+    val effectTracks: List<Track> get() = tracks.filter { it.kind == TrackKind.EFFECT }
+
     /** Every media clip on every track. */
     val allClips: List<MediaClip> get() = tracks.flatMap { it.items.filterIsInstance<MediaClip>() }
 
-    val durationUs: Long get() = tracks.maxOfOrNull { it.endUs } ?: 0L
+    /** The length of the content; effects running past the last clip don't extend it. */
+    val durationUs: Long get() = tracks.filter { it.kind != TrackKind.EFFECT }.maxOfOrNull { it.endUs } ?: 0L
 
     companion object {
         const val MAIN_TRACK_ID = "main"
@@ -78,6 +82,7 @@ data class MediaClip(
     val border: ClipBorder = ClipBorder(),
     val cornerRadius: Float = 0f,
     val blendMode: BlendMode = BlendMode.NORMAL,
+    val effects: List<ClipEffect> = emptyList(),
 ) : TimelineItem {
     override val durationUs: Long
         get() = ((trimEndUs - trimStartUs) / speed.toDouble()).toLong()

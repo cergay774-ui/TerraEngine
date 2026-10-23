@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AspectRatio
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.AutoFixHigh
 import androidx.compose.material.icons.rounded.BorderOuter
 import androidx.compose.material.icons.rounded.Colorize
@@ -47,6 +48,7 @@ import androidx.compose.material.icons.rounded.Opacity
 import androidx.compose.material.icons.rounded.OpenWith
 import androidx.compose.material.icons.rounded.PictureInPicture
 import androidx.compose.material.icons.rounded.SwapHoriz
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -230,11 +232,24 @@ internal fun editorTools(
     onAdd: () -> Unit,
     onAddOverlay: () -> Unit,
     onFormat: () -> Unit,
+    onEffects: () -> Unit,
+    onEffectParams: () -> Unit,
+    onEffectReplace: () -> Unit,
 ): List<EditorTool> {
+    if (state.selectedEffect != null) {
+        return listOf(
+            EditorTool(Icons.Rounded.Tune, stringResource(R.string.editor_tool_effect_params), onClick = onEffectParams),
+            EditorTool(Icons.Rounded.SwapHoriz, stringResource(R.string.editor_tool_replace), onClick = onEffectReplace),
+            EditorTool(Icons.Rounded.ContentCut, stringResource(R.string.editor_tool_split), onClick = onSplit),
+            EditorTool(Icons.Rounded.ContentCopy, stringResource(R.string.editor_tool_duplicate), onClick = onDuplicate),
+            EditorTool(Icons.Rounded.DeleteOutline, stringResource(R.string.editor_tool_delete), destructive = true, onClick = onDelete),
+        )
+    }
     val selected = state.selectedClip
     if (selected == null) {
         return listOf(
             EditorTool(Icons.Rounded.Add, stringResource(R.string.editor_tool_add), onClick = onAdd),
+            EditorTool(Icons.Rounded.AutoAwesome, stringResource(R.string.editor_tool_effects), enabled = state.durationUs > 0, onClick = onEffects),
             EditorTool(Icons.Rounded.PictureInPicture, stringResource(R.string.editor_tool_overlay), enabled = state.durationUs > 0, onClick = onAddOverlay),
             EditorTool(Icons.Rounded.ContentCut, stringResource(R.string.editor_tool_split), enabled = state.clips.isNotEmpty(), onClick = onSplit),
             EditorTool(Icons.Rounded.AspectRatio, stringResource(R.string.editor_tool_format), onClick = onFormat),
@@ -243,6 +258,7 @@ internal fun editorTools(
     val trackIndex = state.selectedOverlayTrackIndex
     return buildList {
         add(EditorTool(Icons.Rounded.ContentCut, stringResource(R.string.editor_tool_split), onClick = onSplit))
+        add(EditorTool(Icons.Rounded.AutoAwesome, stringResource(R.string.editor_tool_effects), onClick = onEffects))
         add(EditorTool(Icons.Rounded.OpenWith, stringResource(R.string.editor_tool_transform)) { onPanel(EditorPanel.TRANSFORM) })
         add(EditorTool(Icons.Rounded.Opacity, stringResource(R.string.editor_tool_opacity)) { onPanel(EditorPanel.OPACITY) })
         add(EditorTool(Icons.Rounded.Crop, stringResource(R.string.editor_tool_crop)) { onPanel(EditorPanel.CROP) })

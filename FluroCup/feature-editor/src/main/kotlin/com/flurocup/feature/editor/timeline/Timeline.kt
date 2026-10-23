@@ -67,6 +67,8 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -131,8 +133,8 @@ private val ReorderGap = 8.dp
 
 /**
  * The timeline: playhead fixed in the middle, drag to scroll (with fling), pinch to zoom,
- * filmstrip frames on clips. Overlay tracks sit above the main track, top layer first, and
- * scroll vertically when there are many. Tap selects; a selected clip's edges trim; long-press
+ * filmstrip frames on clips. Overlay tracks sit above the main track, top layer first, with
+ * effect tracks above them, and all of these scroll vertically when there are many. Tap selects; a selected clip's edges trim; long-press
  * reorders main clips or moves an overlay in time and between layers. Edges snap to the
  * playhead and to other clips' edges with a haptic tick.
  */
@@ -141,6 +143,7 @@ internal fun Timeline(
     state: TimelineState,
     clips: List<ClipUi>,
     overlays: List<OverlayTrackUi>,
+    effects: List<OverlayTrackUi>,
     selectedClipId: String?,
     frames: FilmstripLoader,
     onScrubStart: () -> Unit,
@@ -151,6 +154,8 @@ internal fun Timeline(
     onMove: (clipId: String, toIndex: Int) -> Unit,
     onTrimOverlay: (clipId: String, startUs: Long, trimStartUs: Long, trimEndUs: Long) -> Unit,
     onMoveOverlay: (clipId: String, startUs: Long, row: Int) -> Unit,
+    onTrimEffect: (id: String, startUs: Long, durationUs: Long) -> Unit,
+    onMoveEffect: (id: String, startUs: Long, row: Int) -> Unit,
     onAdd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -173,7 +178,10 @@ internal fun Timeline(
     val rowStepPx = with(density) { (OverlayRowHeight + RowGap).toPx() }
     val mainHeightPx = with(density) { TrackHeight.toPx() }
     val snapPx = with(density) { SnapDistance.toPx() }
-    val rows = overlays.size
+    // Rows above the main track: effect tracks, then overlay tracks, both top first.
+    val upperRows = remember(effects, overlays) { effects + overlays }
+    val effectRows = effects.size
+    val rows = upperRows.size
     val overlayViewport = (OverlayRowHeight + RowGap) * min(rows, VISIBLE_OVERLAY_ROWS)
     val overlayViewportPx = with(density) { overlayViewport.toPx() }
     val maxOverlayScroll = max(0f, rows * rowStepPx - overlayViewportPx)
@@ -182,11 +190,11 @@ internal fun Timeline(
     LaunchedEffect(maxOverlayScroll) { overlayScroll = overlayScroll.coerceIn(0f, maxOverlayScroll) }
 
     val mainBoxes = remember(clips, trim) { layoutMain(clips, trim) }
-    val overlayBoxes = remember(overlays, trim) { layoutOverlays(overlays, trim) }
+    val overlayBoxes = remember(upperRows, trim) { layoutOverlays(upperRows, trim) }
     val allBoxes = mainBoxes + overlayBoxes
 
     // A committed edit keeps showing until the project catches up, so the clip doesn't jump back.
-    LaunchedEffect(clips, overlays) { if (trim?.committed == true) trim = null }
+    LaunchedEffect(clips, upperRows) { if (trim?.committed == true) trim = null }
     LaunchedEffect(trim?.committed) {
         if (trim?.committed == true) {
             delay(800)
@@ -198,6 +206,7 @@ internal fun Timeline(
     val currentOverlays by rememberUpdatedState(overlayBoxes)
     val currentClips by rememberUpdatedState(clips)
     val currentRows by rememberUpdatedState(rows)
+    val currentEffectRows by rememberUpdatedState(effectRows)
     val currentMaxScroll by rememberUpdatedState(maxOverlayScroll)
     val currentMainTop by rememberUpdatedState(mainTopPx)
     val currentViewport by rememberUpdatedState(overlayViewportPx)
@@ -207,6 +216,7 @@ internal fun Timeline(
     val select by rememberUpdatedState(onSelect)
     val move by rememberUpdatedState(onMove)
     val moveOverlay by rememberUpdatedState(onMoveOverlay)
+    val moveEffect by rememberUpdatedState(onMoveEffect)
     val fling = remember { arrayOfNulls<Job>(1) }
 
     fun rowTop(row: Int): Float = if (row == MAIN_ROW) mainTopPx else trackTopPx + row * rowStepPx - overlayScroll
@@ -318,8 +328,14 @@ internal fun Timeline(
                                         else -> rawStart
                                     }
                                     val snapped = snapStart != null || snapEnd != null
-                                    val row = floor((change.position.y - trackTopPx + overlayScroll) / rowStepPx).toInt()
-                                        .coerceIn(-1, currentRows - 1)
+                                    val rawRow = floor((change.position.y - trackTopPx + overlayScroll) / rowStepPx).toInt()
+                                    // Effects stay among effect rows and overlays among overlay rows; the
+                                    // row just above a group's top one means a new track on top of it.
+                                    val row = if (box.ui.effect != null) {
+                                        rawRow.coerceIn(-1, currentEffectRows - 1)
+                                    } else {
+                                        rawRow.coerceIn(currentEffectRows - 1, currentRows - 1)
+                                    }
                                     val previous = overlayDrag
                                     if (snapped && previous?.snapped != true) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     overlayDrag = previous?.copy(startUs = start, row = row, snapped = snapped)
@@ -327,7 +343,11 @@ internal fun Timeline(
                                 val drag = overlayDrag
                                 overlayDrag = null
                                 if (drag != null && (drag.startUs != box.startUs || drag.row != box.row)) {
-                                    moveOverlay(drag.clipId, drag.startUs, drag.row)
+                                    if (box.ui.effect != null) {
+                                        moveEffect(drag.clipId, drag.startUs, drag.row)
+                                    } else {
+                                        moveOverlay(drag.clipId, drag.startUs, (drag.row - currentEffectRows).coerceAtLeast(-1))
+                                    }
                                 }
                             } else if (box != null && currentClips.size > 1) {
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -415,7 +435,12 @@ internal fun Timeline(
                     }
                     overlayBoxes.forEach { box ->
                         if (box.ui.clip.id != dragging?.clipId) {
-                            drawClip(box, state, frames, box.ui.clip.id == selectedClipId, rowTop(box.row), rowHeightPx, FluroColors.Violet)
+                            val selected = box.ui.clip.id == selectedClipId
+                            if (box.ui.effect != null) {
+                                drawEffect(box, state, textMeasurer, selected, rowTop(box.row), rowHeightPx, dragged = false)
+                            } else {
+                                drawClip(box, state, frames, selected, rowTop(box.row), rowHeightPx, FluroColors.Violet)
+                            }
                         }
                     }
                 }
@@ -428,7 +453,11 @@ internal fun Timeline(
             if (dragging != null) {
                 overlayBoxes.firstOrNull { it.ui.clip.id == dragging.clipId }?.let { box ->
                     val moved = box.copy(startUs = dragging.startUs, row = dragging.row)
-                    drawClip(moved, state, frames, selected = true, top = rowTop(dragging.row), height = rowHeightPx, accent = FluroColors.Teal)
+                    if (box.ui.effect != null) {
+                        drawEffect(moved, state, textMeasurer, selected = true, top = rowTop(dragging.row), height = rowHeightPx, dragged = true)
+                    } else {
+                        drawClip(moved, state, frames, selected = true, top = rowTop(dragging.row), height = rowHeightPx, accent = FluroColors.Teal)
+                    }
                 }
             }
             if (reorder == null && dragging == null) {
@@ -457,7 +486,7 @@ internal fun Timeline(
                             onDrag = { clip, accumulatedPx ->
                                 val targets = snapTargets(clip.id) + state.positionUs
                                 val next = if (isOverlay) {
-                                    val rowClips = overlays.getOrNull(box.row)?.clips?.map { it.clip }.orEmpty()
+                                    val rowClips = upperRows.getOrNull(box.row)?.clips?.map { it.clip }.orEmpty()
                                     overlayTrimFor(clip, rowClips, edge, accumulatedPx, state, snapPx, targets)
                                 } else {
                                     mainTrimFor(clip, edge, accumulatedPx, state, snapPx, targets)
@@ -473,7 +502,9 @@ internal fun Timeline(
                                     trim = null
                                 } else {
                                     trim = drag.copy(committed = true)
-                                    if (isOverlay) {
+                                    if (box.ui.effect != null) {
+                                        onTrimEffect(clip.id, drag.startUs, drag.trimEndUs - drag.trimStartUs)
+                                    } else if (isOverlay) {
                                         onTrimOverlay(clip.id, drag.startUs, drag.trimStartUs, drag.trimEndUs)
                                     } else {
                                         onTrim(clip.id, drag.trimStartUs, drag.trimEndUs)
@@ -836,6 +867,58 @@ private fun DrawScope.drawClip(
             cornerRadius = CornerRadius(radius),
             style = Stroke(width = 1.dp.toPx()),
         )
+    }
+    if (selected) {
+        drawRoundRect(
+            color = Color.White,
+            topLeft = Offset(left, top),
+            size = Size(right - left, height),
+            cornerRadius = CornerRadius(radius),
+            style = Stroke(width = 2.dp.toPx()),
+        )
+    }
+}
+
+/** An effect on its track: a coloured bar with the effect's name. */
+private fun DrawScope.drawEffect(
+    box: ClipBox,
+    state: TimelineState,
+    textMeasurer: TextMeasurer,
+    selected: Boolean,
+    top: Float,
+    height: Float,
+    dragged: Boolean,
+) {
+    val center = size.width / 2f
+    val gap = ClipGap.toPx()
+    val left = center + (box.startUs - state.positionUs).toFloat() * state.pxPerUs + gap / 2
+    val right = center + (box.endUs - state.positionUs).toFloat() * state.pxPerUs - gap / 2
+    if (right < 0f || left > size.width || right <= left) return
+    val radius = 8.dp.toPx()
+    val alpha = if (selected || dragged) 0.95f else 0.7f
+    drawRoundRect(
+        brush = Brush.horizontalGradient(
+            listOf(FluroColors.Orchid.copy(alpha = alpha), FluroColors.Violet.copy(alpha = alpha)),
+            startX = left,
+            endX = right,
+        ),
+        topLeft = Offset(left, top),
+        size = Size(right - left, height),
+        cornerRadius = CornerRadius(radius),
+    )
+    val label = box.ui.label.orEmpty()
+    val textLeft = max(left, 0f) + 8.dp.toPx()
+    val maxWidth = (min(right, size.width) - textLeft - 4.dp.toPx()).toInt()
+    if (label.isNotEmpty() && maxWidth > 12.dp.toPx()) {
+        val layout = textMeasurer.measure(
+            text = "✦ $label",
+            style = TextStyle(fontSize = 11.sp, color = Color.White),
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            constraints = Constraints(maxWidth = maxWidth),
+        )
+        drawText(layout, topLeft = Offset(textLeft, top + (height - layout.size.height) / 2))
     }
     if (selected) {
         drawRoundRect(

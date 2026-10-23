@@ -78,7 +78,12 @@ enum class EditorPanel(val editsLookLive: Boolean) {
  * live) and [onLookDone] when it is let go (saved as one undo step).
  */
 @Composable
-internal fun PanelFrame(title: String, onDone: () -> Unit, content: @Composable () -> Unit) {
+internal fun PanelFrame(
+    title: String,
+    onDone: () -> Unit,
+    header: (@Composable () -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -91,6 +96,7 @@ internal fun PanelFrame(title: String, onDone: () -> Unit, content: @Composable 
                 Icon(Icons.Rounded.Check, contentDescription = stringResource(R.string.editor_done), tint = MaterialTheme.colorScheme.primary)
             }
         }
+        header?.invoke()
         Column(
             Modifier
                 .heightIn(max = 300.dp)

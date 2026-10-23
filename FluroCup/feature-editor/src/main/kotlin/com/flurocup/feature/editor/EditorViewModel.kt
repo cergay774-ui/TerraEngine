@@ -12,7 +12,9 @@ import com.flurocup.core.data.project.ProjectFileStore
 import com.flurocup.core.data.project.ProjectRepository
 import com.flurocup.core.engine.composition.CompositionBuilder
 import com.flurocup.core.engine.composition.RenderSpec
+import com.flurocup.core.engine.effects.EffectLibrary
 import com.flurocup.core.engine.effects.LiveLooks
+import com.flurocup.core.engine.effects.LiveValues
 import com.flurocup.core.engine.media.AnalyzedMedia
 import com.flurocup.core.engine.media.MediaAnalyzer
 import com.flurocup.core.engine.media.MediaImportException
@@ -24,7 +26,11 @@ import com.flurocup.core.engine.segmentation.BackgroundRemover
 import com.flurocup.core.model.AspectRatio
 import com.flurocup.core.model.ClipLook
 import com.flurocup.core.model.ClipTransform
+import com.flurocup.core.model.ClipEffect
 import com.flurocup.core.model.CropRect
+import com.flurocup.core.model.EffectCatalog
+import com.flurocup.core.model.EffectDefinition
+import com.flurocup.core.model.EffectItem
 import com.flurocup.core.model.MediaClip
 import com.flurocup.core.model.MediaInfo
 import com.flurocup.core.model.MediaKind
@@ -34,6 +40,7 @@ import com.flurocup.core.model.ProxyPolicy
 import com.flurocup.core.model.TrackKind
 import com.flurocup.core.model.edit.EditCommand
 import com.flurocup.core.model.edit.EditHistory
+import com.flurocup.core.model.edit.EffectEdits
 import com.flurocup.core.model.edit.MainTrackEdits
 import com.flurocup.core.model.export.ExportMath
 import com.flurocup.feature.editor.timeline.FrameKey
@@ -43,6 +50,7 @@ import java.io.File
 import java.util.UUID
 import javax.inject.Inject
 import kotlin.math.min
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,10 +73,27 @@ data class ClipUi(
     /** File the timeline reads its filmstrip frames from: the proxy when there is one. */
     val frameUri: String,
     val isOverlay: Boolean,
+    /** Set for an effect on an effect track, which the timeline shows like a clip. */
+    val effect: EffectItem? = null,
+    /** The effect's name, drawn on it in the timeline. */
+    val label: String? = null,
 )
 
-/** One overlay track as the timeline shows it. */
+/** One overlay or effect track as the timeline shows it. */
 data class OverlayTrackUi(val trackId: String, val clips: List<ClipUi>)
+
+/** An effect being edited: one on an effect track, or one of a clip's own. */
+sealed interface EffectTarget {
+    val effectUid: String
+
+    data class Track(val itemId: String) : EffectTarget {
+        override val effectUid: String get() = itemId
+    }
+
+    data class Clip(val clipId: String, val clipEffectId: String) : EffectTarget {
+        override val effectUid: String get() = clipEffectId
+    }
+}
 
 data class EditorUiState(
     val loading: Boolean = true,
@@ -77,6 +102,8 @@ data class EditorUiState(
     val clips: List<ClipUi> = emptyList(),
     /** Overlay tracks from the top layer down, the way the timeline lists them. */
     val overlays: List<OverlayTrackUi> = emptyList(),
+    /** Effect tracks from the top down; shown above the overlays. */
+    val effects: List<OverlayTrackUi> = emptyList(),
     val importing: ImportProgress? = null,
     val previewSource: PreviewSource = PreviewSource.PROXY,
     val selectedClipId: String? = null,
@@ -87,6 +114,10 @@ data class EditorUiState(
     val selectedClip: ClipUi? get() = selectedClipId?.let { id -> allClips.firstOrNull { it.clip.id == id } }
 
     val allClips: List<ClipUi> get() = clips + overlays.flatMap { it.clips }
+
+    /** The selected effect on an effect track, if an effect is what is selected. */
+    val selectedEffect: EffectItem?
+        get() = selectedClipId?.let { id -> effects.firstNotNullOfOrNull { track -> track.clips.firstOrNull { it.clip.id == id }?.effect } }
 
     val durationUs: Long get() = project?.durationUs ?: 0L
 
@@ -127,6 +158,7 @@ class EditorViewModel @Inject constructor(
     private val thumbnails: ThumbnailCache,
     private val compositions: CompositionBuilder,
     private val backgroundRemover: BackgroundRemover,
+    private val effectLibrary: EffectLibrary,
 ) : ViewModel() {
 
     /** Navigation puts the route's `projectId` argument into the saved state. */
@@ -143,6 +175,12 @@ class EditorViewModel @Inject constructor(
     /** Looks the preview reads every frame; gestures and sliders write here before saving. */
     private val looks = LiveLooks()
 
+    /** Effect parameters the preview reads every frame, by effect id, for live sliders. */
+    private val effectParams = LiveValues<Map<String, Float>>()
+
+    /** Every effect the app has, by category. */
+    val effectCatalog: EffectCatalog get() = effectLibrary.catalog
+
     private val history = EditHistory()
 
     /** Edits, undo and proxy updates all change the project; one at a time, so none is lost. */
@@ -157,6 +195,7 @@ class EditorViewModel @Inject constructor(
     private var lookEditingClipId: String? = null
 
     init {
+        viewModelScope.launch(Dispatchers.IO) { effectLibrary.catalog }
         viewModelScope.launch {
             val project = repository.load(projectId)
             if (project == null) {
@@ -221,14 +260,17 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(selectedClipId = clipId) }
     }
 
-    /** Splits the selected clip, or the main clip under the playhead, at [atUs]. */
+    /** Splits the selected clip or effect, or the main clip under the playhead, at [atUs]. */
     fun split(atUs: Long) {
         val state = _uiState.value
         val project = state.project ?: return
-        val clip = state.selectedClip?.clip?.takeIf { atUs > it.startUs && atUs < it.endUs }
-            ?: MainTrackEdits.clipAt(project, atUs)
+        val selectedEffect = state.selectedEffect
+        val id = when {
+            selectedEffect != null -> selectedEffect.id.takeIf { atUs > selectedEffect.startUs && atUs < selectedEffect.endUs }
+            else -> (state.selectedClip?.clip?.takeIf { atUs > it.startUs && atUs < it.endUs } ?: MainTrackEdits.clipAt(project, atUs))?.id
+        }
         viewModelScope.launch {
-            val done = clip != null && execute(EditCommand.Split(clip.id, atUs, newId()))
+            val done = id != null && execute(EditCommand.Split(id, atUs, newId()))
             if (!done) _messages.send(EditorMessage.CannotSplit)
         }
     }
@@ -277,6 +319,113 @@ class EditorViewModel @Inject constructor(
         val trackId = state.project?.timeline?.findClip(id)?.first?.takeIf { it.kind == TrackKind.OVERLAY }?.id ?: return
         viewModelScope.launch { execute(EditCommand.MoveTrack(trackId, if (up) 1 else -1)) }
     }
+
+    // region Effects
+
+    fun effectDefinition(effectId: String): EffectDefinition? = effectLibrary.definition(effectId)
+
+    /**
+     * Adds [effectId] to the clip [clipId], or with no clip to an effect track from [atUs] for
+     * three seconds (shorter if the video ends sooner). Returns what was added, for its panel.
+     */
+    fun addEffect(effectId: String, clipId: String?, atUs: Long): EffectTarget? {
+        val state = _uiState.value
+        val project = state.project ?: return null
+        val uid = newId()
+        if (clipId != null) {
+            val clip = state.allClips.firstOrNull { it.clip.id == clipId }?.clip ?: return null
+            viewModelScope.launch { execute(EditCommand.UpdateClip(clip.copy(effects = clip.effects + ClipEffect(uid, effectId)))) }
+            return EffectTarget.Clip(clipId, uid)
+        }
+        val start = atUs.coerceIn(0L, (project.durationUs - MainTrackEdits.MIN_CLIP_US).coerceAtLeast(0L))
+        val length = minOf(EffectCatalog.DEFAULT_DURATION_US, project.durationUs - start).coerceAtLeast(MainTrackEdits.MIN_CLIP_US)
+        val item = EffectItem(uid, start, length, effectId)
+        viewModelScope.launch {
+            if (execute(EditCommand.AddEffect(item, newId()))) select(uid)
+        }
+        return EffectTarget.Track(uid)
+    }
+
+    /** The effect id and saved parameters of [target], or null if it is gone. */
+    fun effectOf(target: EffectTarget): Pair<String, Map<String, Float>>? {
+        val project = _uiState.value.project ?: return null
+        return when (target) {
+            is EffectTarget.Track -> EffectEdits.find(project, target.itemId)?.second?.let { it.effectId to it.params }
+            is EffectTarget.Clip -> project.timeline.findClip(target.clipId)?.second?.effects
+                ?.firstOrNull { it.id == target.clipEffectId }?.let { it.effectId to it.params }
+        }
+    }
+
+    /** Parameters as the preview shows them, including a slider still moving. */
+    fun currentEffectParams(target: EffectTarget): Map<String, Float> =
+        effectParams.get(target.effectUid) ?: effectOf(target)?.second.orEmpty()
+
+    /** Shows [params] at once, without saving (a slider is still moving). */
+    fun previewEffectParams(target: EffectTarget, params: Map<String, Float>) {
+        effectParams.set(target.effectUid, params)
+        preview.refresh()
+    }
+
+    fun commitEffectParams(target: EffectTarget, params: Map<String, Float>) {
+        updateEffect(target) { _, _ -> params }
+    }
+
+    /** Swaps the effect for [effectId], starting from its defaults. */
+    fun replaceEffect(target: EffectTarget, effectId: String) {
+        updateEffect(target, effectId) { _, _ -> emptyMap() }
+    }
+
+    fun removeEffect(target: EffectTarget) {
+        val project = _uiState.value.project ?: return
+        viewModelScope.launch {
+            when (target) {
+                is EffectTarget.Track -> execute(EditCommand.Delete(target.itemId))
+                is EffectTarget.Clip -> {
+                    val clip = project.timeline.findClip(target.clipId)?.second ?: return@launch
+                    execute(EditCommand.UpdateClip(clip.copy(effects = clip.effects.filterNot { it.id == target.clipEffectId })))
+                }
+            }
+        }
+    }
+
+    private fun updateEffect(target: EffectTarget, newEffectId: String? = null, params: (String, Map<String, Float>) -> Map<String, Float>) {
+        val project = _uiState.value.project ?: return
+        viewModelScope.launch {
+            val changed = when (target) {
+                is EffectTarget.Track -> {
+                    val item = EffectEdits.find(project, target.itemId)?.second ?: return@launch
+                    execute(EditCommand.UpdateEffect(item.copy(effectId = newEffectId ?: item.effectId, params = params(item.effectId, item.params))))
+                }
+                is EffectTarget.Clip -> {
+                    val clip = project.timeline.findClip(target.clipId)?.second ?: return@launch
+                    val effects = clip.effects.map {
+                        if (it.id == target.clipEffectId) it.copy(effectId = newEffectId ?: it.effectId, params = params(it.effectId, it.params)) else it
+                    }
+                    execute(EditCommand.UpdateClip(clip.copy(effects = effects)))
+                }
+            }
+            if (!changed) {
+                // Nothing changed: show the saved values again.
+                effectOf(target)?.let { effectParams.set(target.effectUid, it.second) }
+                preview.refresh()
+            }
+        }
+    }
+
+    /** Moves an effect in time and between effect tracks; [row] counts from the top, -1 is a new top track. */
+    fun moveEffect(id: String, startUs: Long, row: Int) {
+        val count = _uiState.value.effects.size
+        val bottomUp = if (row < 0) count else count - 1 - row
+        viewModelScope.launch {
+            if (!execute(EditCommand.MoveEffect(id, startUs, bottomUp, newId()))) _messages.send(EditorMessage.NoRoom)
+        }
+    }
+
+    fun trimEffect(id: String, startUs: Long, durationUs: Long) {
+        viewModelScope.launch { execute(EditCommand.TrimEffect(id, startUs, durationUs)) }
+    }
+
+    // endregion
 
     fun setAspectRatio(ratio: AspectRatio) {
         viewModelScope.launch { execute(EditCommand.SetAspectRatio(ratio)) }
@@ -489,13 +638,18 @@ class EditorViewModel @Inject constructor(
         val overlays = saved.timeline.overlayTracks.asReversed().map { track ->
             OverlayTrackUi(track.id, track.items.filterIsInstance<MediaClip>().sortedBy { it.startUs }.map { ui(it, overlay = true) })
         }
+        val effects = saved.timeline.effectTracks.asReversed().map { track ->
+            OverlayTrackUi(track.id, track.items.filterIsInstance<EffectItem>().sortedBy { it.startUs }.map(::effectUi))
+        }
         val allIds = (clips + overlays.flatMap { it.clips }).map { it.clip.id }.toSet()
+        val selectable = allIds + effects.flatMap { track -> track.clips.map { it.clip.id } }
         _uiState.update { state ->
             state.copy(
                 project = saved,
                 clips = clips,
                 overlays = overlays,
-                selectedClipId = state.selectedClipId?.takeIf { it in allIds },
+                effects = effects,
+                selectedClipId = state.selectedClipId?.takeIf { it in selectable },
                 canUndo = history.canUndo,
                 canRedo = history.canRedo,
             )
@@ -509,9 +663,35 @@ class EditorViewModel @Inject constructor(
             }
         }
         looks.retainOnly(allIds)
+        val savedParams = saved.timeline.effectTracks.flatMap { it.items.filterIsInstance<EffectItem>() }.map { it.id to it.params } +
+            saved.timeline.allClips.flatMap { clip -> clip.effects.map { it.id to it.params } }
+        savedParams.forEach { (id, params) ->
+            if (effectParams.get(id) != params) {
+                effectParams.set(id, params)
+                looksChanged = true
+            }
+        }
+        effectParams.retainOnly(savedParams.map { it.first }.toSet())
         rebuildPreview()
         if (looksChanged) preview.refresh()
     }
+
+    /** An effect as a timeline item: a photo-like clip of its length, named after the effect. */
+    private fun effectUi(item: EffectItem) = ClipUi(
+        clip = MediaClip(
+            id = item.id,
+            startUs = item.startUs,
+            source = MediaSource(uri = "effect:${item.effectId}", kind = MediaKind.IMAGE, info = null),
+            trimStartUs = 0,
+            trimEndUs = item.durationUs,
+        ),
+        needsProxy = false,
+        proxy = null,
+        frameUri = "",
+        isOverlay = true,
+        effect = item,
+        label = effectLibrary.definition(item.effectId)?.name ?: item.effectId,
+    )
 
     private fun refreshHistoryFlags() {
         _uiState.update { it.copy(canUndo = history.canUndo, canRedo = history.canRedo) }
@@ -571,8 +751,14 @@ class EditorViewModel @Inject constructor(
 
         // Looks are read live, so only what changes the structure of the composition is compared.
         val key = listOf(width, height, fps, forced, project.settings.background) + project.timeline.tracks.map { track ->
-            listOf(track.id, track.kind, track.hidden) + track.items.filterIsInstance<MediaClip>().map {
-                listOf(it.id, it.startUs, it.trimStartUs, it.trimEndUs, it.speed, uriFor(it), it.crop, it.look.needsShader)
+            listOf(track.id, track.kind, track.hidden) + track.items.map { item ->
+                when (item) {
+                    is MediaClip -> listOf(
+                        item.id, item.startUs, item.trimStartUs, item.trimEndUs, item.speed, uriFor(item), item.crop,
+                        item.look.needsShader, item.effects.map { it.id to it.effectId },
+                    )
+                    is EffectItem -> listOf(item.id, item.effectId, item.startUs, item.durationUs)
+                }
             }
         }
         if (key == previewKey) {
@@ -592,6 +778,7 @@ class EditorViewModel @Inject constructor(
             uriFor = ::uriFor,
             lookFor = looks::forClip,
             forceLookShader = forced,
+            effectParamsFor = effectParams::forId,
         )
         val start = preview.positionUs.coerceAtMost((state.durationUs - 1).coerceAtLeast(0L))
         val composition = runCatching { compositions.video(project, spec) }.getOrNull()

@@ -15,10 +15,13 @@ import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.Effects
 import com.flurocup.core.engine.effects.BackgroundFillEffect
+import com.flurocup.core.engine.effects.CatalogEffect
 import com.flurocup.core.engine.effects.ClipLookEffect
+import com.flurocup.core.engine.effects.EffectLibrary
 import com.flurocup.core.model.Background
 import com.flurocup.core.engine.effects.ClipTransformation
 import com.flurocup.core.model.ClipLook
+import com.flurocup.core.model.EffectItem
 import com.flurocup.core.model.HdrType
 import com.flurocup.core.model.MediaClip
 import com.flurocup.core.model.MediaKind
@@ -44,6 +47,9 @@ data class RenderSpec(
     val lookFor: (MediaClip) -> AtomicReference<ClipLook>,
     /** Clips that get the look shader even with a plain look, so a look can be edited live. */
     val forceLookShader: Set<String> = emptySet(),
+    /** The parameters each effect (by id) reads; the preview passes live references here. */
+    val effectParamsFor: (id: String, saved: Map<String, Float>) -> AtomicReference<Map<String, Float>> =
+        { _, saved -> AtomicReference(saved) },
 )
 
 /**
@@ -56,11 +62,15 @@ data class RenderSpec(
  * timing. So the first sequence is an invisible full-length layer at the project frame rate,
  * then the overlay tracks from the top layer down, then the main track. Gaps on a layer are
  * filled with transparent frames, because video sequences can't have empty gaps.
+ *
+ * A clip's own effects run on its picture after its look, before it is fitted and placed. Effect
+ * tracks run on the finished frame, bottom track first.
  */
 @OptIn(UnstableApi::class)
 @Singleton
 class CompositionBuilder @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val effects: EffectLibrary,
 ) {
 
     /** True if the project needs the multi-layer path (and so a multi-input preview graph). */
@@ -101,7 +111,11 @@ class CompositionBuilder @Inject constructor(
         // Transparent areas (masks, keys, opacity, space around a smaller clip) end up as the
         // project background, the same on screen and in the file.
         val background = (project.settings.background as? Background.Color)?.argb ?: 0xFF000000
-        val finalEffects = compositionEffects + BackgroundFillEffect(background)
+        val finalEffects = buildList {
+            add(BackgroundFillEffect(background))
+            addAll(trackEffects(project, totalUs, spec))
+            addAll(compositionEffects)
+        }
         return Composition.Builder(sequences)
             .apply {
                 setEffects(Effects(emptyList(), finalEffects))
@@ -137,6 +151,27 @@ class CompositionBuilder @Inject constructor(
             .map { track -> playable(track.items.filterIsInstance<MediaClip>()).sortedBy { it.startUs } }
             .filter { it.isNotEmpty() }
 
+    private fun trackEffects(project: Project, totalUs: Long, spec: RenderSpec): List<Effect> =
+        project.timeline.effectTracks
+            .filterNot { it.hidden }
+            .flatMap { track -> track.items.filterIsInstance<EffectItem>() }
+            .filter { it.startUs < totalUs && it.durationUs > 0 }
+            .sortedBy { it.startUs }
+            .mapNotNull { catalogEffect(it.id, it.effectId, it.params, it.startUs, it.durationUs, spec, clipEffect = false) }
+
+    private fun catalogEffect(
+        id: String,
+        effectId: String,
+        params: Map<String, Float>,
+        startUs: Long,
+        durationUs: Long,
+        spec: RenderSpec,
+        clipEffect: Boolean,
+    ): Effect? {
+        val definition = effects.definition(effectId) ?: return null
+        return CatalogEffect(effects.fragmentShader(definition), definition, spec.effectParamsFor(id, params), startUs, durationUs, clipEffect)
+    }
+
     private fun playable(clips: List<MediaClip>) = clips.filter { it.source.kind != MediaKind.AUDIO && it.durationUs > 0 }
 
     private fun layered(clips: List<MediaClip>, totalUs: Long, spec: RenderSpec): EditedMediaItemSequence = sequence(trackTypesFor(clips)) {
@@ -158,6 +193,9 @@ class CompositionBuilder @Inject constructor(
             }
             val look = spec.lookFor(clip)
             if (clip.look.needsShader || clip.id in spec.forceLookShader) add(ClipLookEffect(look))
+            clip.effects.forEach { fx ->
+                catalogEffect(fx.id, fx.effectId, fx.params, clip.startUs, clip.durationUs, spec, clipEffect = true)?.let(::add)
+            }
             add(Presentation.createForWidthAndHeight(spec.width, spec.height, Presentation.LAYOUT_SCALE_TO_FIT))
             add(ClipTransformation(look, spec.width.toFloat() / spec.height))
         }
