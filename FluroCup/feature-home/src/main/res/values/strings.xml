@@ -22,4 +22,12 @@
         <item quantity="many">%d проектов</item>
         <item quantity="other">%d проекта</item>
     </plurals>
+    <string name="home_appearance">Оформление</string>
+    <string name="home_theme">Тема</string>
+    <string name="home_theme_system">Как в системе</string>
+    <string name="home_theme_dark">Тёмная</string>
+    <string name="home_theme_light">Светлая</string>
+    <string name="home_theme_custom">Своя</string>
+    <string name="home_theme_background">Фон</string>
+    <string name="home_theme_accent">Акцентный цвет</string>
 </resources>

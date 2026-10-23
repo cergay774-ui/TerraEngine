@@ -62,6 +62,7 @@
     <string name="editor_effects_for_frame">Ляжет отдельной дорожкой на весь кадр от курсора; длину можно менять на таймлайне</string>
     <string name="editor_effect_add">Добавить эффект</string>
     <string name="editor_effect_replace">Заменить</string>
+    <string name="editor_effect_play">Смотреть</string>
     <string name="editor_effect_info">Эффект · %1$s · %2$s</string>
     <string name="editor_done">Готово</string>
     <string name="editor_reset">Сбросить</string>

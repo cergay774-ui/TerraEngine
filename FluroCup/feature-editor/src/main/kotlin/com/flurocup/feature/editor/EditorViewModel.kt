@@ -4,6 +4,12 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.SystemClock
+import android.media.ThumbnailUtils
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import com.flurocup.core.engine.effects.EffectThumbnailRenderer
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -163,6 +169,7 @@ class EditorViewModel @Inject constructor(
     private val compositions: CompositionBuilder,
     private val backgroundRemover: BackgroundRemover,
     private val effectLibrary: EffectLibrary,
+    private val effectThumbnails: EffectThumbnailRenderer,
 ) : ViewModel() {
 
     /** Navigation puts the route's `projectId` argument into the saved state. */
@@ -184,6 +191,19 @@ class EditorViewModel @Inject constructor(
 
     /** Every effect the app has, by category. */
     val effectCatalog: EffectCatalog get() = effectLibrary.catalog
+
+    private val _effectPreviews = MutableStateFlow<Map<String, ImageBitmap>>(emptyMap())
+
+    /** Effect previews on the frame under the playhead, by effect id, for the picker's tiles. */
+    val effectPreviews: StateFlow<Map<String, ImageBitmap>> = _effectPreviews.asStateFlow()
+    private var thumbnailSource: Pair<String, Long>? = null
+    private var thumbnailJob: Job? = null
+
+    private val _playheadJumps = Channel<Long>(Channel.CONFLATED)
+
+    /** Positions the player jumped to on its own (after an effect preview), for the timeline to follow. */
+    val playheadJumps: Flow<Long> = _playheadJumps.receiveAsFlow()
+    private var previewPlayJob: Job? = null
 
     private val history = EditHistory()
 
@@ -239,12 +259,19 @@ class EditorViewModel @Inject constructor(
 
     val positionUs: Long get() = preview.positionUs
 
-    fun togglePlay() = preview.togglePlay()
+    fun togglePlay() {
+        previewPlayJob?.cancel()
+        preview.togglePlay()
+    }
 
-    fun pause() = preview.pause()
+    fun pause() {
+        previewPlayJob?.cancel()
+        preview.pause()
+    }
 
     /** A finger starts dragging the timeline: pause and switch the player to fast seeking. */
     fun startScrub() {
+        previewPlayJob?.cancel()
         preview.pause()
         preview.setScrubbing(true)
     }
@@ -350,16 +377,100 @@ class EditorViewModel @Inject constructor(
         val uid = newId()
         if (clipId != null) {
             val clip = state.allClips.firstOrNull { it.clip.id == clipId }?.clip ?: return null
-            viewModelScope.launch { execute(EditCommand.UpdateClip(clip.copy(effects = clip.effects + ClipEffect(uid, effectId)))) }
+            viewModelScope.launch {
+                if (execute(EditCommand.UpdateClip(clip.copy(effects = clip.effects + ClipEffect(uid, effectId))))) {
+                    playEffectPreview(clipPreviewStart(clip, atUs))
+                }
+            }
             return EffectTarget.Clip(clipId, uid)
         }
         val start = atUs.coerceIn(0L, (project.durationUs - MainTrackEdits.MIN_CLIP_US).coerceAtLeast(0L))
         val length = minOf(EffectCatalog.DEFAULT_DURATION_US, project.durationUs - start).coerceAtLeast(MainTrackEdits.MIN_CLIP_US)
         val item = EffectItem(uid, start, length, effectId)
         viewModelScope.launch {
-            if (execute(EditCommand.AddEffect(item, newId()))) select(uid)
+            if (execute(EditCommand.AddEffect(item, newId()))) {
+                select(uid)
+                playEffectPreview(start)
+            }
         }
         return EffectTarget.Track(uid)
+    }
+
+    /** Plays [EFFECT_PREVIEW_US] of the video with the effect of [target], from its start or the playhead. */
+    fun previewEffect(target: EffectTarget, atUs: Long) {
+        val project = _uiState.value.project ?: return
+        val from = when (target) {
+            is EffectTarget.Track -> EffectEdits.find(project, target.itemId)?.second?.startUs
+            is EffectTarget.Clip -> project.timeline.findClip(target.clipId)?.second?.let { clipPreviewStart(it, atUs) }
+        } ?: return
+        playEffectPreview(from)
+    }
+
+    /** From the playhead if it is on the clip and leaves room to see the effect, else from the clip's start. */
+    private fun clipPreviewStart(clip: MediaClip, atUs: Long): Long =
+        if (atUs >= clip.startUs && atUs < clip.endUs - EFFECT_PREVIEW_US / 2) atUs else clip.startUs
+
+    /** Plays two seconds from [fromUs] so a new effect is seen moving, then goes back there. */
+    private fun playEffectPreview(fromUs: Long) {
+        previewPlayJob?.cancel()
+        previewPlayJob = viewModelScope.launch {
+            // The composition with the effect is set up by the edit; let a deferred rebuild land first.
+            var waited = 0
+            while (previewRebuildPending && waited < 40) {
+                delay(25)
+                waited++
+            }
+            preview.seekTo(fromUs)
+            _playheadJumps.trySend(fromUs)
+            preview.play()
+            try {
+                delay(EFFECT_PREVIEW_US / 1000)
+            } finally {
+                preview.pause()
+                preview.seekTo(fromUs)
+                _playheadJumps.trySend(fromUs)
+            }
+        }
+    }
+
+    /**
+     * Renders thumbnails of [definitions] on the frame under [atUs], skipping ones already made
+     * for that frame; the map fills in as they are ready.
+     */
+    fun requestThumbnails(definitions: List<EffectDefinition>, atUs: Long) {
+        val state = _uiState.value
+        val project = state.project ?: return
+        val clip = state.selectedClip?.clip?.takeIf { atUs >= it.startUs && atUs < it.endUs }
+            ?: MainTrackEdits.clipAt(project, atUs)
+            ?: project.firstMediaClip
+            ?: return
+        val offsetUs = (atUs - clip.startUs).coerceIn(0L, clip.durationUs)
+        val sourceUs = if (clip.source.kind == MediaKind.IMAGE) 0L else clip.trimStartUs + (offsetUs * clip.speed).toLong()
+        // Frames a second apart look the same at this size.
+        val key = clip.source.uri to sourceUs / 1_000_000L
+        if (key != thumbnailSource) {
+            thumbnailJob?.cancel()
+            thumbnailSource = key
+            _effectPreviews.value = emptyMap()
+        }
+        val missing = definitions.filter { it.id !in _effectPreviews.value }
+        if (missing.isEmpty()) return
+        val previous = thumbnailJob
+        thumbnailJob = viewModelScope.launch {
+            previous?.join()
+            val uri = proxyUri(clip) ?: clip.source.uri
+            val frame = thumbnails.thumbnail(Uri.parse(uri), clip.source.kind, sourceUs, maxSizePx = 320) ?: return@launch
+            val sample = ThumbnailUtils.extractThumbnail(frame, EffectThumbnailRenderer.WIDTH, EffectThumbnailRenderer.HEIGHT)
+            val batch = HashMap<String, ImageBitmap>()
+            missing.forEachIndexed { index, definition ->
+                if (definition.id in _effectPreviews.value) return@forEachIndexed
+                effectThumbnails.render(sample, key, definition)?.let { batch[definition.id] = it.asImageBitmap() }
+                if (batch.size >= 6 || index == missing.lastIndex) {
+                    _effectPreviews.update { it + batch }
+                    batch.clear()
+                }
+            }
+        }
     }
 
     /** The effect id and saved parameters of [target], or null if it is gone. */
@@ -387,8 +498,8 @@ class EditorViewModel @Inject constructor(
     }
 
     /** Swaps the effect for [effectId], starting from its defaults. */
-    fun replaceEffect(target: EffectTarget, effectId: String) {
-        updateEffect(target, effectId) { _, _ -> emptyMap() }
+    fun replaceEffect(target: EffectTarget, effectId: String, atUs: Long) {
+        updateEffect(target, effectId, afterChange = { previewEffect(target, atUs) }) { _, _ -> emptyMap() }
     }
 
     fun removeEffect(target: EffectTarget) {
@@ -404,7 +515,12 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    private fun updateEffect(target: EffectTarget, newEffectId: String? = null, params: (String, Map<String, Float>) -> Map<String, Float>) {
+    private fun updateEffect(
+        target: EffectTarget,
+        newEffectId: String? = null,
+        afterChange: (() -> Unit)? = null,
+        params: (String, Map<String, Float>) -> Map<String, Float>,
+    ) {
         val project = _uiState.value.project ?: return
         viewModelScope.launch {
             val changed = when (target) {
@@ -420,6 +536,7 @@ class EditorViewModel @Inject constructor(
                     execute(EditCommand.UpdateClip(clip.copy(effects = effects)))
                 }
             }
+            if (changed) afterChange?.invoke()
             if (!changed) {
                 // Nothing changed: show the saved values again.
                 effectOf(target)?.let { effectParams.set(target.effectUid, it.second) }
@@ -826,6 +943,9 @@ class EditorViewModel @Inject constructor(
     companion object {
         const val PROJECT_ID_KEY = "projectId"
         private const val TAG = "EditorViewModel"
+
+        /** How long a new effect plays when it is picked. */
+        const val EFFECT_PREVIEW_US = 2_000_000L
         private const val SEEK_INTERVAL_MS = 50L
         private const val FRAME_SIZE_PX = 160
         private const val PREVIEW_SHORT_SIDE = 1080

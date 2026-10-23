@@ -428,7 +428,7 @@ internal fun Timeline(
                 clipRect(top = trackTopPx - 1f, bottom = trackTopPx + overlayViewportPx) {
                     for (row in 0 until rows) {
                         drawRect(
-                            color = Color.White.copy(alpha = 0.03f),
+                            color = FluroColors.Contrast.copy(alpha = 0.04f),
                             topLeft = Offset(0f, rowTop(row)),
                             size = Size(size.width, rowHeightPx),
                         )
@@ -529,11 +529,11 @@ internal fun Timeline(
                 .size(40.dp)
                 .shadow(8.dp, RoundedCornerShape(10.dp))
                 .clip(RoundedCornerShape(10.dp))
-                .background(Color.White)
+                .background(FluroColors.Contrast)
                 .clickable(onClick = onAdd),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.Add, contentDescription = null, tint = Color.Black)
+            Icon(Icons.Rounded.Add, contentDescription = null, tint = FluroColors.OnContrast)
         }
     }
 }
@@ -705,7 +705,7 @@ private fun TrimHandle(
             }
             .size(HandleWidth, height)
             .clip(shape)
-            .background(Color.White)
+            .background(FluroColors.Contrast)
             .pointerInput(Unit) {
                 // Claim the touch so the timeline doesn't scroll or select underneath.
                 awaitEachGesture { awaitFirstDown(requireUnconsumed = false).consume() }
@@ -731,7 +731,7 @@ private fun TrimHandle(
         Box(
             Modifier
                 .size(width = 2.dp, height = 18.dp)
-                .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(1.dp)),
+                .background(FluroColors.OnContrast.copy(alpha = 0.45f), RoundedCornerShape(1.dp)),
         )
     }
 }
@@ -771,7 +771,7 @@ private fun ReorderStrip(drag: ReorderDrag, clips: List<ClipUi>, frames: Filmstr
                     .shadow(if (dragged) 12.dp else 0.dp, RoundedCornerShape(10.dp))
                     .clip(RoundedCornerShape(10.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                    .then(if (dragged) Modifier.border(2.dp, Color.White, RoundedCornerShape(10.dp)) else Modifier),
+                    .then(if (dragged) Modifier.border(2.dp, FluroColors.Contrast, RoundedCornerShape(10.dp)) else Modifier),
             ) {
                 if (frame != null) {
                     Image(bitmap = frame, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
@@ -870,7 +870,7 @@ private fun DrawScope.drawClip(
     }
     if (selected) {
         drawRoundRect(
-            color = Color.White,
+            color = FluroColors.Contrast,
             topLeft = Offset(left, top),
             size = Size(right - left, height),
             cornerRadius = CornerRadius(radius),
@@ -922,7 +922,7 @@ private fun DrawScope.drawEffect(
     }
     if (selected) {
         drawRoundRect(
-            color = Color.White,
+            color = FluroColors.Contrast,
             topLeft = Offset(left, top),
             size = Size(right - left, height),
             cornerRadius = CornerRadius(radius),
@@ -962,12 +962,12 @@ private fun DrawScope.drawPlayhead() {
     val x = size.width / 2f
     val width = 2.dp.toPx()
     drawLine(
-        brush = Brush.verticalGradient(listOf(Color.White, Color.White.copy(alpha = 0.85f))),
+        brush = Brush.verticalGradient(listOf(FluroColors.Contrast, FluroColors.Contrast.copy(alpha = 0.85f))),
         start = Offset(x, 4.dp.toPx()),
         end = Offset(x, size.height),
         strokeWidth = width,
     )
-    drawCircle(Color.White, radius = 4.dp.toPx(), center = Offset(x, 4.dp.toPx()))
+    drawCircle(FluroColors.Contrast, radius = 4.dp.toPx(), center = Offset(x, 4.dp.toPx()))
 }
 
 private val MAJOR_TICKS_US = longArrayOf(1, 2, 5, 10, 15, 30, 60, 120, 300, 600).map { it * 1_000_000L }

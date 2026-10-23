@@ -10,6 +10,9 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.flurocup.app.crash.CrashReportDialog
 import com.flurocup.app.navigation.FluroNavHost
 import com.flurocup.core.ui.theme.FluroTheme
+import com.flurocup.core.ui.theme.ThemeStore
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.DisposableEffect
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -24,13 +27,17 @@ class MainActivity : ComponentActivity() {
                 .withEndAction { provider.remove() }
                 .start()
         }
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
-        )
         super.onCreate(savedInstanceState)
         setContent {
-            FluroTheme {
+            val settings = ThemeStore.settings
+            val dark = settings.isDark(isSystemInDarkTheme())
+            // Light themes need dark status and navigation bar icons.
+            DisposableEffect(dark) {
+                val style = if (dark) SystemBarStyle.dark(Color.TRANSPARENT) else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                onDispose { }
+            }
+            FluroTheme(settings) {
                 FluroNavHost()
                 CrashReportDialog()
             }

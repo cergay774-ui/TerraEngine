@@ -78,7 +78,7 @@ fun GradientButton(
             .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CompositionLocalProvider(LocalContentColor provides FluroColors.Background) {
+        CompositionLocalProvider(LocalContentColor provides FluroColors.OnBrand) {
             ProvideTextStyle(MaterialTheme.typography.labelLarge) { content() }
         }
     }
@@ -118,6 +118,6 @@ fun GradientIconSurface(
             },
         contentAlignment = Alignment.Center,
     ) {
-        CompositionLocalProvider(LocalContentColor provides FluroColors.Background) { content() }
+        CompositionLocalProvider(LocalContentColor provides FluroColors.OnBrand) { content() }
     }
 }

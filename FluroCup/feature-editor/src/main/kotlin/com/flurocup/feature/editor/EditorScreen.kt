@@ -136,6 +136,7 @@ fun EditorScreen(
         }
     }
     val frames = remember(viewModel) { FilmstripLoader(scope) { key -> viewModel.frame(key)?.asImageBitmap() } }
+    LaunchedEffect(viewModel) { viewModel.playheadJumps.collect { timeline.scrollToUs(it) } }
 
     val addPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
         if (uris.isNotEmpty()) {
@@ -720,14 +721,17 @@ private fun EffectSheetContent(
     onCloseParams: (EffectSheet.Params) -> Unit,
     positionUs: () -> Long,
 ) {
+    val previews by viewModel.effectPreviews.collectAsStateWithLifecycle()
     when (sheet) {
         is EffectSheet.Picker -> EffectPickerPanel(
             catalog = viewModel.effectCatalog,
             forClip = sheet.clipId != null || sheet.replacing is EffectTarget.Clip,
+            previews = previews,
+            onShowCategory = { viewModel.requestThumbnails(it, positionUs()) },
             onPick = { definition ->
                 val replacing = sheet.replacing
                 if (replacing != null) {
-                    viewModel.replaceEffect(replacing, definition.id)
+                    viewModel.replaceEffect(replacing, definition.id, positionUs())
                     onPicked(EffectSheet.Params(replacing, definition.id))
                 } else {
                     val target = viewModel.addEffect(definition.id, sheet.clipId, positionUs())
@@ -761,6 +765,7 @@ private fun EffectSheetContent(
                     viewModel.removeEffect(target)
                     onSheet(null)
                 },
+                onPlay = { viewModel.previewEffect(target, positionUs()) },
                 onDone = { onCloseParams(sheet) },
             )
         }

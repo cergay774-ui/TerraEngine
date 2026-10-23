@@ -30,6 +30,9 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -115,13 +118,15 @@ private fun HomeContent(
     var actionsFor by rememberSaveable { mutableStateOf<String?>(null) }
     var renameFor by rememberSaveable { mutableStateOf<String?>(null) }
     var deleteFor by rememberSaveable { mutableStateOf<String?>(null) }
+    var showAppearance by rememberSaveable { mutableStateOf(false) }
+    if (showAppearance) AppearanceSheet(onDismiss = { showAppearance = false })
     val projects = (uiState as? HomeUiState.Projects)?.projects.orEmpty()
     fun find(id: String?) = projects.firstOrNull { it.id == id }
 
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { HomeTopBar(logoModifier) },
+        topBar = { HomeTopBar(logoModifier, onAppearance = { showAppearance = true }) },
         floatingActionButton = {
             AnimatedVisibility(
                 visible = uiState is HomeUiState.Projects,
@@ -193,7 +198,7 @@ private fun HomeContent(
 }
 
 @Composable
-private fun HomeTopBar(logoModifier: Modifier) {
+private fun HomeTopBar(logoModifier: Modifier, onAppearance: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -204,6 +209,10 @@ private fun HomeTopBar(logoModifier: Modifier) {
         FluroLogoMark(modifier = logoModifier, size = 36.dp, glow = 0.6f)
         Spacer(Modifier.width(10.dp))
         FluroWordmark(fontSize = MaterialTheme.typography.titleLarge.fontSize)
+        Spacer(Modifier.weight(1f))
+        IconButton(onClick = onAppearance) {
+            Icon(Icons.Rounded.Palette, contentDescription = stringResource(R.string.home_appearance))
+        }
     }
 }
 

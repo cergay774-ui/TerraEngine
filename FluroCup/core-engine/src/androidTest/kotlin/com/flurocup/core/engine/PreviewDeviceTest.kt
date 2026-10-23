@@ -49,6 +49,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.BeforeClass
 import org.junit.Test
@@ -82,6 +83,24 @@ class PreviewDeviceTest {
         }
         failures.forEach { Log.e(TAG, "Shader failed: $it") }
         assertEquals(failures.joinToString("\n"), 0, failures.size)
+    }
+
+    @Test
+    fun effectThumbnailsShowTheEffect() {
+        val renderer = com.flurocup.core.engine.effects.EffectThumbnailRenderer(library)
+        val sample = Bitmap.createScaledBitmap(
+            android.graphics.BitmapFactory.decodeFile(photo.path),
+            com.flurocup.core.engine.effects.EffectThumbnailRenderer.WIDTH,
+            com.flurocup.core.engine.effects.EffectThumbnailRenderer.HEIGHT,
+            true,
+        )
+        val invert = runBlocking { renderer.render(sample, "sample", library.definition("invert")!!) }
+        assertNotNull(invert)
+        // The left half of the picture is orange (255, 170, 60): inverted it is (0, 85, 195).
+        val pixel = invert!!.getPixel(10, sample.height / 2)
+        assertTrue("not inverted: ${Integer.toHexString(pixel)}", Color.red(pixel) < 40 && Color.blue(pixel) > 150)
+        val failed = library.catalog.effects.filter { runBlocking { renderer.render(sample, "sample", it) } == null }.map { it.id }
+        assertEquals("effects without a thumbnail: $failed", 0, failed.size)
     }
 
     @Test

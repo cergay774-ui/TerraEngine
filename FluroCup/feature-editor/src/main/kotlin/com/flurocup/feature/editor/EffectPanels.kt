@@ -23,6 +23,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -68,10 +76,14 @@ sealed interface EffectSheet {
 internal fun EffectPickerPanel(
     catalog: EffectCatalog,
     forClip: Boolean,
+    previews: Map<String, ImageBitmap>,
+    onShowCategory: (List<EffectDefinition>) -> Unit,
     onPick: (EffectDefinition) -> Unit,
     onDone: () -> Unit,
 ) {
     var category by rememberSaveable { mutableStateOf(catalog.categories.firstOrNull()?.id) }
+    var picked by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(category) { onShowCategory(catalog.inCategory(category.orEmpty())) }
     PanelFrame(
         title = stringResource(if (forClip) R.string.editor_effects_clip_title else R.string.editor_effects_title),
         onDone = onDone,
@@ -103,14 +115,23 @@ internal fun EffectPickerPanel(
             modifier = Modifier.padding(vertical = 4.dp),
         ) {
             catalog.inCategory(category.orEmpty()).forEach { definition ->
-                EffectTile(definition.name, categoryBrush(index, catalog.categories.size)) { onPick(definition) }
+                EffectTile(
+                    name = definition.name,
+                    preview = previews[definition.id],
+                    brush = categoryBrush(index, catalog.categories.size),
+                    selected = definition.id == picked,
+                ) {
+                    picked = definition.id
+                    onPick(definition)
+                }
             }
         }
     }
 }
 
+/** An effect as a tile: its look on the current frame (a gradient until that is ready) and its name. */
 @Composable
-private fun EffectTile(name: String, brush: Brush, onClick: () -> Unit) {
+private fun EffectTile(name: String, preview: ImageBitmap?, brush: Brush, selected: Boolean, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .width(76.dp)
@@ -123,10 +144,19 @@ private fun EffectTile(name: String, brush: Brush, onClick: () -> Unit) {
             modifier = Modifier
                 .size(width = 68.dp, height = 52.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(brush),
+                .background(brush)
+                .then(if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = Color.White.copy(alpha = 0.9f))
+            Crossfade(targetState = preview, label = "effectPreview") { image ->
+                if (image != null) {
+                    Image(bitmap = image, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                } else {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = Color.White.copy(alpha = 0.9f))
+                    }
+                }
+            }
         }
         Spacer(Modifier.height(4.dp))
         Text(
@@ -161,6 +191,7 @@ internal fun EffectParamsPanel(
     onParamsDone: (Map<String, Float>) -> Unit,
     onReplace: () -> Unit,
     onRemove: () -> Unit,
+    onPlay: () -> Unit,
     onDone: () -> Unit,
 ) {
     val values = definition.resolve(params)
@@ -200,6 +231,11 @@ internal fun EffectParamsPanel(
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 6.dp)) {
+            OutlinedButton(onClick = onPlay) {
+                Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(stringResource(R.string.editor_effect_play))
+            }
             OutlinedButton(onClick = onReplace) { Text(stringResource(R.string.editor_effect_replace)) }
             TextButton(onClick = {
                 onParams(emptyMap())
