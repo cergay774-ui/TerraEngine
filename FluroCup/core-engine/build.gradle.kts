@@ -3,6 +3,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
 }
 
 android {
@@ -26,4 +28,11 @@ kotlin {
 dependencies {
     api(project(":core-model"))
     implementation(libs.kotlinx.coroutines.android)
+    api(libs.androidx.media3.common)
+    api(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.transformer)
+    implementation(libs.androidx.media3.effect)
+    implementation(libs.androidx.exifinterface)
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
 }

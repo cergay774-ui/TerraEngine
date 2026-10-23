@@ -1,6 +1,7 @@
 package com.flurocup.core.data.project
 
 import android.content.Context
+import android.graphics.Bitmap
 import com.flurocup.core.model.Project
 import com.flurocup.core.model.projectFromJson
 import com.flurocup.core.model.toJson
@@ -36,6 +37,19 @@ class ProjectFileStore @Inject constructor(
         if (!temp.renameTo(target)) {
             target.delete()
             if (!temp.renameTo(target)) throw IOException("Cannot save $target")
+        }
+    }
+
+    /** Saves the frame shown on the project's card. */
+    suspend fun writeThumbnail(id: String, bitmap: Bitmap): Unit = withContext(Dispatchers.IO) {
+        val dir = projectDir(id)
+        if (!dir.isDirectory && !dir.mkdirs()) throw IOException("Cannot create $dir")
+        val temp = File(dir, "$THUMBNAIL_NAME.tmp")
+        temp.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 88, it) }
+        val target = thumbnailFile(id)
+        if (!temp.renameTo(target)) {
+            target.delete()
+            temp.renameTo(target)
         }
     }
 

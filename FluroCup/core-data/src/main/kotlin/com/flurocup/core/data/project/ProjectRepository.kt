@@ -1,5 +1,6 @@
 package com.flurocup.core.data.project
 
+import android.graphics.Bitmap
 import com.flurocup.core.data.db.ProjectDao
 import com.flurocup.core.data.db.toEntity
 import com.flurocup.core.data.db.toSummary
@@ -34,6 +35,14 @@ class ProjectRepository @Inject constructor(
         files.write(project)
         dao.upsert(project.toEntity(thumbnailPath = existingThumbnail(project.id)))
     }
+
+    /** Stores the card frame and refreshes the list row so the card shows it. */
+    suspend fun saveThumbnail(project: Project, bitmap: Bitmap) {
+        files.writeThumbnail(project.id, bitmap)
+        dao.upsert(project.toEntity(thumbnailPath = existingThumbnail(project.id)))
+    }
+
+    fun hasThumbnail(id: String): Boolean = files.thumbnailFile(id).isFile
 
     suspend fun rename(id: String, newName: String) {
         val project = files.read(id) ?: return

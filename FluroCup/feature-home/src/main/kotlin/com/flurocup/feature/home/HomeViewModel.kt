@@ -2,6 +2,7 @@ package com.flurocup.feature.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.flurocup.core.data.project.PendingImports
 import com.flurocup.core.data.project.ProjectRepository
 import com.flurocup.core.model.ProjectSummary
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -28,6 +29,7 @@ sealed interface HomeEvent {
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: ProjectRepository,
+    private val pendingImports: PendingImports,
 ) : ViewModel() {
 
     val uiState: StateFlow<HomeUiState> = repository.observeProjects()
@@ -39,13 +41,17 @@ class HomeViewModel @Inject constructor(
 
     private var creating = false
 
-    /** Creates "<namePrefix> N" and opens it. Ignores repeated taps while a project is being created. */
-    fun createProject(namePrefix: String) {
+    /**
+     * Creates "<namePrefix> N" with the picked files and opens it; the editor imports [mediaUris].
+     * Ignores repeated taps while a project is being created.
+     */
+    fun createProject(namePrefix: String, mediaUris: List<String>) {
         if (creating) return
         creating = true
         viewModelScope.launch {
             try {
                 val project = repository.createProject(repository.nextDefaultName(namePrefix))
+                pendingImports.put(project.id, mediaUris)
                 _events.send(HomeEvent.OpenProject(project.id))
             } finally {
                 creating = false

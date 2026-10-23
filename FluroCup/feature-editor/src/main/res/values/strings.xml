@@ -1,8 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="ru">
     <string name="editor_back">Назад</string>
-    <string name="editor_loading">Открываем проект…</string>
     <string name="editor_not_found">Проект не найден или повреждён</string>
-    <string name="editor_coming_soon_title">Здесь будет монтаж</string>
-    <string name="editor_coming_soon_text">Импорт видео, превью и таймлайн появятся на следующих этапах.</string>
+    <string name="editor_empty_title">Добавьте видео или фото</string>
+    <string name="editor_empty_text">Клипы встанут на основную дорожку по порядку</string>
+    <string name="editor_add_media">Добавить</string>
+    <string name="editor_play">Воспроизвести</string>
+    <string name="editor_pause">Пауза</string>
+    <string name="editor_preview_settings">Настройки превью</string>
+    <string name="editor_preview_proxy">Превью: прокси</string>
+    <string name="editor_preview_proxy_hint">Плавнее, экспорт всё равно из оригинала</string>
+    <string name="editor_preview_original">Превью: оригинал</string>
+    <string name="editor_preview_original_hint">Полное качество, может притормаживать</string>
+    <string name="editor_importing">Анализ файлов: %1$d из %2$d</string>
+    <string name="editor_aspect_original">Оригинал</string>
+    <string name="editor_aspect_free">Свободное</string>
+    <string name="editor_proxy_queued">Прокси в очереди</string>
+    <string name="editor_proxy_running">Прокси %1$d%%</string>
+    <string name="editor_proxy_ready">Прокси готов</string>
+    <string name="editor_proxy_failed">Прокси не создан</string>
+    <string name="editor_no_realtime">Тяжело для устройства</string>
+    <string name="editor_vfr">VFR</string>
+    <string name="editor_photo">Фото</string>
+    <string name="editor_import_failed_one">Не удалось добавить «%1$s»: %2$s</string>
+    <string name="editor_import_failed_many">Не удалось добавить файлов: %1$d. Первый — «%2$s»: %3$s</string>
+    <string name="editor_reason_unsupported">формат не поддерживается</string>
+    <string name="editor_reason_no_video">в файле нет видео</string>
+    <string name="editor_reason_unreadable">нет доступа к файлу</string>
+    <string name="editor_reason_corrupt">файл повреждён или не читается</string>
+    <string name="editor_unknown_file">файл</string>
 </resources>

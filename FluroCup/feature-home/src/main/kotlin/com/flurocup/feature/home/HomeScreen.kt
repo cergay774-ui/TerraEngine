@@ -1,5 +1,8 @@
 package com.flurocup.feature.home
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
@@ -40,11 +43,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.flurocup.core.engine.media.MediaPermissions
 import com.flurocup.core.model.ProjectSummary
 import com.flurocup.core.ui.components.FluroLogoMark
 import com.flurocup.core.ui.components.FluroWordmark
@@ -73,9 +78,19 @@ fun HomeScreen(
 
     val defaultName = stringResource(R.string.home_default_project_name)
     val copySuffix = stringResource(R.string.home_copy_suffix)
+    val context = LocalContext.current
+    // A project is created only once something is picked; backing out of the picker changes nothing.
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
+        if (uris.isNotEmpty()) {
+            MediaPermissions.persist(context, uris)
+            viewModel.createProject(defaultName, uris.map { it.toString() })
+        }
+    }
     HomeContent(
         uiState = uiState,
-        onCreate = { viewModel.createProject(defaultName) },
+        onCreate = {
+            picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+        },
         onOpen = { openProject(it.id) },
         onRename = viewModel::rename,
         onDuplicate = { viewModel.duplicate(it, copySuffix) },
