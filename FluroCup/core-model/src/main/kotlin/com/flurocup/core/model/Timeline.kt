@@ -9,6 +9,21 @@ data class Timeline(
 ) {
     val mainTrack: Track? get() = tracks.firstOrNull { it.kind == TrackKind.MAIN }
 
+    /** Overlay tracks from the bottom layer (just above the main track) to the top one. */
+    val overlayTracks: List<Track> get() = tracks.filter { it.kind == TrackKind.OVERLAY }
+
+    /** The clip with [id] and the track it is on. */
+    fun findClip(id: String): Pair<Track, MediaClip>? {
+        for (track in tracks) {
+            val clip = track.items.firstOrNull { it.id == id } as? MediaClip
+            if (clip != null) return track to clip
+        }
+        return null
+    }
+
+    /** Every media clip on every track. */
+    val allClips: List<MediaClip> get() = tracks.flatMap { it.items.filterIsInstance<MediaClip>() }
+
     val durationUs: Long get() = tracks.maxOfOrNull { it.endUs } ?: 0L
 
     companion object {
@@ -55,9 +70,29 @@ data class MediaClip(
     val trimEndUs: Long,
     val speed: Float = 1f,
     val volume: Float = 1f,
+    val transform: ClipTransform = ClipTransform(),
+    val crop: CropRect = CropRect(),
+    val opacity: Float = 1f,
+    val chromaKey: ChromaKey? = null,
+    val mask: ClipMask? = null,
+    val border: ClipBorder = ClipBorder(),
+    val cornerRadius: Float = 0f,
+    val blendMode: BlendMode = BlendMode.NORMAL,
 ) : TimelineItem {
     override val durationUs: Long
         get() = ((trimEndUs - trimStartUs) / speed.toDouble()).toLong()
+
+    val look: ClipLook
+        get() = ClipLook(transform, opacity, chromaKey, mask, border, cornerRadius)
+
+    fun withLook(look: ClipLook) = copy(
+        transform = look.transform,
+        opacity = look.opacity,
+        chromaKey = look.chromaKey,
+        mask = look.mask,
+        border = look.border,
+        cornerRadius = look.cornerRadius,
+    )
 }
 
 @Serializable

@@ -16,6 +16,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -29,6 +30,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AspectRatio
+import androidx.compose.material.icons.rounded.AutoFixHigh
+import androidx.compose.material.icons.rounded.BorderOuter
+import androidx.compose.material.icons.rounded.Colorize
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.ContentCut
+import androidx.compose.material.icons.rounded.Crop
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.FlipToBack
+import androidx.compose.material.icons.rounded.FlipToFront
+import androidx.compose.material.icons.rounded.Masks
+import androidx.compose.material.icons.rounded.Opacity
+import androidx.compose.material.icons.rounded.OpenWith
+import androidx.compose.material.icons.rounded.PictureInPicture
+import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -65,7 +83,12 @@ import com.flurocup.core.model.resolutionLabel
 /** The project frame with the player inside; it springs to a new shape when the aspect ratio changes. */
 @OptIn(UnstableApi::class)
 @Composable
-internal fun PreviewSurface(player: Player?, aspectRatio: Float, modifier: Modifier = Modifier) {
+internal fun PreviewSurface(
+    player: Player?,
+    aspectRatio: Float,
+    modifier: Modifier = Modifier,
+    overlay: @Composable BoxScope.() -> Unit = {},
+) {
     val ratio by animateFloatAsState(
         targetValue = aspectRatio,
         animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
@@ -91,6 +114,7 @@ internal fun PreviewSurface(player: Player?, aspectRatio: Float, modifier: Modif
             onRelease = { it.player = null },
             modifier = Modifier.fillMaxSize(),
         )
+        overlay()
     }
 }
 
@@ -189,6 +213,52 @@ private fun ToolButton(tool: EditorTool) {
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+/** The tools for what is selected: nothing, a main-track clip, or an overlay. */
+@Composable
+internal fun editorTools(
+    state: EditorUiState,
+    onSplit: () -> Unit,
+    onDuplicate: () -> Unit,
+    onReplace: () -> Unit,
+    onDelete: () -> Unit,
+    onPanel: (EditorPanel) -> Unit,
+    onLayer: (up: Boolean) -> Unit,
+    onRemoveBackground: () -> Unit,
+    onAdd: () -> Unit,
+    onAddOverlay: () -> Unit,
+    onFormat: () -> Unit,
+): List<EditorTool> {
+    val selected = state.selectedClip
+    if (selected == null) {
+        return listOf(
+            EditorTool(Icons.Rounded.Add, stringResource(R.string.editor_tool_add), onClick = onAdd),
+            EditorTool(Icons.Rounded.PictureInPicture, stringResource(R.string.editor_tool_overlay), enabled = state.durationUs > 0, onClick = onAddOverlay),
+            EditorTool(Icons.Rounded.ContentCut, stringResource(R.string.editor_tool_split), enabled = state.clips.isNotEmpty(), onClick = onSplit),
+            EditorTool(Icons.Rounded.AspectRatio, stringResource(R.string.editor_tool_format), onClick = onFormat),
+        )
+    }
+    val trackIndex = state.selectedOverlayTrackIndex
+    return buildList {
+        add(EditorTool(Icons.Rounded.ContentCut, stringResource(R.string.editor_tool_split), onClick = onSplit))
+        add(EditorTool(Icons.Rounded.OpenWith, stringResource(R.string.editor_tool_transform)) { onPanel(EditorPanel.TRANSFORM) })
+        add(EditorTool(Icons.Rounded.Opacity, stringResource(R.string.editor_tool_opacity)) { onPanel(EditorPanel.OPACITY) })
+        add(EditorTool(Icons.Rounded.Crop, stringResource(R.string.editor_tool_crop)) { onPanel(EditorPanel.CROP) })
+        add(EditorTool(Icons.Rounded.Masks, stringResource(R.string.editor_tool_mask)) { onPanel(EditorPanel.MASK) })
+        add(EditorTool(Icons.Rounded.Colorize, stringResource(R.string.editor_tool_chroma)) { onPanel(EditorPanel.CHROMA) })
+        add(EditorTool(Icons.Rounded.BorderOuter, stringResource(R.string.editor_tool_border)) { onPanel(EditorPanel.BORDER) })
+        if (selected.clip.source.kind == MediaKind.IMAGE) {
+            add(EditorTool(Icons.Rounded.AutoFixHigh, stringResource(R.string.editor_tool_remove_bg), enabled = !state.removingBackground, onClick = onRemoveBackground))
+        }
+        if (trackIndex != null) {
+            add(EditorTool(Icons.Rounded.FlipToFront, stringResource(R.string.editor_tool_layer_up), enabled = trackIndex > 0) { onLayer(true) })
+            add(EditorTool(Icons.Rounded.FlipToBack, stringResource(R.string.editor_tool_layer_down), enabled = trackIndex < state.overlays.lastIndex) { onLayer(false) })
+        }
+        add(EditorTool(Icons.Rounded.ContentCopy, stringResource(R.string.editor_tool_duplicate), onClick = onDuplicate))
+        add(EditorTool(Icons.Rounded.SwapHoriz, stringResource(R.string.editor_tool_replace), onClick = onReplace))
+        add(EditorTool(Icons.Rounded.DeleteOutline, stringResource(R.string.editor_tool_delete), destructive = true, onClick = onDelete))
     }
 }
 

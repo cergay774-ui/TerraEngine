@@ -1,10 +1,15 @@
 package com.flurocup.feature.editor
 
+import android.graphics.Bitmap
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -82,7 +87,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import com.flurocup.core.engine.media.MediaImportException
 import com.flurocup.core.engine.media.MediaPermissions
+import com.flurocup.core.model.ChromaKey
+import com.flurocup.core.model.ClipLook
+import com.flurocup.core.model.CropRect
 import com.flurocup.core.model.formatDuration
+import kotlinx.coroutines.launch
 import com.flurocup.core.ui.components.FluroLogoMark
 import com.flurocup.core.ui.components.GradientButton
 import com.flurocup.core.ui.components.GradientIconSurface
@@ -138,8 +147,35 @@ fun EditorScreen(
             viewModel.replaceSelected(uri)
         }
     }
+    val overlayPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
+        if (uris.isNotEmpty()) {
+            MediaPermissions.persist(context, uris)
+            viewModel.importOverlays(uris, timeline.positionUs)
+        }
+    }
     val mediaRequest = PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
     val pickMedia = { addPicker.launch(mediaRequest) }
+
+    // A property panel replaces the timeline while it is open, so the preview stays in view.
+    var panel by remember { mutableStateOf<EditorPanel?>(null) }
+    var panelLook by remember { mutableStateOf<ClipLook?>(null) }
+    var panelCrop by remember { mutableStateOf(CropRect()) }
+    var pickFrame by remember { mutableStateOf<Bitmap?>(null) }
+    fun closePanel() {
+        panel = null
+        panelLook = null
+        viewModel.setLookEditing(null)
+    }
+    fun openPanel(target: EditorPanel) {
+        val clip = state.selectedClip?.clip ?: return
+        viewModel.pause()
+        panel = target
+        panelLook = viewModel.currentLook(clip.id) ?: clip.look
+        panelCrop = clip.crop
+        viewModel.setLookEditing(if (target.editsLookLive) clip.id else null)
+    }
+    LaunchedEffect(state.selectedClipId) { if (panel != null) closePanel() }
+    BackHandler(enabled = panel != null) { closePanel() }
 
     var fullscreen by rememberSaveable { mutableStateOf(false) }
     var showFormat by remember { mutableStateOf(false) }
@@ -169,6 +205,8 @@ fun EditorScreen(
                     }
                 }
                 EditorMessage.CannotSplit -> context.getString(R.string.editor_cannot_split)
+                EditorMessage.NoRoom -> context.getString(R.string.editor_no_room)
+                EditorMessage.NoPersonFound -> context.getString(R.string.editor_no_person)
             }
             snackbar.showSnackbar(text)
         }
@@ -249,10 +287,34 @@ fun EditorScreen(
                             .padding(horizontal = 16.dp, vertical = 4.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        if (state.clips.isEmpty() && state.importing == null) {
+                        if (state.clips.isEmpty() && state.overlays.isEmpty() && state.importing == null) {
                             EmptyEditor(pickMedia)
                         } else {
-                            PreviewSurface(player = player, aspectRatio = state.previewAspect)
+                            val selectedId = state.selectedClipId
+                            PreviewSurface(player = player, aspectRatio = state.previewAspect) {
+                                PreviewGestureLayer(
+                                    selected = state.selectedClip?.clip,
+                                    clipsTopFirst = {
+                                        val at = timeline.positionUs
+                                        val current = viewModel.uiState.value
+                                        (current.overlays.flatMap { it.clips } + current.clips)
+                                            .map { it.clip }
+                                            .filter { at >= it.startUs && at < it.endUs }
+                                    },
+                                    lookOf = { clip ->
+                                        panelLook?.takeIf { clip.id == selectedId } ?: viewModel.currentLook(clip.id) ?: clip.look
+                                    },
+                                    onSelect = viewModel::select,
+                                    onLookChange = { id, look ->
+                                        if (panel != null) panelLook = look
+                                        viewModel.previewLook(id, look)
+                                    },
+                                    onLookCommit = { id, look ->
+                                        if (panel != null) panelLook = look
+                                        viewModel.commitLook(id, look)
+                                    },
+                                )
+                            }
                         }
                     }
                     PlaybackRow(
@@ -265,61 +327,125 @@ fun EditorScreen(
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     ImportProgressBar(state.importing)
-                    Timeline(
-                        state = timeline,
-                        clips = state.clips,
-                        selectedClipId = state.selectedClipId,
-                        frames = frames,
-                        onScrubStart = viewModel::pause,
-                        onScrub = { viewModel.seekTo(it) },
-                        onScrubEnd = { viewModel.seekTo(it, final = true) },
-                        onSelect = viewModel::select,
-                        onTrim = viewModel::trim,
-                        onMove = viewModel::move,
-                        onAdd = pickMedia,
-                    )
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(22.dp)
-                            .padding(horizontal = 16.dp),
-                    ) {
-                        val selected = state.selectedClip
-                        Text(
-                            text = if (selected != null) clipInfoLine(selected) else stringResource(R.string.editor_timeline_hint),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (selected != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                    AnimatedVisibility(visible = state.removingBackground) {
+                        Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                            Text(stringResource(R.string.editor_removing_bg), style = MaterialTheme.typography.labelMedium)
+                            LinearProgressIndicator(Modifier.fillMaxWidth())
+                        }
                     }
-                    ToolPanel(
-                        panelKey = state.selectedClipId != null,
-                        tools = if (state.selectedClipId != null) {
-                            listOf(
-                                EditorTool(Icons.Rounded.ContentCut, stringResource(R.string.editor_tool_split)) { viewModel.split(timeline.positionUs) },
-                                EditorTool(Icons.Rounded.ContentCopy, stringResource(R.string.editor_tool_duplicate)) { viewModel.duplicateSelected() },
-                                EditorTool(Icons.Rounded.SwapHoriz, stringResource(R.string.editor_tool_replace)) { replacePicker.launch(mediaRequest) },
-                                EditorTool(Icons.Rounded.DeleteOutline, stringResource(R.string.editor_tool_delete), destructive = true) {
-                                    viewModel.deleteSelected()
-                                },
-                            )
-                        } else {
-                            listOf(
-                                EditorTool(Icons.Rounded.Add, stringResource(R.string.editor_tool_add), onClick = pickMedia),
-                                EditorTool(Icons.Rounded.ContentCut, stringResource(R.string.editor_tool_split), enabled = state.clips.isNotEmpty()) {
-                                    viewModel.split(timeline.positionUs)
-                                },
-                                EditorTool(Icons.Rounded.AspectRatio, stringResource(R.string.editor_tool_format)) { showFormat = true },
-                            )
+                    val selectedClip = state.selectedClip?.clip
+                    AnimatedContent(
+                        targetState = panel,
+                        transitionSpec = {
+                            (slideInVertically { it / 3 } + fadeIn()).togetherWith(slideOutVertically { it / 3 } + fadeOut())
                         },
-                        modifier = Modifier
-                            .navigationBarsPadding()
-                            .padding(bottom = 4.dp),
-                    )
+                        label = "editorPanel",
+                        modifier = Modifier.navigationBarsPadding(),
+                    ) { shown ->
+                        val look = panelLook
+                        if (shown == null || selectedClip == null || look == null) {
+                            Column {
+                                Timeline(
+                                    state = timeline,
+                                    clips = state.clips,
+                                    overlays = state.overlays,
+                                    selectedClipId = state.selectedClipId,
+                                    frames = frames,
+                                    onScrubStart = viewModel::pause,
+                                    onScrub = { viewModel.seekTo(it) },
+                                    onScrubEnd = { viewModel.seekTo(it, final = true) },
+                                    onSelect = viewModel::select,
+                                    onTrim = viewModel::trim,
+                                    onMove = viewModel::move,
+                                    onTrimOverlay = viewModel::trimOverlay,
+                                    onMoveOverlay = viewModel::moveOverlay,
+                                    onAdd = pickMedia,
+                                )
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(22.dp)
+                                        .padding(horizontal = 16.dp),
+                                ) {
+                                    val selected = state.selectedClip
+                                    Text(
+                                        text = if (selected != null) clipInfoLine(selected) else stringResource(R.string.editor_timeline_hint),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (selected != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                ToolPanel(
+                                    panelKey = state.selectedClip?.let { if (it.isOverlay) "overlay" else "main" } ?: "none",
+                                    tools = editorTools(
+                                        state = state,
+                                        onSplit = { viewModel.split(timeline.positionUs) },
+                                        onDuplicate = viewModel::duplicateSelected,
+                                        onReplace = { replacePicker.launch(mediaRequest) },
+                                        onDelete = viewModel::deleteSelected,
+                                        onPanel = ::openPanel,
+                                        onLayer = viewModel::moveSelectedLayer,
+                                        onRemoveBackground = viewModel::removeBackground,
+                                        onAdd = pickMedia,
+                                        onAddOverlay = { overlayPicker.launch(mediaRequest) },
+                                        onFormat = { showFormat = true },
+                                    ),
+                                    modifier = Modifier.padding(bottom = 4.dp),
+                                )
+                            }
+                        } else {
+                            val id = selectedClip.id
+                            val onLook: (ClipLook) -> Unit = {
+                                panelLook = it
+                                viewModel.previewLook(id, it)
+                            }
+                            val onLookDone: (ClipLook) -> Unit = { viewModel.commitLook(id, it) }
+                            when (shown) {
+                                EditorPanel.TRANSFORM -> TransformPanel(look, onLook, onLookDone, ::closePanel)
+                                EditorPanel.OPACITY -> OpacityPanel(look, onLook, onLookDone, ::closePanel)
+                                EditorPanel.MASK -> MaskPanel(look, onLook, onLookDone, ::closePanel)
+                                EditorPanel.BORDER -> BorderPanel(look, onLook, onLookDone, ::closePanel)
+                                EditorPanel.CHROMA -> ChromaKeyPanel(
+                                    look = look,
+                                    onLook = onLook,
+                                    onLookDone = onLookDone,
+                                    onPickColor = {
+                                        scope.launch { pickFrame = viewModel.frameForColorPick(selectedClip, timeline.positionUs) }
+                                    },
+                                    onDone = ::closePanel,
+                                )
+                                EditorPanel.CROP -> CropPanel(
+                                    crop = panelCrop,
+                                    onCrop = { panelCrop = it },
+                                    onCropDone = { viewModel.setCrop(id, it) },
+                                    onDone = ::closePanel,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+
+    pickFrame?.let { frame ->
+        ColorPickDialog(
+            frame = frame,
+            onPick = { color ->
+                val id = state.selectedClipId
+                val look = panelLook
+                if (id != null && look != null) {
+                    val key = (look.chromaKey ?: ChromaKey()).copy(colorArgb = color)
+                    val next = look.copy(chromaKey = key)
+                    panelLook = next
+                    viewModel.previewLook(id, next)
+                    viewModel.commitLook(id, next)
+                }
+                pickFrame = null
+            },
+            onDismiss = { pickFrame = null },
+        )
     }
 
     if (showFormat) {

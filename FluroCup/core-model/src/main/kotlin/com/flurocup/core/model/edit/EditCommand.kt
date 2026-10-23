@@ -18,15 +18,15 @@ sealed interface EditCommand {
     }
 
     data class Split(val clipId: String, val atUs: Long, val newClipId: String) : EditCommand {
-        override fun apply(project: Project) = MainTrackEdits.split(project, clipId, atUs, newClipId)
+        override fun apply(project: Project) = TimelineEdits.split(project, clipId, atUs, newClipId)
     }
 
     data class Delete(val clipId: String) : EditCommand {
-        override fun apply(project: Project) = MainTrackEdits.delete(project, clipId)
+        override fun apply(project: Project) = TimelineEdits.delete(project, clipId)
     }
 
-    data class Duplicate(val clipId: String, val newClipId: String) : EditCommand {
-        override fun apply(project: Project) = MainTrackEdits.duplicate(project, clipId, newClipId)
+    data class Duplicate(val clipId: String, val newClipId: String, val newTrackId: String = newClipId) : EditCommand {
+        override fun apply(project: Project) = TimelineEdits.duplicate(project, clipId, newClipId, newTrackId)
     }
 
     data class Move(val clipId: String, val toIndex: Int) : EditCommand {
@@ -38,7 +38,45 @@ sealed interface EditCommand {
     }
 
     data class Replace(val clipId: String, val source: MediaSource) : EditCommand {
-        override fun apply(project: Project) = MainTrackEdits.replace(project, clipId, source)
+        override fun apply(project: Project) = TimelineEdits.replace(project, clipId, source)
+    }
+
+    /** Adds a clip on an overlay track at its start time. */
+    data class AddOverlay(val clip: MediaClip, val newTrackId: String) : EditCommand {
+        override fun apply(project: Project) = OverlayEdits.add(project, clip, newTrackId)
+    }
+
+    data class MoveOverlay(val clipId: String, val startUs: Long, val trackIndex: Int, val newTrackId: String) : EditCommand {
+        override fun apply(project: Project) = OverlayEdits.move(project, clipId, startUs, trackIndex, newTrackId)
+    }
+
+    data class TrimOverlay(val clipId: String, val startUs: Long, val trimStartUs: Long, val trimEndUs: Long) : EditCommand {
+        override fun apply(project: Project) = OverlayEdits.trim(project, clipId, startUs, trimStartUs, trimEndUs)
+    }
+
+    /** Sets a clip's properties (look, crop, blend mode) to those of [clip]. */
+    data class UpdateClip(val clip: MediaClip) : EditCommand {
+        override fun apply(project: Project) = TimelineEdits.update(project, clip)
+    }
+
+    /** Moves an overlay track one layer up (+1) or down (-1). */
+    data class MoveTrack(val trackId: String, val delta: Int) : EditCommand {
+        override fun apply(project: Project) = OverlayEdits.moveTrack(project, trackId, delta)
+    }
+
+    /** Several commands as one undo step; null if none of them changes anything. */
+    data class Batch(val commands: List<EditCommand>) : EditCommand {
+        override fun apply(project: Project): Project? {
+            var current = project
+            var changed = false
+            commands.forEach { command ->
+                command.apply(current)?.let {
+                    current = it
+                    changed = true
+                }
+            }
+            return if (changed) current else null
+        }
     }
 
     data class SetAspectRatio(val ratio: AspectRatio) : EditCommand {

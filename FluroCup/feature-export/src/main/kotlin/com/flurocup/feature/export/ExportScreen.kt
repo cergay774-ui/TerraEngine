@@ -209,7 +209,7 @@ private fun SettingsView(
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         return
     }
-    if (state.clips.isEmpty()) {
+    if (state.durationUs <= 0L) {
         Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
             Text(stringResource(R.string.export_nothing), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         }

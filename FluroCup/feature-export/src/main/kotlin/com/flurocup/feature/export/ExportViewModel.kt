@@ -54,9 +54,9 @@ data class ExportUiState(
     val hasAudio: Boolean = false,
 ) {
     val outputSize: Pair<Int, Int> get() = ExportMath.outputSize(aspect, settings.resolution.shortSide)
-    val durationUs: Long get() = clips.lastOrNull()?.endUs ?: 0L
+    val durationUs: Long get() = project?.durationUs ?: 0L
     val estimatedBytes: Long get() = outputSize.let { (w, h) -> ExportMath.estimatedBytes(settings, w, h, durationUs) }
-    val canExport: Boolean get() = !loading && clips.isNotEmpty() && settings.resolution in resolutions
+    val canExport: Boolean get() = !loading && durationUs > 0 && settings.resolution in resolutions
 }
 
 sealed interface ExportMessage {
@@ -98,10 +98,11 @@ class ExportViewModel @Inject constructor(
                 return@launch
             }
             val clips = MainTrackEdits.clips(project)
+            val allClips = project.timeline.allClips
             val firstVideo = clips.firstOrNull { it.source.kind == MediaKind.VIDEO }?.source?.info
-            val sourceFps = clips.mapNotNull { it.source.info?.frameRate?.takeIf { fps -> fps > 0f } }.maxOrNull() ?: 30f
+            val sourceFps = allClips.mapNotNull { it.source.info?.frameRate?.takeIf { fps -> fps > 0f } }.maxOrNull() ?: 30f
             val sourceShort = firstVideo?.let { min(it.displayWidth, it.displayHeight) } ?: 1080
-            val sourceHdr = clips.firstNotNullOfOrNull { it.source.info?.hdr?.takeIf { hdr -> hdr != HdrType.NONE } } ?: HdrType.NONE
+            val sourceHdr = allClips.firstNotNullOfOrNull { it.source.info?.hdr?.takeIf { hdr -> hdr != HdrType.NONE } } ?: HdrType.NONE
             val frameRates = ExportMath.frameRatesUpTo(sourceFps)
             val codecs = withContext(Dispatchers.Default) { encoders.availableCodecs() }.ifEmpty { listOf(VideoCodec.H264) }
             val codec = when {
@@ -122,7 +123,7 @@ class ExportViewModel @Inject constructor(
                     codecs = codecs,
                     frameRates = frameRates,
                     sourceHdr = sourceHdr,
-                    hasAudio = clips.any { clip -> clip.source.kind == MediaKind.VIDEO && (clip.source.info?.audioTrackCount ?: 1) > 0 },
+                    hasAudio = allClips.any { clip -> clip.source.kind == MediaKind.VIDEO && (clip.source.info?.audioTrackCount ?: 1) > 0 },
                 )
             }
             applySettings(base, preferredShortSide = sourceShort, keepHdrByDefault = true)
@@ -146,14 +147,14 @@ class ExportViewModel @Inject constructor(
         val state = _uiState.value
         val project = state.project ?: return
         if (!state.canExport) return
-        val started = exports.exportVideo(ExportRequest(project.name, state.clips, state.aspect, state.settings))
+        val started = exports.exportVideo(ExportRequest(project, state.settings))
         if (started) ExportService.start(context) else viewModelScope.launch { _messages.send(ExportMessage.Busy) }
     }
 
     fun exportAudio() {
         val state = _uiState.value
         val project = state.project ?: return
-        val started = exports.exportAudio(ExportRequest(project.name, state.clips, state.aspect, state.settings))
+        val started = exports.exportAudio(ExportRequest(project, state.settings))
         if (started) ExportService.start(context) else viewModelScope.launch { _messages.send(ExportMessage.Busy) }
     }
 

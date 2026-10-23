@@ -33,6 +33,7 @@ dependencies {
     api(libs.androidx.media3.transformer)
     implementation(libs.androidx.media3.effect)
     implementation(libs.androidx.exifinterface)
+    implementation(libs.mlkit.segmentation.selfie)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 }
